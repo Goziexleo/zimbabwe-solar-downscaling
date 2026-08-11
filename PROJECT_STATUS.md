@@ -186,6 +186,35 @@ MBE of **+0.0003 W m⁻²** is the strongest bias figure in Table 3.3 and is *ca
 
 It over-predicts some districts by +10 and under-predicts others by −15; they average to nothing. For a map read cell by cell to choose sites, this is the most damaging error structure available.
 
+### 7.7 The perfect-prognosis assumption holds (C1)
+The study trains on ERA5 predictors and applies the relationship to bias-corrected CMIP6. That transfer was previously **asserted, never tested**. Test: feed bias-corrected CMIP6 *historical* predictors to the deployed RF and compare against ERA5 truth for the same period, on climatology (CMIP6 is free-running, so it reproduces the statistics of the period, not its specific months — a month-by-month comparison would be unfair by construction).
+
+| Predictor source | RMSE | MBE | Spatial R |
+|---|---|---|---|
+| ERA5 (as trained) | 1.66 | +0.009 | 0.9988 |
+| CMIP6 CNRM-CM6-1 | 4.81 | +0.424 | 0.9903 |
+| CMIP6 MPI-ESM1-2-HR | 5.87 | +0.548 | 0.9848 |
+| CMIP6 ACCESS-CM2 | 5.49 | +0.396 | 0.9865 |
+| **CMIP6 ensemble mean** | **4.65** | +0.456 | **0.9903** |
+
+Swapping predictor source costs a factor of **2.80** in climatological RMSE (1.66 → 4.65) but skill does **not** collapse: spatial correlation holds at 0.99, and 4.65 sits well below the 10.30 validation RMSE, so transfer is a secondary error source. This is evidence for the study's central assumption rather than an assertion.
+
+**Caveat, stated because it limits the claim:** the EDCM correction is calibrated on this same period, so each variable's *marginal* distribution matches ERA5 almost by construction. The test is therefore optimistic on marginals. What it does genuinely probe — and what the projection actually depends on — is whether the learned multivariate mapping survives CMIP6's own inter-variable correlations, spatial covariance and temporal sequencing. Those are untouched by the correction.
+
+### 7.8 Spectral confirmation: the models inject detail rather than damping it (C2)
+Ullrich et al. recommend power spectra because ML emulators usually *damp* high wavenumbers. Here the result runs the other way, and the reason is the same finding as §7.2: the target is bicubic-interpolated 0.25° ERA5 and holds only **0.02%** of its power beyond wavenumber 10, so there is nothing there to damp.
+
+| Field | Effective resolution (99% of power) | Power beyond k=10 | vs truth |
+|---|---|---|---|
+| Truth | 263 km | 0.0002 | reference |
+| Baseline (bilinear) | 263 km | 0.0001 | 0.5× |
+| Random Forest | 263 km | 0.0002 | 1.4× |
+| XGBoost | 263 km | 0.0003 | 1.9× |
+| CNN | **113 km** | 0.0055 | **33.8×** |
+| U-Net | **113 km** | 0.0047 | **29.0×** |
+
+The shared-weight models inject roughly 30× the truth's fine-scale power — spurious structure, since the target contains none. This is the spectral statement of both the round-trip result (§7.2) and the U-Net's ±15 W m⁻² per-cell bias range (§7.5). Note the usual "power falls to half the reference" definition of effective resolution is one-sided and returns nothing here; the figure quoted is the shortest wavelength inside the band carrying 99% of each field's own power.
+
 ### 7.6 Cross-validation selected worse hyperparameters
 A 150-cell subsampled CV search picked configurations for both tree models that underperformed the untuned defaults on the full 5,751-cell holdout. Defaults retained. The search's own scores gave no warning.
 
@@ -195,16 +224,24 @@ A 150-cell subsampled CV search picked configurations for both tree models that 
 
 ### Table 3.3 — validation 2011–2024 (W m⁻²)
 
-| Model | RMSE | MAE | Pearson R | MBE | SS vs clim. | R² |
+| Model | RMSE | MAE | Pearson R | MBE | SS vs climatology | R² |
 |---|---|---|---|---|---|---|
-| **XGBoost** | **9.11** | **6.73** | **0.9715** | +1.26 | **0.4932** | **0.9426** |
-| U-Net | 10.11 | 7.64 | 0.9640 | +0.0003 | 0.4378 | — |
-| CNN | 10.14 | 7.71 | 0.9646 | +1.20 | 0.4359 | 0.9289 |
-| **Random Forest (deployed)** | 10.30 | 7.73 | 0.9636 | +0.25 | 0.4272 | 0.9267 |
+| **XGBoost** | **9.11** | **6.73** | **0.9715** | +1.26 | **0.5222** | **0.9426** |
+| U-Net | 10.11 | 7.64 | 0.9640 | +0.0003 | 0.4701 | 0.9294 |
+| CNN | 10.14 | 7.71 | 0.9646 | +1.20 | 0.4682 | 0.9289 |
+| **Random Forest (deployed)** | 10.30 | 7.73 | 0.9636 | +0.25 | 0.4601 | 0.9267 |
+
+Regenerate with `compute_table33.py` — a single canonical script scoring every model against
+identical references, so the table cannot drift between scripts and needs no retraining.
+
+**Only one reference is an admissible skill measure.** Climatology (per-cell, per-calendar-month
+mean of the **1985–2010 training** record, RMSE 19.08) is constructible without sight of the
+evaluation period. Interpolation (0.233) and delta-mapping (6.39) are **circularity diagnostics**,
+not competitors: both are built from `rsds`, a reuse of the target's own source field, and the
+first is very nearly an identity. Scoring against an identity measures the circularity of the
+task, not model quality.
 
 Targets are R > 0.90 and |MBE| < 5. **All four models clear both for the first time in the project.**
-
-Three reference forecasts are reported. Skill against **interpolation** (ref RMSE 0.233) and **delta-mapping** (0.131) is ≈ −38 to −76 for every model and measures the circularity of §7.1, not model quality. Skill against **climatology** (17.98) is the meaningful figure.
 
 ### Taylor statistics — time-mean spatial pattern (reference spatial std 7.98 W m⁻²)
 
@@ -220,14 +257,25 @@ The pixel-wise models reproduce the spatial climatology far more faithfully than
 
 ### Uncertainty decomposition — four components
 
+Columns are **RMS over the domain**, so they square and sum to σ_total exactly and the
+percentages follow from them. An earlier version tabulated the spatial *mean*, which could not be
+reconciled with the shares — except for σ_DS, which is spatially constant and so did reconcile,
+which is what made the mismatch confusing.
+
 | Model | Period | σ_GCM | σ_SSP | σ_arch | σ_DS | σ_total | % var DS | % var arch |
 |---|---|---|---|---|---|---|---|---|
-| RF | Near-term | 1.14 | 0.24 | 1.63 | 10.30 | 10.57 | 94.99% | 3.57% |
-| RF | Mid-term | 1.35 | 0.16 | 2.56 | 10.30 | 10.80 | 90.76% | 7.49% |
-| RF | Long-term | 1.53 | 0.23 | 3.87 | 10.30 | 11.24 | 83.74% | 14.22% |
-| U-Net | Near-term | 1.89 | 0.54 | 1.63 | 10.11 | 10.51 | 92.40% | 3.61% |
-| U-Net | Mid-term | 3.05 | 1.00 | 2.56 | 10.11 | 11.05 | 83.60% | 7.16% |
-| U-Net | Long-term | 3.89 | 2.32 | 3.87 | 10.11 | 11.89 | 72.04% | 12.70% |
+| RF | Near-term | 1.24 | 0.26 | 2.00 | 10.30 | 10.57 | 94.99% | 3.57% |
+| RF | Mid-term | 1.42 | 0.18 | 2.96 | 10.30 | 10.81 | 90.76% | 7.49% |
+| RF | Long-term | 1.58 | 0.29 | 4.24 | 10.30 | 11.26 | 83.74% | 14.22% |
+| U-Net | Near-term | 2.03 | 0.56 | 2.00 | 10.11 | 10.52 | 92.40% | 3.61% |
+| U-Net | Mid-term | 3.20 | 1.02 | 2.96 | 10.11 | 11.06 | 83.60% | 7.16% |
+| U-Net | Long-term | 4.00 | 2.38 | 4.24 | 10.11 | 11.91 | 72.04% | 12.70% |
+
+**σ_DS is constant across horizons** — it is the validation RMSE carried forward, not something
+that varies with lead time. Its share falls only because σ_GCM and σ_arch *grow*; the downscaling
+error does not improve. σ_DS is also a different **kind** of quantity: a historical error against a
+reference, where the other three are spreads across futures. σ_arch rests on **n = 2**
+architectures and σ_GCM on **n = 3** GCMs; both are small-sample spread estimates.
 
 σ_DS still dominates (72–95%) but no longer overwhelmingly — halving the validation RMSE shrank it while σ_arch entered. **σ_arch grows with lead time and overtakes σ_GCM by the long-term horizon** (14.2% vs 2.0% for RF): by 2076–2100 the downscaling architecture matters several times more than the GCM.
 
@@ -265,6 +313,22 @@ Tree defaults were retained after HPO (§7.6). Deployed values are now the **scr
 
 ---
 
+## 10a. Second audit — Part A answers
+
+**A6 — the decomposition did not reconcile, and why.** Columns reported the spatial *mean* E[σ]; percentages are computed from E[σ²]. They differ by the field's spatial variance. σ_DS is spatially constant (std 0.0000) so its share reconciled while nothing else did — that asymmetry was the signature. Fixed by tabulating RMS; quadrature now closes exactly.
+
+**A7 — climatology leakage confirmed, direction opposite to the audit's assumption.** The reference averaged the validation target itself, making it the *best attainable* climatology for that period — an unfairly **strong** reference, so skill was **understated**, not inflated. Rebuilt from training: 17.98 → 19.08, skill rose (RF 0.427 → 0.460). Delta-mapping moved far more, 0.131 → 6.39.
+
+**A8 — clean.** EDCM fits against `era5_monthly_predictors_1985_2010.nc` with CMIP6 historical at `slice('1985-01-01','2010-12-31')`. Training period only.
+
+**A9 — the clip never binds in projection.** Across 31,055,400 values per family: RF 0.3084–0.6030, U-Net 0.2952–0.5914. Zero cells at either bound.
+
+**A10 — the criterion was changed after seeing the results.** Traced through the backups: `_preupdate` (Jun 28) *"lowest test-period RMSE"*; `_pre_rf_deploy` (Aug 6) *"the Random Forest, which achieved the lowest validation-period RMSE"* — and RF genuinely won it then (18.72 vs 23.15); `_pre_384_rewrite` (Aug 10) still single-metric; the composite criterion appears only in the Aug 11 file, **after** the corrected-alignment run reversed the ranking that morning. Now disclosed in Chapter 3 §3.8.4 in those words, with the justification resting on cell-by-cell reliability and an explicit statement that a reader who rejects the argument should prefer XGBoost.
+
+**Also found:** Table 3.3's caption still called RMSE the *"primary model selection criterion"*, contradicting §3.8.4. Corrected.
+
+---
+
 ## 10. Audit fixes (B1–B10)
 
 | Item | Status |
@@ -279,6 +343,28 @@ Tree defaults were retained after HPO (§7.6). Deployed values are now the **scr
 | B8 feature importance | **Done** — `feature_importance.csv` |
 | B9 delta-mapping baseline | **Done** — third reference; ref RMSE 0.131 |
 | B10 documentation | **Partly** — see below |
+
+### Second audit, Parts B–F
+
+| Item | Status |
+|---|---|
+| B11 double-count | **Done** — centred RMSE ≡ per-cell bias std, verified identical to 6 dp and algebraically (cRMSE² = var(m−r)). §3.8.4 now rests on two independent axes: mean offset and spatial error structure, since RMSE² = bias² + cRMSE². |
+| B12 degenerate baselines | **Done** — interpolation and delta-mapping relabelled circularity diagnostics in §3.7.3, `compute_table33.py` and the CSV; climatology named the only admissible reference |
+| B13 σ_DS constant | **Done** — stated in the script output and here |
+| B14 σ_DS a different kind of quantity | **Done** — stated alongside |
+| B15 σ_arch from four members | **Not done** — still n = 2. Needs CNN and XGBoost projections, and XGBoost has no persistence path (~14 GB). Member count is now printed and captioned so the weakness is visible. |
+| B16 U-Net R² | **Done** — 0.9294 |
+| C1 perfect prognosis | **Done** — §7.7. Required extending EDCM to emit a historical pseudo-scenario (`EDCM_INCLUDE_HISTORICAL=1`) |
+| C2 power spectra | **Done** — §7.8 |
+| C3 multiple temporal splits | **Not done** |
+| C4 join logic | **Done** — no nearest-neighbour temporal joins survive outside the guarded, warned carry-forward inside `align_to_months` |
+| D1 version control | **Done** — git initialised, 61 files committed, `data/` (16 GB) excluded; staged content scanned for credentials before committing |
+| D2 regression tests | **Done** — `pytest tests/` 16 passed; reintroducing the §6.11 lag turns it red, restoring turns it green |
+| D3 pin environment | **Done** — `environment.yml`, 247 packages |
+| D4 OpenMP workaround | **Done** — documented in README with the actual cause and the proper fix |
+| E1 dashboard | **Not done** — still stale |
+| E2–E6 | Carried forward below |
+| Part F figures | **Done** — six PNGs in `figures/` from `make_figures.py` |
 
 ---
 
