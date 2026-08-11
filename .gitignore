@@ -1,0 +1,15 @@
+# Data and models — large, regenerable, not source
+data/
+figures/
+logs/
+env/
+deprecated/*.nc
+deprecated/**/*.nc
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# OS
+.DS_Store

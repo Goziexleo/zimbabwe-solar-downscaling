@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pandoc -t markdown \"CR_Madukwe_Chapter3_Final.docx\" -o \"/private/tmp/claude-501/-Users-gozie-Documents-MCSM-PROJECT-AGY/87690010-9873-4e1e-9a4a-4714b3c1d4da/scratchpad/chapter3.md\")",
+      "Bash(test -f ~/.cdsapirc && echo \"CDSAPIRC: present\" || echo \"CDSAPIRC: missing\" *)",
+      "Bash(python3 -c \"import sys; print\\(sys.executable\\)\")",
+      "Bash(conda env *)",
+      "Bash(pyenv versions *)",
+      "Bash(python3 -c \"import torch; print\\('torch', torch.__version__\\)\")",
+      "Read(//opt/anaconda3/envs/**)",
+      "Bash(/opt/anaconda3/bin/python3 -c \"import sys; print\\(sys.executable\\)\")",
+      "Bash(/opt/anaconda3/bin/pip list *)",
+      "Bash(curl -s -m 30 \"https://origin.cpc.ncep.noaa.gov/products/analysis_monitoring/ensostuff/ONI_v5.php\")",
+      "Bash(curl -s -m 30 -L \"https://www.cpc.ncep.noaa.gov/data/indices/oni.ascii.txt\" -o /private/tmp/claude-501/-Users-gozie-Documents-MCSM-PROJECT-AGY/87690010-9873-4e1e-9a4a-4714b3c1d4da/scratchpad/oni.ascii.txt)",
+      "Bash(cat /tmp/unet_train.log 2>/dev/null | tail -30 *)",
+      "Bash(kill 54256)"
+    ]
+  }
+}
