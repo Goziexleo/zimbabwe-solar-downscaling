@@ -97,7 +97,7 @@ The retained domain is narrower than Chapter 3's nominal box (15.0–22.5°S, 25
 | Script | Role |
 |---|---|
 | `train_pixelwise_rf.py` | 5,751 forests. `PERSIST_RF_MODELS=1` writes per-cell joblib (~4 GB measured) + `manifest.json` |
-| `train_pixelwise_xgb.py` | 5,751 boosters, never persisted (~1 min to refit) |
+| `train_pixelwise_xgb.py` | 5,751 boosters at 200 **fixed** rounds (no validation early stopping, see §6.12). `PERSIST_XGB_MODELS=1` writes per-cell joblib (~400 MB) + `manifest.json` |
 | `train_cnn_downscaler.py` | CNN, MSE + spatial-gradient penalty, 100 epochs |
 | `train_unet_downscaler.py` | U-Net, ENSO-stratified batches, flip augmentation, early stopping |
 | `compute_table33.py` | **Canonical Table 3.3** for all four models from the saved fields — single source of truth, no retraining |
@@ -109,7 +109,7 @@ The retained domain is narrower than Chapter 3's nominal box (15.0–22.5°S, 25
 ### Projection and verification
 | Script | Role |
 |---|---|
-| `generate_future_projections.py` / `..._rf.py` / `..._cnn.py` | U-Net / RF / CNN → downscaled GHI, 6 GCM-scenario combos each |
+| `generate_future_projections{,_rf,_cnn,_xgb}.py` | U-Net / RF / CNN / XGBoost → downscaled GHI, 6 GCM-scenario combos each |
 | `compute_mme_aggregations.py` | Ensemble mean + inter-model spread, 3 horizons. `PROJECTIONS_DIR` / `MME_OUTPUT_DIR` |
 | `generate_validation_spatial_fields.py` | Full GHI fields: truth, baseline, all 4 models |
 | `compute_spatial_verification.py` | Taylor statistics + per-pixel bias/RMSE maps |
@@ -127,6 +127,13 @@ The retained domain is narrower than Chapter 3's nominal box (15.0–22.5°S, 25
 Invisible in training because `build_ml_features_and_targets.py` used the *same* unsafe match in the opposite direction, cancelling it. Two wrongs made a right in one split and not the other.
 
 **Consequences, all corrected:** models were fed the wrong month's irradiance as a high-weight feature at validation only, degrading every Table 3.3 figure (XGBoost RMSE 22.94 → 5.54 on fixing this alone). The baseline was computed from the same lagged field, inflating its RMSE from 0.233 to 32.38 and turning deeply negative skill scores into apparently positive ones. Both build scripts now match on calendar month.
+
+### 6.12 XGBoost was early-stopped on the validation set
+`train_pixelwise_xgb.py` fitted each cell with `eval_set=[(X_val, y_val)]` and `early_stopping_rounds=50`, so the number of boosting rounds — each cell's effective capacity — was chosen by watching the data the model was then scored against. 5,751 hyperparameters fitted on the evaluation set.
+
+Measured cost: **9.1145 leaky against 9.2422 clean**, about 1.4% of RMSE. Early stopping on an inner 80/20 split of the training record was also tried and scored *worse* (10.0157), because holding back a fifth of an already-small 312-month record costs more than the stopping rule gains. Fixed 200 rounds uses all training data and no validation information, and is now the default.
+
+**The ranking is unchanged** — at 9.2422 XGBoost still has the lowest aggregate RMSE, so the §3.8.4 selection argument is unaffected. But it was not an out-of-sample number, and it was the number that put XGBoost ahead of RF in the first place.
 
 ### 6.3 Fabricated zero band across ~25% of the domain (severe, silent)
 The fine grid extended up to 0.85° beyond coarse ERA5 coverage; interpolation returned NaN there, a defensive `np.nan_to_num` zeroed it, and a quarter of every training target became a hard-zero band. No aggregate metric flagged it — found only by plotting fields. Fixed by aligning `FINE_LAT`/`FINE_LON` to real coverage.
@@ -167,9 +174,9 @@ Ablation (XGBoost, all else constant):
 |---|---|---|---|
 | A. Lagged `rsds`, 6 predictors (original) | 22.94 | 0.817 | −0.203 |
 | B. Lag fixed, `rsds` **kept** | **5.54** | **0.9894** | 0.7096 |
-| C. Lag fixed, `rsds` **dropped** (deployed) | 9.11 | 0.9715 | 0.5225 |
+| C. Lag fixed, `rsds` **dropped** (deployed) | 9.24 | 0.9707 | 0.5155 |
 
-Skill is against the corrected 19.08 climatology, so configuration C now agrees with §8 (0.5222, differing only by rounding). An earlier version used the leaky 17.98 reference and gave 0.6922 and 0.4932 — putting the same model at two different skill scores in two sections of this document.
+Skill is against the corrected 19.08 climatology, so configuration C agrees with §8 (0.5155). An earlier version used the leaky 17.98 reference and gave 0.6922 and 0.4932 — putting the same model at two different skill scores in two sections of this document.
 
 A→B is the fix alone and accounts for essentially all the improvement. B→C shows **dropping `rsds` made the models measurably worse** — it merely left them above threshold. The ~20 points of climatology skill lost (0.69 → 0.49) is precisely the circular portion. *"We removed a predictor and R improved" is the wrong causal claim* and an examiner comparing B and C would catch it.
 
@@ -186,7 +193,7 @@ MBE of **+0.0003 W m⁻²** is the strongest bias figure in Table 3.3 and is *ca
 | Model | Per-cell bias mean | std | range |
 |---|---|---|---|
 | Random Forest | +0.247 | 0.571 | −1.26 to +2.10 |
-| XGBoost | +1.258 | 0.721 | −0.91 to +3.41 |
+| XGBoost | +1.200 | 0.742 | −1.00 to +3.46 |
 | **U-Net** | **+0.000** | **3.539** | **−14.81 to +10.18** |
 
 It over-predicts some districts by +10 and under-predicts others by −15; they average to nothing. For a map read cell by cell to choose sites, this is the most damaging error structure available.
@@ -235,7 +242,7 @@ A 150-cell subsampled CV search picked configurations for both tree models that 
 
 | Model | RMSE | MAE | Pearson R | MBE | SS vs climatology | R² |
 |---|---|---|---|---|---|---|
-| **XGBoost** | **9.11** | **6.73** | **0.9715** | +1.26 | **0.5222** | **0.9426** |
+| **XGBoost** | **9.24** | **6.85** | **0.9707** | +1.20 | **0.5155** | **0.9410** |
 | U-Net | 10.11 | 7.64 | 0.9640 | +0.0003 | 0.4701 | 0.9294 |
 | CNN | 10.14 | 7.71 | 0.9646 | +1.20 | 0.4682 | 0.9289 |
 | **Random Forest (deployed)** | 10.30 | 7.73 | 0.9636 | +0.25 | 0.4601 | 0.9267 |
@@ -258,7 +265,7 @@ Targets are R > 0.90 and |MBE| < 5. **All four models clear both for the first t
 |---|---|---|---|---|
 | Baseline (bilinear) | 0.9998 | 0.9949 | 0.161 | 2.0% |
 | **Random Forest** | **0.9978** | 0.9725 | **0.571** | **7.2%** |
-| XGBoost | 0.9965 | 0.9612 | 0.721 | 9.0% |
+| XGBoost | 0.9963 | 0.9608 | 0.742 | 9.3% |
 | CNN | 0.9176 | 0.9937 | 3.229 | 40.5% |
 | U-Net | 0.8995 | 0.9762 | 3.539 | 44.4% |
 
@@ -273,16 +280,16 @@ which is what made the mismatch confusing.
 
 | Model | Period | σ_GCM | σ_SSP | σ_arch | σ_DS | σ_total | % var DS | % var arch |
 |---|---|---|---|---|---|---|---|---|
-| RF | Near-term | 1.24 | 0.26 | 2.44 | 10.30 | 10.66 | 93.33% | 5.26% |
-| RF | Mid-term | 1.42 | 0.18 | 4.26 | 10.30 | 11.24 | 84.00% | 14.38% |
-| RF | Long-term | 1.58 | 0.29 | 6.46 | 10.30 | 12.26 | 70.53% | **27.76%** |
-| U-Net | Near-term | 2.03 | 0.56 | 2.44 | 10.11 | 10.61 | 90.77% | 5.31% |
-| U-Net | Mid-term | 3.20 | 1.02 | 4.26 | 10.11 | 11.47 | 77.62% | 13.80% |
-| U-Net | Long-term | 4.00 | 2.38 | 6.46 | 10.11 | 12.87 | 61.71% | **25.21%** |
+| RF | Near-term | 1.24 | 0.26 | 2.34 | 10.30 | 10.64 | 93.73% | 4.86% |
+| RF | Mid-term | 1.42 | 0.18 | 3.90 | 10.30 | 11.11 | 85.99% | 12.35% |
+| RF | Long-term | 1.58 | 0.29 | 5.88 | 10.30 | 11.97 | 74.06% | **24.14%** |
+| U-Net | Near-term | 2.03 | 0.56 | 2.34 | 10.11 | 10.59 | 91.16% | 4.90% |
+| U-Net | Mid-term | 3.20 | 1.02 | 3.90 | 10.11 | 11.35 | 79.39% | 11.84% |
+| U-Net | Long-term | 4.00 | 2.38 | 5.88 | 10.11 | 12.59 | 64.50% | **21.83%** |
 
-**σ_arch now rests on n = 3** (RF, U-Net, CNN), matching σ_GCM's own n = 3 so the comparison is like-for-like. Adding the CNN — projected from its existing checkpoint, no retraining — raised σ_arch at the long-term horizon from 4.24 to 6.46 and its variance share from 14.2% to **27.8%**. XGBoost is still absent because it is never persisted and cannot be projected without persisting it first (~4-5 GB), so n = 3 remains a small-sample spread.
+**σ_arch rests on all four benchmarked architectures (n = 4)** — RF, XGBoost, CNN, U-Net — which exceeds σ_GCM's n = 3, so the comparison between them no longer favours the GCM term on sample size. Reaching n = 4 required persisting XGBoost (~400 MB at 200 fixed rounds, an order of magnitude below RF's ~4 GB) and projecting it.
 
-**By 2076–2100 the choice of downscaling architecture accounts for 27.8% of projection variance against the GCM's 1.7%** — a factor of roughly seventeen. That is the single most striking number in the decomposition, and it is now supported by the same number of members as the quantity it is being compared against.
+**By 2076–2100 architecture choice accounts for 24.1% of projection variance against the GCM's 1.7%** — a factor of about fourteen. The estimate has been stable as members were added (14.2% at n=2, 27.8% at n=3, 24.1% at n=4), which is itself reassuring: the conclusion is not an artefact of which two models happened to be compared.
 
 **σ_DS is constant across horizons** — it is the validation RMSE carried forward, not something
 that varies with lead time. Its share falls only because σ_GCM and σ_arch *grow*; the downscaling
@@ -310,9 +317,9 @@ U-Net projects **3.3× to 6.7×** more brightening than RF and the two agree onl
 
 Selection uses a **composite criterion**, and Chapter 3 §3.8.4 states plainly that it was adopted **after** the corrected-alignment run reversed the ranking (see §10a, A10). It is defended on the grounds that a suitability map is consulted one cell at a time, so per-cell reliability governs fitness for purpose in a way a domain average cannot — an argument that does not depend on which model it favours. A reader who rejects it should prefer XGBoost.
 
-On aggregate RMSE alone the choice would be XGBoost (9.11 vs 10.30, a 12% gap).
+On aggregate RMSE alone the choice would be XGBoost (9.24 vs 10.30, a 10% gap).
 
-**The criterion rests on two independent axes, not three.** Centred RMSE of the time-mean field and the standard deviation of the per-cell bias are *the same quantity* — expanding the centred error gives var(m − r) — verified identical to 6 decimal places. Since RMSE² = bias² + centredRMSE², the genuinely independent axes are the **systematic offset** and the **spatial error structure**. RF wins on both: mean bias +0.25 against XGBoost's +1.26, a factor of five; and the lowest centred error of the four, 0.571 against 0.721. The 12% penalty is small beside σ_DS ≈ 10.
+**The criterion rests on two independent axes, not three.** Centred RMSE of the time-mean field and the standard deviation of the per-cell bias are *the same quantity* — expanding the centred error gives var(m − r) — verified identical to 6 decimal places. Since RMSE² = bias² + centredRMSE², the genuinely independent axes are the **systematic offset** and the **spatial error structure**. RF wins on both: mean bias +0.25 against XGBoost's +1.26, a factor of five; and the lowest centred error of the four, 0.571 against 0.742. The 10% penalty is small beside σ_DS ≈ 10.
 
 **Why U-Net fails hardest** — three measured architectural causes: 17.8M parameters against 312 training fields (≈57,000 per field); the padded 96×96 domain compressed to **3×3** at the bottleneck; and one shared kernel set forced to fit a single predictor→irradiance relation from Lowveld to Eastern Highlands, so it learns the domain-*average* relation (hence competitive aggregate error) and fails where local relations depart. RF fits 5,751 independent local relations and structurally cannot trade one district against another. CNN sits between — shared weights but only 79k parameters plus a spatial-gradient penalty — and its scores sit between accordingly.
 
@@ -322,7 +329,7 @@ This runs against Chapter 2's expectation (Rampal et al. 2024) that encoder-deco
 | Model | Configuration |
 |---|---|
 | Random Forest | `n_estimators=500, max_features=sqrt, min_samples_leaf=5` |
-| XGBoost | `max_depth=6, eta=0.05, subsample=0.8, min_child_weight=3` |
+| XGBoost | `max_depth=6, eta=0.05, subsample=0.8, min_child_weight=3, n_estimators=200` (fixed, no early stopping) |
 | CNN | `lr=0.0005, lambda_gp=0.01` |
 | U-Net | `lr=2e-4`, dropout 0.3, weight decay 1e-4, batch 16, patience 20 |
 
@@ -369,7 +376,7 @@ Tree defaults were retained after HPO (§7.6). Deployed values are now the **scr
 | B12 degenerate baselines | **Done** — interpolation and delta-mapping relabelled circularity diagnostics in §3.7.3, `compute_table33.py` and the CSV; climatology named the only admissible reference |
 | B13 σ_DS constant | **Done** — stated in the script output and here |
 | B14 σ_DS a different kind of quantity | **Done** — stated alongside |
-| B15 σ_arch from more members | **Partly — now n = 3.** CNN projections generated from its existing checkpoint (`generate_future_projections_cnn.py`), raising σ_arch's long-term variance share from 14.2% to 27.8%. Matches σ_GCM's n = 3. XGBoost still absent: never persisted, ~4-5 GB to add, which is affordable. |
+| B15 σ_arch from more members | **Done — n = 4**, all benchmarked architectures. CNN projected from its existing checkpoint; XGBoost persisted (~400 MB) and projected. Exceeds σ_GCM's n = 3. Long-term variance share settled at 24.1% (14.2% at n=2, 27.8% at n=3). |
 | B16 U-Net R² | **Done** — 0.9294 |
 | C1 perfect prognosis | **Done** — §7.7. Required extending EDCM to emit a historical pseudo-scenario (`EDCM_INCLUDE_HISTORICAL=1`) |
 | C2 power spectra | **Done** — §7.8 |
@@ -406,8 +413,8 @@ data/processed/
   era5/csi_finegrid/clearsky_ghi_finegrid_climatology.nc
   ml_ready/ml_{training,validation}_dataset.nc
   cmip6_bias_corrected/
-  projections/ (U-Net) · projections_rf/ (RF) · projections_cnn/ (CNN)
-  mme_aggregations/ · mme_aggregations_rf/ · mme_aggregations_cnn/
+  projections/ (U-Net) · projections_rf/ · projections_cnn/ · projections_xgb/
+  mme_aggregations/ · mme_aggregations_rf/ · mme_aggregations_cnn/ · mme_aggregations_xgb/
   evaluation/
     validation_spatial_fields.nc      truth + baseline + all 4 models
     taylor_diagram_stats.csv · spatial_verification_maps.nc

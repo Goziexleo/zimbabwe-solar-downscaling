@@ -138,32 +138,24 @@ for i in range(n_lat):
 rf_ghi = csi_to_ghi(rf_csi, times, ds_clearsky_fine)
 
 # -------------------------------------------------------------- XGBoost ----
-print("[4/4] Retraining pixel-wise XGBoost with final (default) hyperparameters "
-      "and running inference (not persisted, so retrained here)...")
-import xgboost as xgb
-from joblib import Parallel, delayed
+# Loaded from persisted models rather than refitted here. The previous version
+# refitted with early_stopping_rounds against the validation set, which chose
+# each cell's capacity by watching the data it was then scored on.
+print("[4/4] Running pixel-wise XGBoost inference (loading persisted models)...")
+XGB_MODEL_DIR = os.path.abspath("./data/processed/models/pixelwise_xgb")
+with open(os.path.join(XGB_MODEL_DIR, "manifest.json")) as f:
+    xgb_manifest = json.load(f)
+assert xgb_manifest["feature_vars"] == px_feature_vars, "XGBoost manifest feature order mismatch"
 
-train_path = "./data/processed/ml_ready/ml_training_dataset.nc"
-ds_train = xr.open_dataset(train_path)
-X_train_px, y_train_px, _ = build_fine_pixel_dataset(ds_train, TOPO_PATH)
-
-
-def fit_predict_cell(i, j):
-    xgb_cell = xgb.XGBRegressor(
-        max_depth=6, learning_rate=0.05, subsample=0.8, min_child_weight=3,
-        n_estimators=1000, reg_alpha=0.1, reg_lambda=1.0,
-        early_stopping_rounds=50, eval_metric="rmse", random_state=42, n_jobs=1,
-    )
-    xgb_cell.fit(X_train_px[:, i, j, :], y_train_px[:, i, j],
-                 eval_set=[(X_val_px[:, i, j, :], y_val_px[:, i, j])], verbose=False)
-    return i, j, xgb_cell.predict(X_val_px[:, i, j, :])
-
-
-cell_indices = [(i, j) for i in range(n_lat) for j in range(n_lon)]
-results = Parallel(n_jobs=-1, verbose=5)(delayed(fit_predict_cell)(i, j) for i, j in cell_indices)
 xgb_csi = np.zeros((n_time, n_lat, n_lon), dtype=np.float32)
-for i, j, pred in results:
-    xgb_csi[:, i, j] = pred
+for i in range(n_lat):
+    for j in range(n_lon):
+        p = os.path.join(XGB_MODEL_DIR, f"xgb_cell_{i:03d}_{j:03d}.joblib")
+        if not os.path.exists(p):
+            continue
+        xgb_csi[:, i, j] = joblib.load(p).predict(X_val_px[:, i, j, :])
+    if (i + 1) % 20 == 0 or i == n_lat - 1:
+        print(f"  Row {i + 1}/{n_lat} done")
 xgb_ghi = csi_to_ghi(xgb_csi, times, ds_clearsky_fine)
 
 # ------------------------------------------------------------------ Save ----

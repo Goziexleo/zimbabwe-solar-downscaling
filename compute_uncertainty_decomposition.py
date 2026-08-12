@@ -57,6 +57,7 @@ ARCH_DIRS = {
     "unet": os.path.abspath("./data/processed/mme_aggregations"),
     "rf": os.path.abspath("./data/processed/mme_aggregations_rf"),
     "cnn": os.path.abspath("./data/processed/mme_aggregations_cnn"),
+    "xgb": os.path.abspath("./data/processed/mme_aggregations_xgb"),
 }
 ARCH_DIRS = {k: v for k, v in ARCH_DIRS.items() if os.path.isdir(v)}
 print(f"sigma_arch estimated from {len(ARCH_DIRS)} architectures: {sorted(ARCH_DIRS)}")

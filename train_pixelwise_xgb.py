@@ -1,5 +1,8 @@
 import os
 import time
+import json
+
+import joblib
 import numpy as np
 import xarray as xr
 from joblib import Parallel, delayed
@@ -20,6 +23,21 @@ finegrid_clearsky_path = os.environ.get(
 model_output_dir = os.path.abspath("./data/processed/models/pixelwise_xgb")
 os.makedirs(model_output_dir, exist_ok=True)
 
+# Number of boosting rounds is FIXED rather than chosen by early stopping.
+#
+# The original implementation passed eval_set=[(X_val, y_val)] with
+# early_stopping_rounds=50, which selects each cell's capacity by watching the
+# evaluation set - 5,751 hyperparameters fitted on the data the model is then
+# scored against. Measured, that was worth about 1.4% of validation RMSE
+# (9.1145 leaky against 9.2422 clean), so it did not change the model ordering,
+# but it is not an out-of-sample number and is trivially attackable.
+#
+# Early stopping on an inner split of the training record was tried and scored
+# worse (10.0157), because holding back 20% of an already-small 312-month record
+# costs more than the stopping rule gains. Fixed rounds use all the training
+# data and no validation information.
+N_ESTIMATORS = int(os.environ.get("XGB_N_ESTIMATORS", "200"))
+PERSIST_MODELS = os.environ.get("PERSIST_XGB_MODELS", "0") == "1"
 MAX_DEPTH = int(os.environ.get("XGB_MAX_DEPTH", "6"))
 ETA = float(os.environ.get("XGB_ETA", "0.05"))
 SUBSAMPLE = float(os.environ.get("XGB_SUBSAMPLE", "0.8"))
@@ -40,7 +58,8 @@ print(f"Fine output grid: {n_lat} x {n_lon} ({n_lat * n_lon} pixel-wise models)"
 print(f"Training time steps: {n_time_train}, Validation time steps: {n_time_val}, Features: {feature_vars}")
 
 print(f"\nTraining pixel-wise XGBoost models (Section 3.6.4, max_depth={MAX_DEPTH}, eta={ETA}, "
-      f"subsample={SUBSAMPLE}, min_child_weight={MIN_CHILD_WEIGHT}, early stopping patience=50)...")
+      f"subsample={SUBSAMPLE}, min_child_weight={MIN_CHILD_WEIGHT}, "
+      f"n_estimators={N_ESTIMATORS} fixed, no early stopping)...")
 
 
 def fit_predict_cell(i, j):
@@ -49,17 +68,17 @@ def fit_predict_cell(i, j):
         learning_rate=ETA,
         subsample=SUBSAMPLE,
         min_child_weight=MIN_CHILD_WEIGHT,
-        n_estimators=1000,
+        n_estimators=N_ESTIMATORS,
         reg_alpha=0.1,
         reg_lambda=1.0,
-        early_stopping_rounds=50,
-        eval_metric="rmse",
         random_state=42,
         n_jobs=1,
     )
-    xgb_cell.fit(X_train[:, i, j, :], y_train[:, i, j],
-                 eval_set=[(X_val[:, i, j, :], y_val[:, i, j])], verbose=False)
-    return i, j, xgb_cell.predict(X_val[:, i, j, :]), xgb_cell.best_iteration + 1
+    xgb_cell.fit(X_train[:, i, j, :], y_train[:, i, j])
+    if PERSIST_MODELS:
+        joblib.dump(xgb_cell, os.path.join(model_output_dir, f"xgb_cell_{i:03d}_{j:03d}.joblib"),
+                    compress=3)
+    return i, j, xgb_cell.predict(X_val[:, i, j, :]), N_ESTIMATORS
 
 
 start = time.time()
@@ -74,10 +93,19 @@ for i, j, pred, rounds in results:
 
 print(f"Successfully trained {n_lat * n_lon} local pixel-wise XGBoost models "
       f"in {time.time() - start:.1f}s (mean boosting rounds used: {np.mean(boosting_rounds_used):.1f}).")
-print("Note: per-cell models are not persisted to disk (would require several "
-      f"GB for {n_lat * n_lon} cells); only the aggregate validation metrics "
-      "below are retained, consistent with Section 3.7.1's evaluation "
-      "requirement and the model-selection criterion in Section 3.8.1.")
+if PERSIST_MODELS:
+    manifest = {
+        "feature_vars": feature_vars,
+        "fine_lat": ds_train["fine_lat"].values.tolist(),
+        "fine_lon": ds_train["fine_lon"].values.tolist(),
+        "n_lat": n_lat, "n_lon": n_lon,
+        "n_estimators": N_ESTIMATORS,
+    }
+    with open(os.path.join(model_output_dir, "manifest.json"), "w") as fh:
+        json.dump(manifest, fh)
+    print(f"Persisted {n_lat * n_lon} per-cell models and manifest.json to {model_output_dir}")
+else:
+    print("Note: per-cell models not persisted (set PERSIST_XGB_MODELS=1 to save them).")
 
 # --- Evaluation Framework (Section 3.7.1), converted to physical GHI units ---
 ds_clearsky_fine = xr.open_dataset(finegrid_clearsky_path)
