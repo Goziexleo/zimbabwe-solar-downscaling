@@ -471,7 +471,7 @@ Under **git** since the second audit: 61 files tracked, two commits, `data/` exc
 - Chapter 2 also sets up the expectation that encoder-decoders beat tree methods, which the results overturn — needs a forward-reference to §3.8.4 or reframing as a hypothesis the study tests.
 - **Dozier & Frew (1990)** is cited as plain text and is not in the Zotero library.
 - §6.1 uses 0.68 for a collapsed *correlation* while §7.5 discusses *std ratios* near 0.68 — add a clarifying clause if both appear in the thesis.
-- **The published results dashboard is stale** (predates three retrains): `https://claude.ai/code/artifact/0998da0d-86ae-45b5-810a-a8d616f9323a`
+- **The published results dashboard has been withdrawn** and replaced with a retraction notice (see §10a / E1). Nothing further is needed unless you want the URL itself deleted, which must be done from the artifacts gallery.
 
 **Still specified but not implemented:** per-cell QC flag counts for the appendix (§3.4.3).
 
