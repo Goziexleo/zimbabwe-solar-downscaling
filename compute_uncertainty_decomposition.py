@@ -51,7 +51,7 @@ MME_DIRS = {
 # a spread wants as many members as are available, whereas a decomposition file
 # is only wanted for the models actually reported. The CNN is included here on
 # projections generated from its existing checkpoint; XGBoost is absent because
-# it is never persisted and so cannot be projected without ~14 GB of new state.
+# it is never persisted and so cannot be projected without persisting it first (~4-5 GB).
 # n = 3 matches sigma_GCM's own n = 3, making that comparison like-for-like.
 ARCH_DIRS = {
     "unet": os.path.abspath("./data/processed/mme_aggregations"),

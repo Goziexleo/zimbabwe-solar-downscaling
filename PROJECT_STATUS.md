@@ -96,7 +96,7 @@ The retained domain is narrower than Chapter 3's nominal box (15.0–22.5°S, 25
 ### Training and evaluation
 | Script | Role |
 |---|---|
-| `train_pixelwise_rf.py` | 5,751 forests. `PERSIST_RF_MODELS=1` writes per-cell joblib (~14 GB) + `manifest.json` |
+| `train_pixelwise_rf.py` | 5,751 forests. `PERSIST_RF_MODELS=1` writes per-cell joblib (~4 GB measured) + `manifest.json` |
 | `train_pixelwise_xgb.py` | 5,751 boosters, never persisted (~1 min to refit) |
 | `train_cnn_downscaler.py` | CNN, MSE + spatial-gradient penalty, 100 epochs |
 | `train_unet_downscaler.py` | U-Net, ENSO-stratified batches, flip augmentation, early stopping |
@@ -280,7 +280,7 @@ which is what made the mismatch confusing.
 | U-Net | Mid-term | 3.20 | 1.02 | 4.26 | 10.11 | 11.47 | 77.62% | 13.80% |
 | U-Net | Long-term | 4.00 | 2.38 | 6.46 | 10.11 | 12.87 | 61.71% | **25.21%** |
 
-**σ_arch now rests on n = 3** (RF, U-Net, CNN), matching σ_GCM's own n = 3 so the comparison is like-for-like. Adding the CNN — projected from its existing checkpoint, no retraining — raised σ_arch at the long-term horizon from 4.24 to 6.46 and its variance share from 14.2% to **27.8%**. XGBoost is still absent because it is never persisted and cannot be projected without ~14 GB of new state, so n = 3 remains a small-sample spread.
+**σ_arch now rests on n = 3** (RF, U-Net, CNN), matching σ_GCM's own n = 3 so the comparison is like-for-like. Adding the CNN — projected from its existing checkpoint, no retraining — raised σ_arch at the long-term horizon from 4.24 to 6.46 and its variance share from 14.2% to **27.8%**. XGBoost is still absent because it is never persisted and cannot be projected without persisting it first (~4-5 GB), so n = 3 remains a small-sample spread.
 
 **By 2076–2100 the choice of downscaling architecture accounts for 27.8% of projection variance against the GCM's 1.7%** — a factor of roughly seventeen. That is the single most striking number in the decomposition, and it is now supported by the same number of members as the quantity it is being compared against.
 
@@ -369,7 +369,7 @@ Tree defaults were retained after HPO (§7.6). Deployed values are now the **scr
 | B12 degenerate baselines | **Done** — interpolation and delta-mapping relabelled circularity diagnostics in §3.7.3, `compute_table33.py` and the CSV; climatology named the only admissible reference |
 | B13 σ_DS constant | **Done** — stated in the script output and here |
 | B14 σ_DS a different kind of quantity | **Done** — stated alongside |
-| B15 σ_arch from more members | **Partly — now n = 3.** CNN projections generated from its existing checkpoint (`generate_future_projections_cnn.py`), raising σ_arch's long-term variance share from 14.2% to 27.8%. Matches σ_GCM's n = 3. XGBoost still absent: never persisted, ~14 GB to add. |
+| B15 σ_arch from more members | **Partly — now n = 3.** CNN projections generated from its existing checkpoint (`generate_future_projections_cnn.py`), raising σ_arch's long-term variance share from 14.2% to 27.8%. Matches σ_GCM's n = 3. XGBoost still absent: never persisted, ~4-5 GB to add, which is affordable. |
 | B16 U-Net R² | **Done** — 0.9294 |
 | C1 perfect prognosis | **Done** — §7.7. Required extending EDCM to emit a historical pseudo-scenario (`EDCM_INCLUDE_HISTORICAL=1`) |
 | C2 power spectra | **Done** — §7.8 |
@@ -402,7 +402,7 @@ Edited at run level with `python-docx` so all **26 live Zotero citation fields s
 
 ```
 data/processed/
-  models/{unet,cnn}/*.pth · models/pixelwise_rf/*.joblib + manifest.json (~14 GB)
+  models/{unet,cnn}/*.pth · models/pixelwise_rf/*.joblib + manifest.json (~4 GB)
   era5/csi_finegrid/clearsky_ghi_finegrid_climatology.nc
   ml_ready/ml_{training,validation}_dataset.nc
   cmip6_bias_corrected/

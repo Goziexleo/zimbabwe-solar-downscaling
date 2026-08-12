@@ -26,7 +26,8 @@ model_output_dir = os.environ.get(
     "RF_MODEL_OUTPUT_DIR", os.path.abspath("./data/processed/models/pixelwise_rf")
 )
 os.makedirs(model_output_dir, exist_ok=True)
-# Persisting ~5,751 x 500-tree forests costs ~14GB - opt-in, since most runs
+# Persisting ~5,751 x 500-tree forests costs ~4GB at monthly resolution
+# (measured: 0.72 MB/cell) - opt-in, since most runs
 # (e.g. re-checking Table 3.3 metrics) don't need the models on disk, only
 # the aggregate validation numbers. Set PERSIST_RF_MODELS=1 when the trained
 # models are actually needed downstream (e.g. to apply to future GCM data).
@@ -37,7 +38,8 @@ PERSIST_MODELS = os.environ.get("PERSIST_RF_MODELS", "0") == "1"
 # for all 5,751 cells - not viable to persist). RF_MIN_SAMPLES_LEAF raises
 # the leaf-size floor for the daily experiment (50 -> ~2.5MB/cell, ~14GB
 # total), which is also a reasonable regularisation adjustment given far
-# more samples per pixel.
+# more samples per pixel. NOTE the ~14GB figure applies to the DAILY variant
+# only; the deployed monthly models measure ~4GB in total.
 MIN_SAMPLES_LEAF = int(os.environ.get("RF_MIN_SAMPLES_LEAF", "5"))
 N_ESTIMATORS = int(os.environ.get("RF_N_ESTIMATORS", "500"))
 _max_features_raw = os.environ.get("RF_MAX_FEATURES", "sqrt")

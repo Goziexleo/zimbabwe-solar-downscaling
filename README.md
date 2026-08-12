@@ -101,7 +101,7 @@ and physical-bound invariants. Tests skip cleanly when the datasets are absent.
 | `MODEL_PREDICTORS` | Override the model input set; used for the `rsds` ablation |
 | `FORCE_REMERGE=1` | Recompute predictors even if already merged |
 | `EDCM_INCLUDE_HISTORICAL=1` | Also bias-correct the historical period, for the transfer test |
-| `PERSIST_RF_MODELS=1` | Write the 5,751 per-cell forests (~14 GB) |
+| `PERSIST_RF_MODELS=1` | Write the 5,751 per-cell forests (~4 GB measured) |
 | `NAN_FRACTION_LIMIT` | Fraction of NaN above which `safe_nan_to_num` raises (default 0.01) |
 
 ## What is not in git
