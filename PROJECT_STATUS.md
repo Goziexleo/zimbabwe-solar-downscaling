@@ -410,7 +410,7 @@ Tree defaults were retained after HPO (§7.6). Deployed values are now the **scr
 | D2 regression tests | **Done** — `pytest tests/` 16 passed; reintroducing the §6.11 lag turns it red, restoring turns it green |
 | D3 pin environment | **Done** — `environment.yml`, 247 packages |
 | D4 OpenMP workaround | **Done** — documented in README with the actual cause and the proper fix |
-| E1 dashboard | **Not done** — still stale |
+| E1 dashboard | **Done** — withdrawn and replaced with a retraction notice |
 | E2–E6 | Carried forward below |
 | Part F figures | **Done** — six PNGs in `figures/` from `make_figures.py` |
 
@@ -475,7 +475,7 @@ Under **git** since the second audit: 61 files tracked, two commits, `data/` exc
 
 **Still specified but not implemented:** per-cell QC flag counts for the appendix (§3.4.3).
 
-**E1 — the published dashboard remains stale** and is the last open audit item: `https://claude.ai/code/artifact/0998da0d-86ae-45b5-810a-a8d616f9323a`
+**E1 — closed.** The published dashboard has been **withdrawn**: its content is replaced by a retraction notice explaining that every figure was superseded by the alignment fix, the circular-predictor removal, the two leakage fixes and three retrains. The URL now resolves to that notice rather than to wrong numbers. Fully deleting the URL, if wanted, must be done from the artifacts gallery.
 
 ---
 
