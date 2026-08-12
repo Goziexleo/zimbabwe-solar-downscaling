@@ -109,11 +109,11 @@ The retained domain is narrower than Chapter 3's nominal box (15.0–22.5°S, 25
 ### Projection and verification
 | Script | Role |
 |---|---|
-| `generate_future_projections.py` / `..._rf.py` | U-Net / RF → downscaled GHI, 6 GCM-scenario combos |
+| `generate_future_projections.py` / `..._rf.py` / `..._cnn.py` | U-Net / RF / CNN → downscaled GHI, 6 GCM-scenario combos each |
 | `compute_mme_aggregations.py` | Ensemble mean + inter-model spread, 3 horizons. `PROJECTIONS_DIR` / `MME_OUTPUT_DIR` |
 | `generate_validation_spatial_fields.py` | Full GHI fields: truth, baseline, all 4 models |
 | `compute_spatial_verification.py` | Taylor statistics + per-pixel bias/RMSE maps |
-| `compute_uncertainty_decomposition.py` | **Four-component** σ_GCM / σ_SSP / σ_arch / σ_DS. σ_DS is now **derived** from the validation fields, not hardcoded. |
+| `compute_uncertainty_decomposition.py` | **Four-component** σ_GCM / σ_SSP / σ_arch / σ_DS. σ_DS **derived** from the validation fields; σ_arch from `ARCH_DIRS` (n = 3), kept separate from the deployed-model list. |
 
 `deprecated/daily_resolution_experiment/` holds the superseded daily-resolution scripts and outputs, with a README explaining why.
 
@@ -273,12 +273,16 @@ which is what made the mismatch confusing.
 
 | Model | Period | σ_GCM | σ_SSP | σ_arch | σ_DS | σ_total | % var DS | % var arch |
 |---|---|---|---|---|---|---|---|---|
-| RF | Near-term | 1.24 | 0.26 | 2.00 | 10.30 | 10.57 | 94.99% | 3.57% |
-| RF | Mid-term | 1.42 | 0.18 | 2.96 | 10.30 | 10.81 | 90.76% | 7.49% |
-| RF | Long-term | 1.58 | 0.29 | 4.24 | 10.30 | 11.26 | 83.74% | 14.22% |
-| U-Net | Near-term | 2.03 | 0.56 | 2.00 | 10.11 | 10.52 | 92.40% | 3.61% |
-| U-Net | Mid-term | 3.20 | 1.02 | 2.96 | 10.11 | 11.06 | 83.60% | 7.16% |
-| U-Net | Long-term | 4.00 | 2.38 | 4.24 | 10.11 | 11.91 | 72.04% | 12.70% |
+| RF | Near-term | 1.24 | 0.26 | 2.44 | 10.30 | 10.66 | 93.33% | 5.26% |
+| RF | Mid-term | 1.42 | 0.18 | 4.26 | 10.30 | 11.24 | 84.00% | 14.38% |
+| RF | Long-term | 1.58 | 0.29 | 6.46 | 10.30 | 12.26 | 70.53% | **27.76%** |
+| U-Net | Near-term | 2.03 | 0.56 | 2.44 | 10.11 | 10.61 | 90.77% | 5.31% |
+| U-Net | Mid-term | 3.20 | 1.02 | 4.26 | 10.11 | 11.47 | 77.62% | 13.80% |
+| U-Net | Long-term | 4.00 | 2.38 | 6.46 | 10.11 | 12.87 | 61.71% | **25.21%** |
+
+**σ_arch now rests on n = 3** (RF, U-Net, CNN), matching σ_GCM's own n = 3 so the comparison is like-for-like. Adding the CNN — projected from its existing checkpoint, no retraining — raised σ_arch at the long-term horizon from 4.24 to 6.46 and its variance share from 14.2% to **27.8%**. XGBoost is still absent because it is never persisted and cannot be projected without ~14 GB of new state, so n = 3 remains a small-sample spread.
+
+**By 2076–2100 the choice of downscaling architecture accounts for 27.8% of projection variance against the GCM's 1.7%** — a factor of roughly seventeen. That is the single most striking number in the decomposition, and it is now supported by the same number of members as the quantity it is being compared against.
 
 **σ_DS is constant across horizons** — it is the validation RMSE carried forward, not something
 that varies with lead time. Its share falls only because σ_GCM and σ_arch *grow*; the downscaling
@@ -365,7 +369,7 @@ Tree defaults were retained after HPO (§7.6). Deployed values are now the **scr
 | B12 degenerate baselines | **Done** — interpolation and delta-mapping relabelled circularity diagnostics in §3.7.3, `compute_table33.py` and the CSV; climatology named the only admissible reference |
 | B13 σ_DS constant | **Done** — stated in the script output and here |
 | B14 σ_DS a different kind of quantity | **Done** — stated alongside |
-| B15 σ_arch from four members | **Not done** — still n = 2. Needs CNN and XGBoost projections, and XGBoost has no persistence path (~14 GB). Member count is now printed and captioned so the weakness is visible. |
+| B15 σ_arch from more members | **Partly — now n = 3.** CNN projections generated from its existing checkpoint (`generate_future_projections_cnn.py`), raising σ_arch's long-term variance share from 14.2% to 27.8%. Matches σ_GCM's n = 3. XGBoost still absent: never persisted, ~14 GB to add. |
 | B16 U-Net R² | **Done** — 0.9294 |
 | C1 perfect prognosis | **Done** — §7.7. Required extending EDCM to emit a historical pseudo-scenario (`EDCM_INCLUDE_HISTORICAL=1`) |
 | C2 power spectra | **Done** — §7.8 |
@@ -402,8 +406,8 @@ data/processed/
   era5/csi_finegrid/clearsky_ghi_finegrid_climatology.nc
   ml_ready/ml_{training,validation}_dataset.nc
   cmip6_bias_corrected/
-  projections/ (U-Net) · projections_rf/ (RF)          6 GCM-scenario combos each
-  mme_aggregations/ · mme_aggregations_rf/             3 horizons × 2 scenarios
+  projections/ (U-Net) · projections_rf/ (RF) · projections_cnn/ (CNN)
+  mme_aggregations/ · mme_aggregations_rf/ · mme_aggregations_cnn/
   evaluation/
     validation_spatial_fields.nc      truth + baseline + all 4 models
     taylor_diagram_stats.csv · spatial_verification_maps.nc

@@ -40,10 +40,26 @@ VALIDATION_RMSE = validation_rmse()
 print("sigma_DS read from validation fields: " +
       ", ".join(f"{k}={v:.4f}" for k, v in VALIDATION_RMSE.items()))
 
+# Models that get their own decomposition file: the deployed Random Forest and
+# the U-Net retained as an architecture comparison.
 MME_DIRS = {
     "unet": os.path.abspath("./data/processed/mme_aggregations"),
     "rf": os.path.abspath("./data/processed/mme_aggregations_rf"),
 }
+
+# Architectures contributing to sigma_arch. Kept separate from MME_DIRS because
+# a spread wants as many members as are available, whereas a decomposition file
+# is only wanted for the models actually reported. The CNN is included here on
+# projections generated from its existing checkpoint; XGBoost is absent because
+# it is never persisted and so cannot be projected without ~14 GB of new state.
+# n = 3 matches sigma_GCM's own n = 3, making that comparison like-for-like.
+ARCH_DIRS = {
+    "unet": os.path.abspath("./data/processed/mme_aggregations"),
+    "rf": os.path.abspath("./data/processed/mme_aggregations_rf"),
+    "cnn": os.path.abspath("./data/processed/mme_aggregations_cnn"),
+}
+ARCH_DIRS = {k: v for k, v in ARCH_DIRS.items() if os.path.isdir(v)}
+print(f"sigma_arch estimated from {len(ARCH_DIRS)} architectures: {sorted(ARCH_DIRS)}")
 
 OUTPUT_DIR = os.path.abspath("./data/processed/evaluation")
 os.makedirs(OUTPUT_DIR, exist_ok=True)
@@ -79,7 +95,7 @@ for model_key, mme_dir in MME_DIRS.items():
         # decomposition silently assumes the choice of downscaling model
         # contributes no uncertainty, which the projections contradict.
         arch_means = []
-        for other_key, other_dir in MME_DIRS.items():
+        for other_key, other_dir in ARCH_DIRS.items():
             fields = [
                 xr.open_dataset(
                     os.path.join(other_dir, f"mme_suitability_{s}_{period}.nc")
@@ -128,7 +144,7 @@ for model_key, mme_dir in MME_DIRS.items():
             "sigma_arch_rms": rms(sigma_arch),
             "sigma_ds": sigma_ds,
             "sigma_total_rms": rms(sigma_total),
-            "n_arch_members": len(MME_DIRS),
+            "n_arch_members": len(ARCH_DIRS),
             "pct_var_gcm": 100 * mean_gcm2 / mean_total2,
             "pct_var_ssp": 100 * mean_ssp2 / mean_total2,
             "pct_var_arch": 100 * mean_arch2 / mean_total2,
@@ -163,7 +179,7 @@ Notes on reading this table:
     historical error measured against a reference; sigma_GCM, sigma_SSP and
     sigma_arch are spreads across possible futures. The comparison is
     informative but the two are not the same thing.
-  - sigma_arch is estimated from {len(MME_DIRS)} architectures and sigma_GCM
+  - sigma_arch is estimated from {len(ARCH_DIRS)} architectures and sigma_GCM
     from 3 GCMs. Both are small-sample spread estimates and should be read as
     indicative of magnitude, not as precise quantities.
 """)
