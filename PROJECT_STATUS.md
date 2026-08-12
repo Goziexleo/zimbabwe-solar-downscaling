@@ -105,6 +105,7 @@ The retained domain is narrower than Chapter 3's nominal box (15.0–22.5°S, 25
 | `hpo_pixelwise.py` | 5-fold temporal CV grid search on a 150-cell subsample |
 | `compute_information_content.py` | Sub-0.25° information test with elevation positive control |
 | `compute_feature_importance.py` | RF MDI + permutation, XGBoost gain + cover |
+| `compute_rolling_origin.py` | Rolling-origin evaluation across 4 expanding-window folds (C3) |
 
 ### Projection and verification
 | Script | Role |
@@ -230,6 +231,29 @@ Ullrich et al. recommend power spectra because ML emulators typically damp high 
 **Correction to an earlier version of this document.** It reported all four models *injecting* ~30× the truth's fine-scale power, measured in GHI space, and named the CNN the worst offender. That was an artefact of the measurement space. GHI-space excess is a *symptom* of getting CSI wrong: a model that reproduces CSI's fine structure recovers the cancellation and yields a smooth GHI, while one that smooths CSI destroys the structure that would have cancelled and lets the clear-sky field's own structure survive. The U-Net's GHI excess is therefore caused by its CSI damping, not by invented detail — and the CNN's apparent excess is the smallest real discrepancy of the group.
 
 On the effective-resolution definition: the conventional "power falls to half the reference" rule degenerates on the GHI field, whose reference has almost no short-wavelength power for a ratio to be taken against. The figure quoted is the shortest wavelength enclosing 99% of each field's *own* power, which is well defined under damping and excess alike.
+
+### 7.9 The model ranking is stable across periods (C3)
+Every headline number rests on one 1985–2010 / 2011–2024 split. A rolling-origin design refits on an expanding training window and evaluates on the block immediately after it, so each fold stays a strictly forward-in-time test. Each fold's climatology reference is built from **that fold's own training window**, so the §10a A7 leakage fix carries through.
+
+| Model | 1999–2004 | 2005–2010 | 2011–2016 | 2017–2024 |
+|---|---|---|---|---|
+| Random Forest | 11.73 | 12.84 | 9.05 | 10.83 |
+| **XGBoost** | **9.47** | **11.29** | **8.16** | **9.62** |
+
+**XGBoost has the lower RMSE in all four folds**, by margins of 0.89 to 2.26 W m⁻². The ordering that §3.8.4 arbitrates is therefore a property of the models, not of the deployed period — which matters, because a composite criterion adjudicating between models whose ranking flips by period would be arbitrating noise.
+
+Relative to each model's own deployed-split fold, no architecture is unusually period-sensitive:
+
+| Model | 1999–2004 | 2005–2010 | 2011–2016 | 2017–2024 | spread |
+|---|---|---|---|---|---|
+| Random Forest | 1.30 | 1.42 | 1.00 | 1.20 | 1.42 |
+| XGBoost | 1.16 | 1.38 | 1.00 | 1.18 | 1.38 |
+| CNN | 1.29 | 1.36 | 1.00 | 1.26 | 1.36 |
+| U-Net | 1.12 | 1.43 | 1.00 | 1.17 | 1.43 |
+
+All four sit within a spread of ~1.4, and all four find 2005–2010 hardest and 2011–2016 easiest — a property of the periods, not of any model.
+
+**A units caveat, recorded because the raw output invites the error.** The two networks report validation MSE in different units: the CNN trains on raw CSI, the U-Net on a standardised anomaly `(CSI − climatology)/anomaly_std`. With `anomaly_std = 0.0578`, the scale factor is 1/std² ≈ 299, which accounts for essentially the whole of the ~278× gap between their raw numbers. **Their absolute MSEs are not comparable**; only each model against itself across folds is, which is what the relative table above reports.
 
 ### 7.6 Cross-validation selected worse hyperparameters
 A 150-cell subsampled CV search picked configurations for both tree models that underperformed the untuned defaults on the full 5,751-cell holdout. Defaults retained. The search's own scores gave no warning.
@@ -380,7 +404,7 @@ Tree defaults were retained after HPO (§7.6). Deployed values are now the **scr
 | B16 U-Net R² | **Done** — 0.9294 |
 | C1 perfect prognosis | **Done** — §7.7. Required extending EDCM to emit a historical pseudo-scenario (`EDCM_INCLUDE_HISTORICAL=1`) |
 | C2 power spectra | **Done** — §7.8 |
-| C3 multiple temporal splits | **Not done** |
+| C3 multiple temporal splits | **Done** — `compute_rolling_origin.py`, 4 expanding-origin folds. XGBoost lowest RMSE in all four; all models within a 1.4 spread relative to their own deployed-split fold. See §7.9. |
 | C4 join logic | **Done** — no nearest-neighbour temporal joins survive outside the guarded, warned carry-forward inside `align_to_months` |
 | D1 version control | **Done** — git initialised, 61 files committed, `data/` (16 GB) excluded; staged content scanned for credentials before committing |
 | D2 regression tests | **Done** — `pytest tests/` 16 passed; reintroducing the §6.11 lag turns it red, restoring turns it green |
@@ -450,6 +474,8 @@ Under **git** since the second audit: 61 files tracked, two commits, `data/` exc
 - **The published results dashboard is stale** (predates three retrains): `https://claude.ai/code/artifact/0998da0d-86ae-45b5-810a-a8d616f9323a`
 
 **Still specified but not implemented:** per-cell QC flag counts for the appendix (§3.4.3).
+
+**E1 — the published dashboard remains stale** and is the last open audit item: `https://claude.ai/code/artifact/0998da0d-86ae-45b5-810a-a8d616f9323a`
 
 ---
 

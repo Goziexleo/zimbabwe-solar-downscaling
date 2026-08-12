@@ -10,8 +10,8 @@ from ml_dataset_common import CNN_FEATURE_VARS, safe_nan_to_num
 from cnn_model import SuperResolutionCNN
 
 # --- Configuration (Section 3.6.5) ---
-train_path = "./data/processed/ml_ready/ml_training_dataset.nc"
-val_path = "./data/processed/ml_ready/ml_validation_dataset.nc"
+train_path = os.environ.get("ML_TRAIN_PATH", "./data/processed/ml_ready/ml_training_dataset.nc")
+val_path = os.environ.get("ML_VAL_PATH", "./data/processed/ml_ready/ml_validation_dataset.nc")
 model_output_dir = os.path.abspath("./data/processed/models/cnn")
 os.makedirs(model_output_dir, exist_ok=True)
 model_path = os.environ.get("CNN_MODEL_PATH", os.path.join(model_output_dir, "cnn_csi_downscaler.pth"))
