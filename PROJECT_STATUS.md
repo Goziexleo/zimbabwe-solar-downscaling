@@ -2,7 +2,7 @@
 
 **Project:** Machine Learning-Based Downscaling of GCM Outputs for Solar Energy Suitability Mapping over Zimbabwe
 **Author:** Chiagozie Raphael Madukwe (FSR2526653), University of Zimbabwe MSc
-**Project root:** `/Users/gozie/Documents/MCSM PROJECT AGY` (not a git repository)
+**Project root:** `/Users/gozie/Documents/MCSM PROJECT AGY` (git repository since the second audit; `data/` untracked)
 **Chapter 3:** `.../UNI ZIM/PROJECT CHAPTERS/CR_Madukwe_Chapter3_Final.docx`
 
 **Chapter 3 backups (same folder), in order:**
@@ -100,7 +100,8 @@ The retained domain is narrower than Chapter 3's nominal box (15.0–22.5°S, 25
 | `train_pixelwise_xgb.py` | 5,751 boosters, never persisted (~1 min to refit) |
 | `train_cnn_downscaler.py` | CNN, MSE + spatial-gradient penalty, 100 epochs |
 | `train_unet_downscaler.py` | U-Net, ENSO-stratified batches, flip augmentation, early stopping |
-| `evaluate_unet.py` / `evaluate_cnn.py` | Table 3.3 metrics. All evaluations report skill against **three** references: interpolation, climatology, delta-mapping |
+| `compute_table33.py` | **Canonical Table 3.3** for all four models from the saved fields — single source of truth, no retraining |
+| `evaluate_unet.py` / `evaluate_cnn.py` | Per-model metrics. Skill is reported against climatology (the only admissible reference); interpolation and delta-mapping appear as circularity diagnostics |
 | `hpo_pixelwise.py` | 5-fold temporal CV grid search on a 150-cell subsample |
 | `compute_information_content.py` | Sub-0.25° information test with elevation positive control |
 | `compute_feature_importance.py` | RF MDI + permutation, XGBoost gain + cover |
@@ -150,7 +151,9 @@ NaN poisoning of BatchNorm producing all-NaN projections · bias-correction glob
 ## 7. Substantive findings
 
 ### 7.1 The task is largely circular, at every resolution
-`rsds` was populated by copying ERA5 `ssrd` — the field the target is built from. With correct alignment, **bilinear interpolation of `rsds` reproduces the target at RMSE 0.233 W m⁻², correlation 0.999982**, and delta-mapping does better still at **0.131**. Every model scores ≈ −38 to −43 against these. Two independent baselines confirm it is not an artefact of one interpolation choice.
+`rsds` was populated by copying ERA5 `ssrd` — the field the target is built from. With correct alignment, **bilinear interpolation of `rsds` reproduces the target at RMSE 0.233 W m⁻², correlation 0.999982** — a near-identity. Every model scores ≈ **−38 to −43** against it.
+
+**The circularity evidence rests on the interpolation baseline alone.** Delta-mapping was also a near-identity (0.131) while it too was leaking from the validation period; rebuilt from the training climatology it sits at **6.39**, and models score ≈ **−0.43 to −0.61** against it, not −40. It is a far weaker circularity signal and no longer an independent confirmation. The two differ because delta-mapping rescales the interpolated field toward a climatological mean estimated on a *different* period, and that rescaling error dominates a baseline whose underlying field was otherwise near-exact. Interpolation at 0.233 with correlation 0.999982 is overwhelming on its own.
 
 This was first seen at daily resolution and misdiagnosed as daily-specific; it was masked at monthly resolution by bug §6.11. The response was to drop `rsds` from the model inputs, making the task a genuine perfect-prognosis problem.
 
@@ -162,9 +165,11 @@ Ablation (XGBoost, all else constant):
 
 | Configuration | RMSE | Pearson R | SS vs climatology |
 |---|---|---|---|
-| A. Lagged `rsds`, 6 predictors (original) | 22.94 | 0.817 | — |
-| B. Lag fixed, `rsds` **kept** | **5.54** | **0.9894** | 0.6922 |
-| C. Lag fixed, `rsds` **dropped** (deployed) | 9.11 | 0.9715 | 0.4932 |
+| A. Lagged `rsds`, 6 predictors (original) | 22.94 | 0.817 | −0.203 |
+| B. Lag fixed, `rsds` **kept** | **5.54** | **0.9894** | 0.7096 |
+| C. Lag fixed, `rsds` **dropped** (deployed) | 9.11 | 0.9715 | 0.5225 |
+
+Skill is against the corrected 19.08 climatology, so configuration C now agrees with §8 (0.5222, differing only by rounding). An earlier version used the leaky 17.98 reference and gave 0.6922 and 0.4932 — putting the same model at two different skill scores in two sections of this document.
 
 A→B is the fix alone and accounts for essentially all the improvement. B→C shows **dropping `rsds` made the models measurably worse** — it merely left them above threshold. The ~20 points of climatology skill lost (0.69 → 0.49) is precisely the circular portion. *"We removed a predictor and R improved" is the wrong causal claim* and an examiner comparing B and C would catch it.
 
@@ -199,21 +204,25 @@ The study trains on ERA5 predictors and applies the relationship to bias-correct
 
 Swapping predictor source costs a factor of **2.80** in climatological RMSE (1.66 → 4.65) but skill does **not** collapse: spatial correlation holds at 0.99, and 4.65 sits well below the 10.30 validation RMSE, so transfer is a secondary error source. This is evidence for the study's central assumption rather than an assertion.
 
-**Caveat, stated because it limits the claim:** the EDCM correction is calibrated on this same period, so each variable's *marginal* distribution matches ERA5 almost by construction. The test is therefore optimistic on marginals. What it does genuinely probe — and what the projection actually depends on — is whether the learned multivariate mapping survives CMIP6's own inter-variable correlations, spatial covariance and temporal sequencing. Those are untouched by the correction.
+**Two caveats, stated because they limit the claim.** First, this probes **climatological** transfer only. That is deliberate — CMIP6 is free-running, so a month-by-month comparison would be unfair by construction — but it means **nothing here tests whether *temporal* skill transfers**, and temporal skill is precisely what these models deliver (§7.2: the spatial pattern was already recoverable by interpolation). A model could reproduce the climatology under CMIP6 forcing while losing its month-to-month discrimination entirely, and this test would not detect it. Second, the EDCM correction is calibrated on this same period, so each variable's *marginal* distribution matches ERA5 almost by construction. The test is therefore optimistic on marginals. What it does genuinely probe — and what the projection actually depends on — is whether the learned multivariate mapping survives CMIP6's own inter-variable correlations, spatial covariance and temporal sequencing. Those are untouched by the correction.
 
-### 7.8 Spectral confirmation: the models inject detail rather than damping it (C2)
-Ullrich et al. recommend power spectra because ML emulators usually *damp* high wavenumbers. Here the result runs the other way, and the reason is the same finding as §7.2: the target is bicubic-interpolated 0.25° ERA5 and holds only **0.02%** of its power beyond wavenumber 10, so there is nothing there to damp.
+### 7.8 Spectral diagnostic: the U-Net damps, the CNN does not (C2)
+Ullrich et al. recommend power spectra because ML emulators typically damp high wavenumbers, making effective resolution coarser than the stated grid. **The models must be judged in CSI space, which is where their loss operates.** GHI is recovered as CSI × clear-sky, and because the CSI target was built by *dividing* by that same clear-sky field, its fine structure is nearly the inverse of the clear-sky field's — multiplying back cancels it. That is why the GHI target is smooth (0.02% of power beyond k=10) while the CSI target is not (0.25%).
 
-| Field | Effective resolution (99% of power) | Power beyond k=10 | vs truth |
-|---|---|---|---|
-| Truth | 263 km | 0.0002 | reference |
-| Baseline (bilinear) | 263 km | 0.0001 | 0.5× |
-| Random Forest | 263 km | 0.0002 | 1.4× |
-| XGBoost | 263 km | 0.0003 | 1.9× |
-| CNN | **113 km** | 0.0055 | **33.8×** |
-| U-Net | **113 km** | 0.0047 | **29.0×** |
+| Field | Shortest wavelength retaining 99% of power | CSI power beyond k=10 | vs truth | Verdict |
+|---|---|---|---|---|
+| Truth | 263 km | 0.00249 | reference | reference |
+| Baseline (bilinear) | 263 km | 0.00247 | 0.99× | matches truth |
+| Random Forest | 263 km | 0.00245 | 0.98× | matches truth |
+| XGBoost | 263 km | 0.00251 | 1.01× | matches truth |
+| CNN | 113 km | 0.00259 | 1.04× | matches truth |
+| **U-Net** | 113 km | **0.00021** | **0.08×** | **DAMPED** |
 
-The shared-weight models inject roughly 30× the truth's fine-scale power — spurious structure, since the target contains none. This is the spectral statement of both the round-trip result (§7.2) and the U-Net's ±15 W m⁻² per-cell bias range (§7.5). Note the usual "power falls to half the reference" definition of effective resolution is one-sided and returns nothing here; the figure quoted is the shortest wavelength inside the band carrying 99% of each field's own power.
+**The U-Net damps CSI power beyond k=10 by a factor of twelve** — the Ullrich failure mode, tied to loss and architecture. The CNN sits within 4% of the target: its explicit spatial-gradient penalty, which acts on CSI, is doing its job.
+
+**Correction to an earlier version of this document.** It reported all four models *injecting* ~30× the truth's fine-scale power, measured in GHI space, and named the CNN the worst offender. That was an artefact of the measurement space. GHI-space excess is a *symptom* of getting CSI wrong: a model that reproduces CSI's fine structure recovers the cancellation and yields a smooth GHI, while one that smooths CSI destroys the structure that would have cancelled and lets the clear-sky field's own structure survive. The U-Net's GHI excess is therefore caused by its CSI damping, not by invented detail — and the CNN's apparent excess is the smallest real discrepancy of the group.
+
+On the effective-resolution definition: the conventional "power falls to half the reference" rule degenerates on the GHI field, whose reference has almost no short-wavelength power for a ratio to be taken against. The figure quoted is the shortest wavelength enclosing 99% of each field's *own* power, which is well defined under damping and excess alike.
 
 ### 7.6 Cross-validation selected worse hyperparameters
 A 150-cell subsampled CV search picked configurations for both tree models that underperformed the untuned defaults on the full 5,751-cell holdout. Defaults retained. The search's own scores gave no warning.
@@ -295,7 +304,11 @@ U-Net projects **3.3× to 6.7×** more brightening than RF and the two agree onl
 
 **The pixel-wise Random Forest is deployed.** U-Net projections are retained solely to quantify architecture sensitivity.
 
-Selection uses a **composite criterion**, stated as such because applying it changes the answer: spatial pattern fidelity and local-bias distribution weigh alongside aggregate error, since a suitability map is read cell by cell. On aggregate RMSE alone the choice would be XGBoost (9.11 vs 10.30, a 12% gap). On the composite criterion RF wins — lowest centred RMSE (0.571 vs 0.721) and the smallest, tightest local bias (+0.25, std 0.57 vs XGBoost's +1.26). The 12% penalty is small beside σ_DS ≈ 10.
+Selection uses a **composite criterion**, and Chapter 3 §3.8.4 states plainly that it was adopted **after** the corrected-alignment run reversed the ranking (see §10a, A10). It is defended on the grounds that a suitability map is consulted one cell at a time, so per-cell reliability governs fitness for purpose in a way a domain average cannot — an argument that does not depend on which model it favours. A reader who rejects it should prefer XGBoost.
+
+On aggregate RMSE alone the choice would be XGBoost (9.11 vs 10.30, a 12% gap).
+
+**The criterion rests on two independent axes, not three.** Centred RMSE of the time-mean field and the standard deviation of the per-cell bias are *the same quantity* — expanding the centred error gives var(m − r) — verified identical to 6 decimal places. Since RMSE² = bias² + centredRMSE², the genuinely independent axes are the **systematic offset** and the **spatial error structure**. RF wins on both: mean bias +0.25 against XGBoost's +1.26, a factor of five; and the lowest centred error of the four, 0.571 against 0.721. The 12% penalty is small beside σ_DS ≈ 10.
 
 **Why U-Net fails hardest** — three measured architectural causes: 17.8M parameters against 312 training fields (≈57,000 per field); the padded 96×96 domain compressed to **3×3** at the bottleneck; and one shared kernel set forced to fit a single predictor→irradiance relation from Lowveld to Eastern Highlands, so it learns the domain-*average* relation (hence competitive aggregate error) and fails where local relations depart. RF fits 5,751 independent local relations and structurally cannot trade one district against another. CNN sits between — shared weights but only 79k parameters plus a spatial-gradient penalty — and its scores sit between accordingly.
 
@@ -341,7 +354,7 @@ Tree defaults were retained after HPO (§7.6). Deployed values are now the **scr
 | B6 σ_arch | **Done** — fourth component; overtakes σ_GCM by the long-term horizon |
 | B7 sky-view factor | **Superseded by §7.4** — widening cannot affect the deployed model |
 | B8 feature importance | **Done** — `feature_importance.csv` |
-| B9 delta-mapping baseline | **Done** — third reference; ref RMSE 0.131 |
+| B9 delta-mapping baseline | **Done** — third reference; ref RMSE **6.39** after the A7 leakage fix (0.131 before it, when it too was leaking) |
 | B10 documentation | **Partly** — see below |
 
 ### Second audit, Parts B–F
@@ -397,8 +410,15 @@ data/processed/
     uncertainty_decomposition_{unet,rf}.nc + summary.csv
     information_content.csv · feature_importance.csv
 deprecated/daily_resolution_experiment/    superseded, with README
+figures/                                   six presentation PNGs (make_figures.py)
+tests/                                     pytest regression suite
 logs/                                      all run logs
+environment.yml                            247 pinned packages
+README.md                                  run order, OpenMP workaround, env vars
+.gitignore                                 excludes data/ (16 GB), figures/, logs/
 ```
+
+Under **git** since the second audit: 61 files tracked, two commits, `data/` excluded.
 
 **Verification:** all 6 sanity checks pass — no all-NaN/all-zero variables across 32 files; latitude ascending and consistent; no fabricated edge band; zero NaN in any projection; SVF varies; counts confirmed at 312 / 168 / 5,751.
 
