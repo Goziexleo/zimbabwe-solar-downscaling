@@ -107,6 +107,7 @@ The retained domain is narrower than Chapter 3's nominal box (15.0–22.5°S, 25
 | `compute_feature_importance.py` | RF MDI + permutation, XGBoost gain + cover |
 | `compute_rolling_origin.py` | Rolling-origin evaluation across 4 expanding-window folds (C3) |
 | `compute_bootstrap_ci.py` | Paired year-block bootstrap: CIs on Table 3.3 and on model differences |
+| `check_status_consistency.py` | Guards this document against stale numbers; run by `pytest` |
 
 ### Projection and verification
 | Script | Role |
@@ -115,7 +116,7 @@ The retained domain is narrower than Chapter 3's nominal box (15.0–22.5°S, 25
 | `compute_mme_aggregations.py` | Ensemble mean + inter-model spread, 3 horizons. `PROJECTIONS_DIR` / `MME_OUTPUT_DIR` |
 | `generate_validation_spatial_fields.py` | Full GHI fields: truth, baseline, all 4 models |
 | `compute_spatial_verification.py` | Taylor statistics + per-pixel bias/RMSE maps |
-| `compute_uncertainty_decomposition.py` | **Four-component** σ_GCM / σ_SSP / σ_arch / σ_DS. σ_DS **derived** from the validation fields; σ_arch from `ARCH_DIRS` (n = 3), kept separate from the deployed-model list. |
+| `compute_uncertainty_decomposition.py` | **Four-component** σ_GCM / σ_SSP / σ_arch / σ_DS. σ_DS **derived** from the validation fields; σ_arch from `ARCH_DIRS` (n = 4), kept separate from the deployed-model list. |
 
 `deprecated/daily_resolution_experiment/` holds the superseded daily-resolution scripts and outputs, with a README explaining why.
 
@@ -218,20 +219,20 @@ Swapping predictor source costs a factor of **2.80** in climatological RMSE (1.6
 ### 7.8 Spectral diagnostic: the U-Net damps, the CNN does not (C2)
 Ullrich et al. recommend power spectra because ML emulators typically damp high wavenumbers, making effective resolution coarser than the stated grid. **The models must be judged in CSI space, which is where their loss operates.** GHI is recovered as CSI × clear-sky, and because the CSI target was built by *dividing* by that same clear-sky field, its fine structure is nearly the inverse of the clear-sky field's — multiplying back cancels it. That is why the GHI target is smooth (0.02% of power beyond k=10) while the CSI target is not (0.25%).
 
-| Field | Shortest wavelength retaining 99% of power | CSI power beyond k=10 | vs truth | Verdict |
-|---|---|---|---|---|
-| Truth | 263 km | 0.00249 | reference | reference |
-| Baseline (bilinear) | 263 km | 0.00247 | 0.99× | matches truth |
-| Random Forest | 263 km | 0.00245 | 0.98× | matches truth |
-| XGBoost | 263 km | 0.00251 | 1.01× | matches truth |
-| CNN | 113 km | 0.00259 | 1.04× | matches truth |
-| **U-Net** | 113 km | **0.00021** | **0.08×** | **DAMPED** |
+| Field | CSI power beyond k=10 | vs truth | Verdict |
+|---|---|---|---|
+| Truth | 0.00249 | reference | reference |
+| Baseline (bilinear) | 0.00247 | 0.99× | matches truth |
+| Random Forest | 0.00245 | 0.98× | matches truth |
+| XGBoost | 0.00251 | 1.01× | matches truth |
+| CNN | 0.00259 | 1.04× | matches truth |
+| **U-Net** | **0.00021** | **0.08×** | **DAMPED** |
 
 **The U-Net damps CSI power beyond k=10 by a factor of twelve** — the Ullrich failure mode, tied to loss and architecture. The CNN sits within 4% of the target: its explicit spatial-gradient penalty, which acts on CSI, is doing its job.
 
 **Correction to an earlier version of this document.** It reported all four models *injecting* ~30× the truth's fine-scale power, measured in GHI space, and named the CNN the worst offender. That was an artefact of the measurement space. GHI-space excess is a *symptom* of getting CSI wrong: a model that reproduces CSI's fine structure recovers the cancellation and yields a smooth GHI, while one that smooths CSI destroys the structure that would have cancelled and lets the clear-sky field's own structure survive. The U-Net's GHI excess is therefore caused by its CSI damping, not by invented detail — and the CNN's apparent excess is the smallest real discrepancy of the group.
 
-On the effective-resolution definition: the conventional "power falls to half the reference" rule degenerates on the GHI field, whose reference has almost no short-wavelength power for a ratio to be taken against. The figure quoted is the shortest wavelength enclosing 99% of each field's *own* power, which is well defined under damping and excess alike.
+**No effective-resolution figure is quoted, deliberately.** The conventional definition — the wavelength at which power falls to half the reference — is one-sided and degenerates on this GHI field, whose reference has almost no short-wavelength power for a ratio to be taken against. A cumulative-power substitute was tried and discarded: on a 71 × 81 grid the available wavelengths are the discrete set 788/k km (788, 394, 263, 197, 158, 131, 113…), so the statistic is quantised into a handful of bins. It took only two distinct values across all six fields and put the CNN and U-Net in the *same* bin while their power ratios were 1.04× and 0.08× — opposite verdicts, identical number. Read cold it also appeared to say the damped model resolved finer scales than the truth. The power ratio carries the result on its own.
 
 ### 7.9 The model ranking is stable across periods (C3)
 Every headline number rests on one 1985–2010 / 2011–2024 split. A rolling-origin design refits on an expanding training window and evaluates on the block immediately after it, so each fold stays a strictly forward-in-time test. Each fold's climatology reference is built from **that fold's own training window**, so the §10a A7 leakage fix carries through.
@@ -344,12 +345,12 @@ which is what made the mismatch confusing.
 **By 2076–2100 architecture choice accounts for 24.1% of projection variance against the GCM's 1.7%** — a factor of about fourteen. The estimate has been stable as members were added (14.2% at n=2, 27.8% at n=3, 24.1% at n=4), which is itself reassuring: the conclusion is not an artefact of which two models happened to be compared.
 
 **σ_DS is constant across horizons** — it is the validation RMSE carried forward, not something
-that varies with lead time. Its share falls only because σ_GCM and σ_arch *grow*; the downscaling
-error does not improve. σ_DS is also a different **kind** of quantity: a historical error against a
-reference, where the other three are spreads across futures. σ_arch rests on **n = 2**
-architectures and σ_GCM on **n = 3** GCMs; both are small-sample spread estimates.
+that varies with lead time. Its share falls from 93.7% to 74.1% only because σ_GCM and σ_arch
+*grow*; the downscaling error itself does not improve. σ_DS is also a different **kind** of
+quantity: a historical error measured against a reference, where the other three are spreads
+across possible futures.
 
-σ_DS still dominates (72–95%) but no longer overwhelmingly — halving the validation RMSE shrank it while σ_arch entered. **σ_arch grows with lead time and overtakes σ_GCM by the long-term horizon** (14.2% vs 2.0% for RF): by 2076–2100 the downscaling architecture matters several times more than the GCM.
+
 
 ### Projected change, and how much it depends on architecture
 
@@ -371,7 +372,7 @@ Selection uses a **composite criterion**, and Chapter 3 §3.8.4 states plainly t
 
 On aggregate RMSE alone the choice would be XGBoost (9.24 vs 10.30, a 10% gap).
 
-**The criterion rests on two independent axes, not three.** Centred RMSE of the time-mean field and the standard deviation of the per-cell bias are *the same quantity* — expanding the centred error gives var(m − r) — verified identical to 6 decimal places. Since RMSE² = bias² + centredRMSE², the genuinely independent axes are the **systematic offset** and the **spatial error structure**. RF wins on both: mean bias +0.25 against XGBoost's +1.26, a factor of five; and the lowest centred error of the four, 0.571 against 0.742. The 10% penalty is small beside σ_DS ≈ 10.
+**The criterion rests on two independent axes, not three.** Centred RMSE of the time-mean field and the standard deviation of the per-cell bias are *the same quantity* — expanding the centred error gives var(m − r) — verified identical to 6 decimal places. Since RMSE² = bias² + centredRMSE², the genuinely independent axes are the **systematic offset** and the **spatial error structure**. RF wins on both: mean bias +0.25 against XGBoost's +1.20, a factor of nearly five; and the lowest centred error of the four, 0.571 against 0.742. The 10% penalty is small beside σ_DS ≈ 10.
 
 **Why U-Net fails hardest** — three measured architectural causes: 17.8M parameters against 312 training fields (≈57,000 per field); the padded 96×96 domain compressed to **3×3** at the bottleneck; and one shared kernel set forced to fit a single predictor→irradiance relation from Lowveld to Eastern Highlands, so it learns the domain-*average* relation (hence competitive aggregate error) and fails where local relations depart. RF fits 5,751 independent local relations and structurally cannot trade one district against another. CNN sits between — shared weights but only 79k parameters plus a spatial-gradient penalty — and its scores sit between accordingly.
 
@@ -514,6 +515,7 @@ Under **git** since the second audit: 61 files tracked, two commits, `data/` exc
 3. **Cloud is unresolved.** The dominant control on surface irradiance is parameterised inside the GCM and available only as a grid mean. Feature importance confirms cloud fraction dominates the fit.
 4. **Defensive NaN handling hides failures.** Two of the three severe silent bugs were `np.nan_to_num` converting a loud failure into a plausible field. Both were caught by inspecting fields, not scores. `safe_nan_to_num` now makes this loud.
 5. **Two bugs cancelled each other** (§6.11). A bug invisible in one data split because a second bug reverses it is the hardest class to find — the lesson is that identical logic must be used at every join, not merely logic that works.
+6. **Prose drifts from tables.** Four audit rounds found the same failure: a number corrected in a table while the sentence beneath kept the old value, every time caught by an external reader. The tables had a defence — `compute_table33.py` as the single canonical source — and the prose had none. `check_status_consistency.py` now supplies one, checking that canonical CSV values appear and that superseded values do not reappear outside an explanatory context. It runs under `pytest`. Its own first version had exactly the bug it exists to prevent: it scanned a whole paragraph for any explanatory word, so a stale figure passed because an unrelated clause elsewhere in the same line said "no longer". It now searches a 90-character window around the value.
 
 ---
 

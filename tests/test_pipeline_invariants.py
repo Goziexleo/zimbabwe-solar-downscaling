@@ -183,3 +183,27 @@ def test_safe_nan_to_num_raises_above_threshold():
     small[0] = np.nan
     out = safe_nan_to_num(small, "test:one_nan")
     assert out[0] == 0.0 and np.isfinite(out).all()
+
+
+# ------------------------------------------------- documentation drift ----
+@pytest.mark.skipif(not os.path.exists(os.path.join(ROOT, "PROJECT_STATUS.md")),
+                    reason="status document not present")
+def test_status_document_has_no_stale_numbers():
+    """PROJECT_STATUS.md must agree with the canonical evaluation CSVs.
+
+    Four audit rounds found the same failure: a number corrected in a table
+    while the sentence beneath it kept the old value. Every instance was caught
+    by an external reader rather than by anything in the project. This asserts
+    the two conditions that would have caught them - canonical values present,
+    superseded values absent outside an explanatory context.
+    """
+    from check_status_consistency import check
+    missing, resurrected = check()
+    problems = []
+    if missing:
+        problems += [f"canonical value absent: {lab} (expected '{val}')"
+                     for lab, val in missing]
+    if resurrected:
+        problems += [f"superseded value present at line {ln}: '{val}' — {why}"
+                     for val, why, ln, _ in resurrected]
+    assert not problems, "PROJECT_STATUS.md is out of date:\n  " + "\n  ".join(problems)

@@ -26,12 +26,18 @@ about twelve relative to the target - the damping Ullrich et al. describe, tied
 to the loss function and architecture. The CNN, which carries an explicit
 spatial-gradient penalty, sits within 4 per cent of the target and does not damp.
 
-The usual "power falls to half the reference" definition of effective resolution
-degenerates here: the GHI reference has essentially no power at short
-wavelengths, so the ratio is dominated by a near-zero denominator and the
-threshold is never crossed from above. Effective resolution is instead reported
-as the shortest wavelength still inside the band carrying 99 per cent of a
-field's own power, which is well defined under damping and excess alike.
+NO EFFECTIVE-RESOLUTION COLUMN IS REPORTED, deliberately. The conventional
+definition - the wavelength at which power falls to half the reference - is
+one-sided and degenerates on this GHI field, whose reference has almost no
+short-wavelength power for a ratio to be taken against. A cumulative-power
+substitute was tried and discarded: on a 71 x 81 grid the available wavelengths
+are the discrete set 788/k km (788, 394, 263, 197, 158, 131, 113, ...), so the
+statistic is quantised to a handful of bins. Across all six fields it took only
+two distinct values, and it placed the CNN and the U-Net in the same bin while
+their power ratios were 1.04x and 0.08x - opposite verdicts, identical number.
+It could not discriminate, and read cold it appeared to say the damped model
+resolved finer scales than the truth. The power ratio alone carries the result
+without that risk.
 """
 
 import os
@@ -47,7 +53,6 @@ OUT_SUMMARY = os.path.join(ROOT, "data/processed/evaluation/effective_resolution
 
 FINE_RES_DEG = 0.1
 KM_PER_DEG = 111.0
-CUMULATIVE_THRESHOLD = 0.99  # effective resolution: shortest wavelength still carrying signal
 
 SERIES = [
     ("Truth (ERA5)", "ghi_true"),
@@ -125,24 +130,14 @@ def main():
         pc = spectra_csi[label]
         tail_csi = np.nansum(pc[10:]) / np.nansum(pc)
         ratio_csi = tail_csi / tail_ref_csi
-        # Effective resolution: the shortest wavelength still inside the band
-        # holding CUMULATIVE_THRESHOLD of the field's total power. Defined this
-        # way it is meaningful whether a field damps the high wavenumbers or
-        # injects into them, unlike a one-sided "power falls below X" rule.
-        cum = np.nancumsum(p) / np.nansum(p)
-        idx = int(np.searchsorted(cum, CUMULATIVE_THRESHOLD))
-        idx = min(idx, len(wavelength_km) - 1)
-        tail = np.nansum(p[10:]) / np.nansum(p)
         rows.append({
             "field": label,
-            "shortest wavelength retaining power (km)": float(wavelength_km[idx]),
             "CSI power beyond k=10": float(tail_csi),
             "CSI vs truth": ("reference" if label == "Truth (ERA5)"
                              else f"{ratio_csi:.2f}x"),
             "CSI verdict": ("reference" if label == "Truth (ERA5)"
                             else "DAMPED" if ratio_csi < 0.7
                             else "excess" if ratio_csi > 1.4 else "matches truth"),
-            "GHI power beyond k=10": float(tail),
         })
     summary = pd.DataFrame(rows)
     summary.to_csv(OUT_SUMMARY, index=False)
@@ -165,10 +160,10 @@ therefore means a model got CSI WRONG - not that it invented detail.
   CNN    sits within a few per cent of the target: its spatial-gradient
          penalty, which acts on CSI, is doing its job.
 
-"shortest wavelength retaining power" is where 99% of a field's OWN power is
-enclosed. The conventional "power falls to half the reference" definition
-degenerates on the GHI field, whose reference has almost no short-wavelength
-power for a ratio to be taken against.
+No effective-resolution figure is quoted. On this grid the available wavelengths
+are the discrete set 788/k km, so any such statistic is quantised into a few
+bins - it put the CNN and U-Net in the same bin despite opposite verdicts, and
+read backwards besides. The power ratio says the same thing unambiguously.
 """)
     print("\nGHI-space power ratio to truth, by wavelength band (symptom, not cause):")
     hdr = f"{'wavelength':>12} " + "".join(f"{l.split(' (')[0][:12]:>14}" for l, _ in SERIES[1:])
