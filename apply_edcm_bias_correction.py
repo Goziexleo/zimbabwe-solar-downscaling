@@ -11,6 +11,7 @@ import numpy as np
 import xarray as xr
 import os
 import glob
+import re
 import time
 from scipy.interpolate import interp1d
 
@@ -56,11 +57,53 @@ def get_coord_names(ds):
     return lat_name, lon_name
 
 
-def get_files(model, experiment, var):
+VARIANT_RE = re.compile(r"_(r\d+i\d+p\d+f\d+)_")
+
+
+def _variant(path):
+    m = VARIANT_RE.search(os.path.basename(path))
+    return m.group(1) if m else None
+
+
+def get_files(model, experiment, var, pinned_variant=None):
+    """Files for one model/experiment/variable, restricted to ONE ensemble member.
+
+    The raw archive can hold several realisations of the same experiment - this
+    project has both r1i1p1f2 and r10i1p1f2 of CNRM-CM6-1 ssp245 clt. A bare
+    glob matches all of them and hands overlapping time ranges to
+    open_mfdataset(compat="override"), which silently keeps whichever sorts
+    first. That mixes realisations inside one series: the bias-correction
+    transfer function would be calibrated on one member's historical run and
+    applied to another's future run, so part of the apparent change signal would
+    be a switch of realisation rather than a forced response.
+
+    It happens to be harmless here, because the stray r10 file covers 2015-2020
+    and every window actually used (1985-2010 historical, 2026-2100 future)
+    excludes it. Relying on that is not a control, so the member is pinned
+    explicitly and any discarded alternative is reported.
+    """
     realm = REALM_BY_VAR[var]
     pattern = os.path.join(cmip6_raw_dir, f"{var}_{realm}_{model}_{experiment}_*.nc")
-    all_files = sorted(glob.glob(pattern))
-    return [f for f in all_files if os.path.getsize(f) > 0]
+    all_files = [f for f in sorted(glob.glob(pattern)) if os.path.getsize(f) > 0]
+    if not all_files:
+        return []
+
+    variants = {}
+    for path in all_files:
+        variants.setdefault(_variant(path), []).append(path)
+
+    if pinned_variant is not None and pinned_variant in variants:
+        chosen = pinned_variant
+    else:
+        # Prefer the member with the most files, breaking ties on the lowest
+        # realisation number, so the choice does not depend on string sorting.
+        chosen = max(variants, key=lambda v: (len(variants[v]),
+                                              -int(re.match(r"r(\d+)", v).group(1)) if v else 0))
+    if len(variants) > 1:
+        dropped = {v: len(p) for v, p in variants.items() if v != chosen}
+        print(f"    WARNING: {model}/{experiment}/{var} has multiple ensemble members "
+              f"{sorted(variants)}; using {chosen}, ignoring {dropped}")
+    return variants[chosen]
 
 
 def edcdf_matching_1d(obs_hist, sim_hist, sim_fut, bins=100):
@@ -104,7 +147,12 @@ for model in models:
         for var in variables:
             print(f"  Bias correcting: {var}")
             hist_files = get_files(model, "historical", var)
-            fut_files = hist_files if ssp == "historical" else get_files(model, ssp, var)
+            # Pin the future member to whatever the historical calibration used,
+            # so the transfer function and the field it corrects are the same
+            # realisation.
+            hist_variant = _variant(hist_files[0]) if hist_files else None
+            fut_files = (hist_files if ssp == "historical"
+                         else get_files(model, ssp, var, pinned_variant=hist_variant))
 
             if not hist_files or not fut_files:
                 print(f"    Warning: Missing files for {var}. Skipping variable.")

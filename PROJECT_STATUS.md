@@ -106,6 +106,7 @@ The retained domain is narrower than Chapter 3's nominal box (15.0–22.5°S, 25
 | `compute_information_content.py` | Sub-0.25° information test with elevation positive control |
 | `compute_feature_importance.py` | RF MDI + permutation, XGBoost gain + cover |
 | `compute_rolling_origin.py` | Rolling-origin evaluation across 4 expanding-window folds (C3) |
+| `compute_bootstrap_ci.py` | Paired year-block bootstrap: CIs on Table 3.3 and on model differences |
 
 ### Projection and verification
 | Script | Role |
@@ -254,6 +255,33 @@ Relative to each model's own deployed-split fold, no architecture is unusually p
 All four sit within a spread of ~1.4, and all four find 2005–2010 hardest and 2011–2016 easiest — a property of the periods, not of any model.
 
 **A units caveat, recorded because the raw output invites the error.** The two networks report validation MSE in different units: the CNN trains on raw CSI, the U-Net on a standardised anomaly `(CSI − climatology)/anomaly_std`. With `anomaly_std = 0.0578`, the scale factor is 1/std² ≈ 299, which accounts for essentially the whole of the ~278× gap between their raw numbers. **Their absolute MSEs are not comparable**; only each model against itself across folds is, which is what the relative table above reports.
+
+### 7.10 Confidence intervals: which differences survive resampling
+Every metric had been a point estimate, including the gaps §3.8.4 turns on. A **paired year-block bootstrap** (2,000 replicates, resampling whole calendar years so spatial and seasonal correlation are preserved within each unit, every model scored on the same resampled years) gives:
+
+| Model | RMSE | 95% CI |
+|---|---|---|
+| **XGBoost** | 9.24 | [8.55, 9.87] |
+| U-Net | 10.11 | [9.63, 10.65] |
+| CNN | 10.14 | [9.54, 10.74] |
+| Random Forest | 10.30 | [9.37, 11.25] |
+
+Individual intervals overlap heavily — but that is the wrong comparison. Because the bootstrap is paired, the interval on each *difference* removes the year-to-year variation common to all models:
+
+| Comparison | ΔRMSE | 95% CI | Verdict |
+|---|---|---|---|
+| Random Forest − XGBoost | +1.058 | [+0.530, +1.671] | **distinguishable** |
+| CNN − XGBoost | +0.900 | [+0.561, +1.228] | **distinguishable** |
+| U-Net − XGBoost | +0.866 | [+0.412, +1.281] | **distinguishable** |
+| CNN − Random Forest | −0.158 | [−0.907, +0.508] | not distinguishable |
+| Random Forest − U-Net | +0.193 | [−0.519, +0.970] | not distinguishable |
+| CNN − U-Net | +0.035 | [−0.287, +0.388] | not distinguishable |
+
+**XGBoost's aggregate advantage is real**: its RMSE deficit against all three others excludes zero. The comparison §3.8.4 rests on — Random Forest against XGBoost, +1.058 W m⁻² — survives at [+0.530, +1.671].
+
+**Two consequences worth stating.** First, the deployment argument is now sharper, not weaker: RF is being preferred despite a *statistically distinguishable* aggregate deficit, so the spatial-fidelity case has to carry that weight explicitly. Second, **RF, CNN and U-Net are not distinguishable from one another on RMSE** — the ordering among those three is noise at this sample size, and any narrative ranking them should say so.
+
+Mean bias is the weakest column: **every model's MBE interval spans zero**, including XGBoost's +1.20 [−0.14, +2.41]. The fivefold RF-vs-XGBoost bias ratio cited in §9 is a point-estimate ratio between two quantities that are individually indistinguishable from zero, and should be presented as indicative rather than established.
 
 ### 7.6 Cross-validation selected worse hyperparameters
 A 150-cell subsampled CV search picked configurations for both tree models that underperformed the untuned defaults on the full 5,751-cell holdout. Defaults retained. The search's own scores gave no warning.
