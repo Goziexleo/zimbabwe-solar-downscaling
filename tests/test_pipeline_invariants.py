@@ -172,6 +172,43 @@ def test_rf_manifest_matches_builder(val):
     assert feature_vars == manifest["feature_vars"]
 
 
+# ------------------------------------------------------- §3.4.3 QC -------
+@pytest.mark.skipif(
+    not os.path.isdir(os.path.join(ROOT, "data/processed/cmip6_bias_corrected")),
+    reason="bias-corrected CMIP6 fields not built",
+)
+def test_bias_corrected_fields_respect_physical_bounds():
+    """No predictor fed to the models may be physically impossible.
+
+    EDCM is tail-sensitive: matching a bounded variable against an empirical
+    CDF pushed 0.64% of cloud-fraction values outside [0, 100] (as low as
+    -5.93%) and a handful of optical depths below zero. Section 3.4.3 claimed
+    this was handled; it was not, until apply_qc_bounds.py. Nothing else in the
+    pipeline would notice - the models simply receive an out-of-range predictor
+    and, being trees, saturate on it.
+    """
+    import glob
+    from apply_qc_bounds import PHYSICAL_BOUNDS
+
+    files = sorted(glob.glob(os.path.join(
+        ROOT, "data/processed/cmip6_bias_corrected/*_corrected.nc")))
+    if not files:
+        pytest.skip("no bias-corrected files")
+    offenders = []
+    for path in files:
+        ds = xr.open_dataset(path)
+        for var, (lo, hi) in PHYSICAL_BOUNDS.items():
+            if var not in ds.data_vars:
+                continue
+            a = ds[var].values
+            if lo is not None and np.nanmin(a) < lo:
+                offenders.append(f"{os.path.basename(path)}:{var} min={np.nanmin(a):.4f} < {lo}")
+            if hi is not None and np.nanmax(a) > hi:
+                offenders.append(f"{os.path.basename(path)}:{var} max={np.nanmax(a):.4f} > {hi}")
+        ds.close()
+    assert not offenders, "physically impossible predictor values:\n  " + "\n  ".join(offenders)
+
+
 # ------------------------------------------------------ loud NaN guard ----
 def test_safe_nan_to_num_raises_above_threshold():
     """The helper must refuse to silence a large NaN fraction."""

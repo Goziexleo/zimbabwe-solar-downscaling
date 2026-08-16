@@ -50,6 +50,8 @@ python compute_finegrid_clearsky_ghi.py            # clear-sky ceiling
 # 2. Predictors  (FORCE_REMERGE=1 to recompute an existing file)
 FORCE_REMERGE=1 python merge_predictor_stack.py
 EDCM_INCLUDE_HISTORICAL=1 python apply_edcm_bias_correction.py
+# enforce physical bounds on the corrected fields (EDCM overshoots at the tails)
+python apply_qc_bounds.py --apply
 
 # 3. ML-ready datasets
 python build_ml_features_and_targets.py

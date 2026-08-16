@@ -91,6 +91,7 @@ The retained domain is narrower than Chapter 3's nominal box (15.0–22.5°S, 25
 | `compute_finegrid_clearsky_ghi.py` | Monthly clear-sky ceiling, PVLIB Ineichen, **per-cell SRTM elevation** and **per-cell/per-month Linke turbidity** |
 | `merge_predictor_stack.py` | Merges `rsds` (reused `ssrd`) + MERRA-2 `od550aer`. Aligns on **calendar month** (`align_to_months`) — the old nearest-timestamp match caused §6.11. `FORCE_REMERGE=1` recomputes; warns loudly on missing months. |
 | `apply_edcm_bias_correction.py` | Equidistant CDF matching of CMIP6 against ERA5 |
+| `apply_qc_bounds.py` | **§3.4.3 QC.** Enforces physical bounds on the bias-corrected fields (EDCM overshoots them at the tails) and writes the per-cell flag counts. Run with no arguments to report, `--apply` to enforce. Originals preserved in `cmip6_bias_corrected_preqc/`. |
 | `build_ml_features_and_targets.py` / `build_ml_validation_dataset.py` | Produce the 312 / 168-sample datasets |
 
 ### Training and evaluation
@@ -284,6 +285,16 @@ Individual intervals overlap heavily — but that is the wrong comparison. Becau
 
 **Two consequences worth stating.** First, the deployment argument could no longer be carried on aggregate grounds: RF would have to be preferred *despite* a statistically distinguishable deficit, so the spatial-fidelity case had to carry that weight explicitly — and the next subsection shows it cannot. Second, **RF, CNN and U-Net are not distinguishable from one another on RMSE** — the ordering among those three is noise at this sample size, and any narrative ranking them should say so.
 
+**Reconciling that with the sections that do rank them.** §7.5, §7.8 and §9 all order these three, and Table 3.3 lists them in an RMSE order (U-Net 10.11, CNN 10.14, RF 10.30) that the bootstrap says is not real. Both are correct because **they are rankings on different axes, and only one of the two axes supports a ranking**:
+
+| Axis | RF vs CNN | CNN vs U-Net | RF vs U-Net | Ordering established? |
+|---|---|---|---|---|
+| Aggregate RMSE | −0.158 [−0.907, +0.508] | +0.035 [−0.287, +0.388] | +0.193 [−0.519, +0.970] | **no — none of the three** |
+| Centred RMSE | −2.525 [−2.758, −2.217] | −0.299 [−0.517, −0.070] | −2.824 [−3.024, −2.486] | **yes — all three pairs** |
+| Spatial R | +0.080 [+0.066, +0.095] | +0.018 [+0.006, +0.031] | +0.098 [+0.082, +0.115] | **yes — all three pairs** |
+
+**RF > CNN > U-Net is fully established on both spatial axes, including the narrow CNN-over-U-Net margin, and is established on none of the aggregate ones.** So the rule for the whole document is: *rank these three on spatial fidelity, never on RMSE.* Every ranking §7.5, §7.8 and §9 make is a spatial-fidelity ranking — the U-Net's ±15 W m⁻² per-cell bias range, its 0.08× spectral damping, the bottleneck argument — and each survives. Table 3.3's row order is an artefact of sorting by a column that does not separate them; read the Taylor table for the ordering that holds.
+
 Mean bias is the weakest column: **every model's MBE interval spans zero**, including XGBoost's +1.20 [−0.14, +2.41]. The fivefold RF-vs-XGBoost bias ratio discussed in §9 is a point-estimate ratio between two quantities that are individually indistinguishable from zero, and is presented there as indicative rather than established.
 
 ### The spatial axis, tested — and the consequence for §3.8.4
@@ -356,6 +367,25 @@ first is very nearly an identity. Scoring against an identity measures the circu
 task, not model quality.
 
 Targets are R > 0.90 and |MBE| < 5. **All four models clear both for the first time in the project.**
+
+### The raw-magnitude objection, and the honest answer
+
+**The objection.** Domain-mean GHI over the validation period is **239.1 W m⁻²**, so an RMSE of 9.24 is 3.9% of the signal — which sounds excellent and *is the wrong denominator*. Most of that 239 is the deterministic solar-geometry component that the clear-sky normalisation removes before the model sees anything. Quoting error against it credits the model for astronomy.
+
+**Four denominators, in increasing order of honesty:**
+
+| Denominator | Value | XGBoost RMSE as % | What it means |
+|---|---|---|---|
+| Domain-time mean GHI | 239.1 | **3.9%** | flattering — mostly solar geometry |
+| Seasonal range of the domain mean | 103.9 | 8.9% | still largely deterministic |
+| Temporal std of GHI | 38.04 | **24.3%** | the fair aggregate figure |
+| Climatology RMSE | 19.08 | 48.4% (SS = **0.5155**) | **the defensible headline** |
+
+**Skill against climatology is the number to quote: the model halves the error of a per-cell, per-calendar-month mean built without sight of the evaluation period.** That is a real result and it is the one §8 leads with.
+
+**The sharpest form of the objection, and why it does not land.** The spatial standard deviation of the time-mean GHI field is only **7.98 W m⁻²** — so the aggregate RMSE of 9.24 *exceeds the entire spatial variability of the map being produced*. Read cold, that says the error is bigger than the signal. It is a category error, but a fair one to raise: the 9.24 includes month-to-month temporal error, while a suitability map is built from the **time mean**, whose error is the centred RMSE of **0.742 W m⁻² — 9.3% of that 7.98 spatial std**. The two numbers answer different questions. The correct statement is that the model resolves the *spatial pattern* of the resource to about a tenth of its variation, and resolves *individual months* to about a quarter of their variation.
+
+**What this does not rescue.** §7.2 established that the spatial pattern was already largely recoverable by interpolation, so the 0.742 is not evidence of skill at generating sub-grid structure. The genuine contribution is temporal, and the temporal figure is the 24.3% one.
 
 ### Taylor statistics — time-mean spatial pattern (reference spatial std 7.98 W m⁻²)
 
@@ -449,6 +479,8 @@ state only because four architectures were carried through to projection rather 
 
 1. **The composite criterion does not separate the two models (§7.10).** RF−XGBoost is −0.145 [−0.305, **+0.010**] on centred RMSE and +0.0016 [−0.0006, +0.0042] on spatial R. Neither interval excludes zero, so neither leg of the criterion is established. The aggregate deficit it was meant to outweigh *is* established: +1.058 [+0.530, +1.671], confirmed by XGBoost winning all four rolling-origin folds (§7.9).
 2. **RF cannot separate the emission scenarios (§7.11).** Its SSP5-8.5 minus SSP2-4.5 separation *shrinks* with lead time (+0.465 → +0.307 → +0.167), it inverts on the long-term change signal, and only 71.7% of cells order the pathways correctly, against XGBoost's 96.7%. The mechanism is tree extrapolation: temperature leaves the 1985–2010 training range 4.95% of the time under SSP5-8.5 against 0.79% under SSP2-4.5, and a tree's prediction saturates outside the range it was fitted on.
+
+3. **The ranking is not an artefact of the chosen split (§7.9).** This is the consequence of the rolling-origin result, and it belongs here rather than only in §7. The entire deployment argument rests on a comparison measured over one 1985–2010 / 2011–2024 division of the record. A rolling-origin design, refitting on an expanding window and testing on the block immediately after it, puts XGBoost ahead in **all four** forward-in-time folds by margins of 0.89 to 2.26 W m⁻². The preference is therefore a property of the models rather than of the validation period, and no fold reverses it. The negative form matters more than the positive one: had the ranking flipped between folds, *any* selection rule — the original single-metric one included — would have been arbitrating noise, and the honest conclusion would have been that the four models are not separable at this sample size. That is precisely the conclusion §7.10 forces for RF against CNN against U-Net, whose RMSE differences are not distinguishable. It is not the conclusion for XGBoost, which is separable from all three and stays separable in every fold.
 
 **XGBoost is the only model no other model is established to beat on any tested axis**, while it is established to beat all three on RMSE. Deploying it also **returns the study to §3.8.1's original pre-registered criterion** — lowest validation RMSE — which removes the post-hoc criterion change (A10) as an attack surface rather than defending it.
 
@@ -579,14 +611,19 @@ Under **git** since the second audit: 61 files tracked, two commits, `data/` exc
 - **Chapter 4** (results and discussion)
 - **SARAH-2 / NSRDB independent validation — COMMITTED, deferred.** Will be implemented, but deliberately **out of scope for the 24 August interview**. It is the only route to genuine sub-0.25° resolution (§7.2) and the fix for the validation-independence gap (§14.1).
 
-**Needs your hand**
-- Chapter 1 (~line 149) and Chapter 2 §2.3.3 present SARAH-2 and NSRDB as validation data for this study. Because that validation is committed rather than abandoned, these sections do **not** need retracting — they describe work that is planned. Chapter 3 §3.3.3 has been reworded to match ("is planned as the next stage of this work and is not reported here"), so the three chapters are now consistent in treating it as deferred. Check the tense in Chapters 1 and 2 reads as intent rather than as completed work.
-- Chapter 2 also sets up the expectation that encoder-decoders beat tree methods, which the results overturn — needs a forward-reference to §3.8.4 or reframing as a hypothesis the study tests.
-- **Dozier & Frew (1990)** is cited as plain text and is not in the Zotero library.
-- §6.1 uses 0.68 for a collapsed *correlation* while §7.5 discusses *std ratios* near 0.68 — add a clarifying clause if both appear in the thesis.
+**Needs your hand — one item, and it needs the Zotero desktop app**
+- **Dozier & Frew (1990) is not in the Zotero library.** Verified precisely: it appears once, as plain text at Chapter 3 paragraph 75 ("the Dozier and Frew (1990) sky-view integral"), and is in **none** of the 26 `ZOTERO_ITEM` citation fields. Chapter 3's bibliography is Zotero-generated (`ZOTERO_BIBL` field present), so **the reference will not appear in the reference list** as things stand. I cannot add it — the library is the desktop application's own database. Add this item, then re-cite the plain text as a live field:
+
+  > Dozier, J. and Frew, J. (1990). Rapid calculation of terrain parameters for radiation modeling from digital elevation data. *IEEE Transactions on Geoscience and Remote Sensing*, 28(5), 963–969. doi:10.1109/36.58986
+
 - **The published results dashboard has been withdrawn** and replaced with a retraction notice (see §10a / E1). Nothing further is needed unless you want the URL itself deleted, which must be done from the artifacts gallery.
 
-**Still specified but not implemented:** per-cell QC flag counts for the appendix (§3.4.3).
+**Closed in the Round 5 pass**
+- **Chapter 1 needed no change.** Its SARAH-2/NSRDB passage (paragraph 35) describes those products' *limitation* — that they carry no future information — and never claims them as this study's validation. Checked rather than assumed.
+- **Chapter 2 §2.3.3 tense — fixed.** Paragraph 69 claimed SARAH-2 was "a suitable independent validation dataset for the downscaled products produced in this study"; paragraph 71 said "NSRDB **serves as** a secondary independent validation source". Both now state the validation is planned and not reported here, pointing to §3.3.3, so Chapters 1, 2 and 3 agree.
+- **Chapter 2 forward reference — added.** Paragraph 128's "Benchmarking studies **confirm** that deep learning models outperform classical baselines" is softened to "**report**", and the paragraph now closes by framing this as a hypothesis the study tests rather than assumes, states that it is not borne out here, and forward-references §3.8.4.
+- **The 0.68 ambiguity does not exist in the thesis.** Searched all three chapters: **0.68 appears nowhere**. The collision is between two *status-document* sections (§6.1's collapsed correlation and §7.5's std ratios), not between two thesis passages, so no clarifying clause is needed. Resolved as not applicable rather than left open.
+- **Per-cell QC flag counts — implemented, and they found a real defect.** See §7.12.
 
 **E1 — closed.** The published dashboard has been **withdrawn**: its content is replaced by a retraction notice explaining that every figure was superseded by the alignment fix, the circular-predictor removal, the two leakage fixes and three retrains. The URL now resolves to that notice rather than to wrong numbers. Fully deleting the URL, if wanted, must be done from the artifacts gallery.
 
