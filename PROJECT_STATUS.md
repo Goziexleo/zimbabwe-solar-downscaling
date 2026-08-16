@@ -340,6 +340,39 @@ This is the concrete form of the stationarity caveat in §14.2, and it matters m
 
 **A caution against over-reading it in the other direction.** All four scenario separations are small beside σ_DS ≈ 10 W m⁻². The CNN's +9.654 is not obviously *better* for being larger — it is comparable to the model's own error, and its long-term change of +16.6 W m⁻² is implausibly large for a 75-year irradiance trend. The honest reading is that RF is disqualified on this axis, XGBoost is adequate, and the neural models' larger responses are unverifiable rather than demonstrably right.
 
+### 7.12 §3.4.3's quality control did not exist, and the null result is the interesting part
+
+**What was claimed and what was there.** §3.4.3 stated that physically unrealistic CMIP6 values — negative rsds, cloud fraction above 100%, negative humidity — "were replaced with the model climatology using a 31-day centred moving window". No such step existed anywhere in the pipeline. The section also said per-cell flag counts "were not separately tabulated".
+
+**The violations are real.** Equidistant CDF matching is tail-sensitive: matching a *bounded* variable against an empirical distribution drives a fraction of corrected values past the bound.
+
+| Variable | Flagged | Of total | Worst excursion | Cells affected |
+|---|---|---|---|---|
+| `clt` | 38,843 | 0.6406% | **−5.93%** cloud fraction | **751 / 957** |
+| `od550aer` | 107 | 0.0018% | −0.0046 optical depth | 69 / 957 |
+
+A negative cloud fraction is not a small error in kind, and it was reaching models trained on a strictly non-negative predictor. 751 of 957 coarse cells are affected at least once, up to 277 time steps at a single cell — spread across the domain, not confined to a corner.
+
+**The ERA5 half, by contrast, is exactly clean.** The clear-sky index is clipped to [0, 1.1], and the clip never binds: across 1,794,312 training and 966,168 validation values the maximum is 0.6323. **The flag count is identically zero at every cell** — so §3.4.3's appendix table is now a determinate result rather than an untabulated unknown.
+
+**The fix.** `apply_qc_bounds.py` enforces the bounds by **truncation**, not by the climatological replacement §3.4.3 specified. The violations are small overshoots at the distribution tails; truncation preserves the corrected value everywhere else, whereas climatological replacement would discard a correctly corrected value to repair a boundary artefact. §3.4.3 has been rewritten to describe what the code does. Originals are preserved in `cmip6_bias_corrected_preqc/`, and a regression test asserts no predictor is physically impossible — verified to fail against those originals with 11 offenders.
+
+**Impact on every published number: essentially none — and *why* is a genuine corroboration of §7.11.** All four models' projections, all four MME aggregations and the decomposition were regenerated from the corrected inputs.
+
+| Quantity | Pre-QC | Post-QC |
+|---|---|---|
+| RF long-term change (SSP2-4.5 / SSP5-8.5) | +1.648 / +1.349 | **+1.648 / +1.349** (identical) |
+| XGBoost long-term change | +4.081 / +4.771 | **+4.081 / +4.771** (identical) |
+| CNN long-term change | +8.309 / +16.566 | +8.307 / +16.558 |
+| U-Net long-term change | +5.432 / +8.995 | +5.432 / +8.988 |
+| Scenario ordering, cells correct | RF 71.7%, XGB 96.7% | **unchanged** |
+| σ_arch share, long term (deployed) | 27.20% | 27.18% |
+| C1 transfer, XGBoost ensemble | 4.8226 | **4.8226** (identical to 4 dp) |
+
+**The two tree models are bit-identical; only the two networks moved.** That is exactly what §7.11 predicts and is measured here independently. The out-of-bound cloud values were *already* outside the 1985–2010 training range, and a tree returns the same leaf for every input beyond that range — so moving the input from −5.93 to 0 moves the prediction not at all. The networks extrapolate through their linear layers, so the same input change propagates, in the third decimal. **The QC's null effect on the deployed model is the saturation mechanism showing up in a completely different experiment.**
+
+**This does not make the fix optional.** A defect that happens not to move the current answer is still a defect: it would matter for any model that extrapolates, for any rerun with different data, and for a reader entitled to expect that a documented QC step exists. The honest statement is that §3.4.3 was wrong, is now correct, and that correcting it changed no conclusion in this study.
+
 ### 7.6 Cross-validation selected worse hyperparameters
 A 150-cell subsampled CV search picked configurations for both tree models that underperformed the untuned defaults on the full 5,751-cell holdout. Defaults retained. The search's own scores gave no warning.
 
@@ -408,22 +441,22 @@ which is what made the mismatch confusing.
 
 | Model | Period | σ_GCM | σ_SSP | σ_arch | σ_DS | σ_total | % var DS | % var arch |
 |---|---|---|---|---|---|---|---|---|
-| **XGB (deployed)** | Near-term | 1.92 | 0.43 | 2.34 | 9.24 | 9.74 | 90.10% | 5.80% |
-| **XGB (deployed)** | Mid-term | 2.20 | 0.48 | 3.90 | 9.24 | 10.28 | 80.80% | 14.42% |
-| **XGB (deployed)** | Long-term | 2.54 | 0.83 | 5.88 | 9.24 | 11.28 | 67.19% | **27.20%** |
+| **XGB (deployed)** | Near-term | 1.92 | 0.43 | 2.34 | 9.24 | 9.74 | 90.10% | 5.79% |
+| **XGB (deployed)** | Mid-term | 2.20 | 0.48 | 3.90 | 9.24 | 10.28 | 80.81% | 14.41% |
+| **XGB (deployed)** | Long-term | 2.54 | 0.83 | 5.88 | 9.24 | 11.27 | 67.21% | **27.18%** |
 | U-Net | Near-term | 2.03 | 0.56 | 2.34 | 10.11 | 10.59 | 91.16% | 4.90% |
-| U-Net | Mid-term | 3.20 | 1.02 | 3.90 | 10.11 | 11.35 | 79.39% | 11.84% |
-| U-Net | Long-term | 4.00 | 2.38 | 5.88 | 10.11 | 12.59 | 64.50% | **21.83%** |
-| RF | Near-term | 1.24 | 0.26 | 2.34 | 10.30 | 10.64 | 93.73% | 4.86% |
-| RF | Mid-term | 1.42 | 0.18 | 3.90 | 10.30 | 11.11 | 85.99% | 12.35% |
-| RF | Long-term | 1.58 | 0.29 | 5.88 | 10.30 | 11.97 | 74.06% | **24.14%** |
+| U-Net | Mid-term | 3.20 | 1.02 | 3.90 | 10.11 | 11.35 | 79.40% | 11.83% |
+| U-Net | Long-term | 4.00 | 2.38 | 5.88 | 10.11 | 12.58 | 64.53% | **21.82%** |
+| RF | Near-term | 1.24 | 0.26 | 2.34 | 10.30 | 10.64 | 93.73% | 4.85% |
+| RF | Mid-term | 1.42 | 0.18 | 3.90 | 10.30 | 11.11 | 86.00% | 12.35% |
+| RF | Long-term | 1.58 | 0.29 | 5.88 | 10.30 | 11.97 | 74.08% | **24.12%** |
 
 The Random Forest rows are retained because §3.8.4 deployed it until the bootstrap (§7.10) and the
 scenario test (§7.11) reversed that choice; keeping them makes the reversal auditable.
 
 **σ_arch rests on all four benchmarked architectures (n = 4)** — RF, XGBoost, CNN, U-Net — which exceeds σ_GCM's n = 3, so the comparison between them no longer favours the GCM term on sample size. Reaching n = 4 required persisting XGBoost (~400 MB at 200 fixed rounds, an order of magnitude below RF's ~4 GB) and projecting it — the same persisted models that now serve the deployment.
 
-**By 2076–2100 architecture choice accounts for 27.20% of projection variance against the GCM's 5.06%** — a factor of about five. The estimate has been stable as members were added (14.2% at n=2, 27.8% at n=3, 24–27% at n=4), which is itself reassuring: the conclusion is not an artefact of which two models happened to be compared.
+**By 2076–2100 architecture choice accounts for 27.18% of projection variance against the GCM's 5.06%** — a factor of about five. The estimate has been stable as members were added (14.2% at n=2, 27.8% at n=3, 24–27% at n=4), which is itself reassuring: the conclusion is not an artefact of which two models happened to be compared.
 
 **σ_SSP was quietly reporting the scenario defect all along.** It is half the |SSP5-8.5 − SSP2-4.5|
 ensemble-mean difference — that is, it *is* the scenario separation. At long term the deployed
@@ -432,7 +465,7 @@ tell the pathways apart contributes almost no scenario uncertainty, which reads 
 is actually saturation (§7.11). Nothing flagged this until the scenarios were compared directly.
 
 **σ_DS is constant across horizons** — it is the validation RMSE carried forward, not something
-that varies with lead time. Its share falls from 90.1% to 67.2% only because σ_GCM and σ_arch
+that varies with lead time. Its share falls from 90.10% to 67.21% only because σ_GCM and σ_arch
 *grow*; the downscaling error itself does not improve. σ_DS is also a different **kind** of
 quantity: a historical error measured against a reference, where the other three are spreads
 across possible futures.
@@ -446,7 +479,7 @@ across possible futures.
 | **XGBoost (deployed)** | +4.08 W m⁻² | +4.77 W m⁻² |
 | Random Forest | +1.65 W m⁻² | +1.35 W m⁻² |
 | U-Net | +5.43 W m⁻² | +8.99 W m⁻² |
-| CNN | +8.31 W m⁻² | +16.57 W m⁻² |
+| CNN | +8.31 W m⁻² | +16.56 W m⁻² |
 
 The magnitude spans a factor of four to twelve across architectures, which is what σ_arch measures.
 All of it is small beside σ_DS ≈ 9–10 W m⁻²: **no projected change in this study is large relative
