@@ -5,8 +5,11 @@
     difference
   - sigma_DS: downscaling/model uncertainty, the model's own validation RMSE
     (Table 3.3), propagated uniformly across the domain
-via root-sum-of-squares, for both deployed model families (U-Net and RF),
-for each of the 3 planning horizons.
+via root-sum-of-squares, for the deployed XGBoost and for the two models
+retained as comparisons (the U-Net as the shared-weight contrast, the Random
+Forest because Section 3.8.4 deployed it before the bootstrap and the
+scenario-discrimination test reversed that choice), for each of the 3 planning
+horizons.
 """
 
 import os
@@ -31,7 +34,7 @@ def validation_rmse():
     ds = xr.open_dataset(FIELDS_PATH)
     truth = ds["ghi_true"].values
     out = {}
-    for key, var in [("unet", "ghi_unet"), ("rf", "ghi_rf")]:
+    for key, var in [("xgb", "ghi_xgb"), ("unet", "ghi_unet"), ("rf", "ghi_rf")]:
         out[key] = float(np.sqrt(np.mean((ds[var].values - truth) ** 2)))
     return out
 
@@ -40,19 +43,21 @@ VALIDATION_RMSE = validation_rmse()
 print("sigma_DS read from validation fields: " +
       ", ".join(f"{k}={v:.4f}" for k, v in VALIDATION_RMSE.items()))
 
-# Models that get their own decomposition file: the deployed Random Forest and
-# the U-Net retained as an architecture comparison.
+# Models that get their own decomposition file: the deployed XGBoost, the U-Net
+# as the shared-weight contrast, and the Random Forest, retained because
+# Section 3.8.4 deployed it until the bootstrap showed its spatial advantage was
+# not established and Section 7.11 showed it cannot separate the emission
+# scenarios. Keeping its row makes that reversal auditable rather than silent.
 MME_DIRS = {
+    "xgb": os.path.abspath("./data/processed/mme_aggregations_xgb"),
     "unet": os.path.abspath("./data/processed/mme_aggregations"),
     "rf": os.path.abspath("./data/processed/mme_aggregations_rf"),
 }
 
 # Architectures contributing to sigma_arch. Kept separate from MME_DIRS because
 # a spread wants as many members as are available, whereas a decomposition file
-# is only wanted for the models actually reported. The CNN is included here on
-# projections generated from its existing checkpoint; XGBoost is absent because
-# it is never persisted and so cannot be projected without persisting it first (~4-5 GB).
-# n = 3 matches sigma_GCM's own n = 3, making that comparison like-for-like.
+# is only wanted for the models actually reported. All four are present: the CNN
+# and XGBoost on projections generated from their persisted checkpoints.
 ARCH_DIRS = {
     "unet": os.path.abspath("./data/processed/mme_aggregations"),
     "rf": os.path.abspath("./data/processed/mme_aggregations_rf"),
@@ -91,10 +96,10 @@ for model_key, mme_dir in MME_DIRS.items():
         sigma_ds_field = xr.full_like(sigma_gcm, sigma_ds)
 
         # sigma_ARCH: spread across downscaling architectures, computed the same
-        # way as sigma_GCM but treating the deployed Random Forest and the
-        # retained U-Net as the two ensemble members. Without this term the
-        # decomposition silently assumes the choice of downscaling model
-        # contributes no uncertainty, which the projections contradict.
+        # way as sigma_GCM but treating the four trained architectures as the
+        # ensemble members. Without this term the decomposition silently assumes
+        # the choice of downscaling model contributes no uncertainty, which the
+        # projections contradict.
         arch_means = []
         for other_key, other_dir in ARCH_DIRS.items():
             fields = [

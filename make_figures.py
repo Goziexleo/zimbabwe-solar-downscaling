@@ -109,7 +109,7 @@ def fig_feature_importance():
 # --------------------------------------------------- 4. uncertainty --------
 def fig_uncertainty():
     df = pd.read_csv(os.path.join(EVAL, "uncertainty_decomposition_summary.csv"))
-    df = df[df["model"] == "rf"]
+    df = df[df["model"] == "xgb"]          # the deployed model (Section 3.8.4)
     per = ["near_term_2026_2050", "mid_term_2051_2075", "long_term_2076_2100"]
     lbl = ["Near\n2026-50", "Mid\n2051-75", "Long\n2076-2100"]
     fig, (a1, a2) = plt.subplots(1, 2, figsize=(11, 4.2))
@@ -124,7 +124,7 @@ def fig_uncertainty():
         bottom += v
     a1.set_xticks(x); a1.set_xticklabels(lbl)
     a1.set_ylabel("% of total variance"); a1.set_ylim(0, 100)
-    a1.set_title("Uncertainty decomposition (Random Forest)")
+    a1.set_title("Uncertainty decomposition (XGBoost, deployed)")
     a1.legend(frameon=False, fontsize=8.6, loc="center right")
 
     for k, name, col in keys[1:3]:
@@ -169,8 +169,8 @@ def fig_error_maps():
     fig, axes = plt.subplots(1, 3, figsize=(13.2, 4.2))
     ext = [lon.min(), lon.max(), lat.min(), lat.max()]
     panels = [("ghi_true_mean_map", "Mean GHI, ERA5 truth", "viridis", None),
-              ("bias_map_rf", "Random Forest bias", "RdBu_r", 2.2),
-              ("rmse_map_rf", "Random Forest RMSE", "magma", None)]
+              ("bias_map_xgb", "XGBoost bias (deployed)", "RdBu_r", 2.2),
+              ("rmse_map_xgb", "XGBoost RMSE (deployed)", "magma", None)]
     for ax, (var, title, cmap, lim) in zip(axes, panels):
         d = ds[var].values
         kw = dict(vmin=-lim, vmax=lim) if lim else {}

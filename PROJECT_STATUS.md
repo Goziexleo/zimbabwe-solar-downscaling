@@ -202,17 +202,19 @@ MBE of **+0.0003 W m⁻²** is the strongest bias figure in Table 3.3 and is *ca
 It over-predicts some districts by +10 and under-predicts others by −15; they average to nothing. For a map read cell by cell to choose sites, this is the most damaging error structure available.
 
 ### 7.7 The perfect-prognosis assumption holds (C1)
-The study trains on ERA5 predictors and applies the relationship to bias-corrected CMIP6. That transfer was previously **asserted, never tested**. Test: feed bias-corrected CMIP6 *historical* predictors to the deployed RF and compare against ERA5 truth for the same period, on climatology (CMIP6 is free-running, so it reproduces the statistics of the period, not its specific months — a month-by-month comparison would be unfair by construction).
+The study trains on ERA5 predictors and applies the relationship to bias-corrected CMIP6. That transfer was previously **asserted, never tested**. Test: feed bias-corrected CMIP6 *historical* predictors to the model and compare against ERA5 truth for the same period, on climatology (CMIP6 is free-running, so it reproduces the statistics of the period, not its specific months — a month-by-month comparison would be unfair by construction). Run for **both** pixel-wise models: `PP_MODEL=xgb` (deployed) and `PP_MODEL=rf`.
 
-| Predictor source | RMSE | MBE | Spatial R |
-|---|---|---|---|
-| ERA5 (as trained) | 1.66 | +0.009 | 0.9988 |
-| CMIP6 CNRM-CM6-1 | 4.81 | +0.424 | 0.9903 |
-| CMIP6 MPI-ESM1-2-HR | 5.87 | +0.548 | 0.9848 |
-| CMIP6 ACCESS-CM2 | 5.49 | +0.396 | 0.9865 |
-| **CMIP6 ensemble mean** | **4.65** | +0.456 | **0.9903** |
+| Predictor source | XGBoost RMSE | XGBoost Spatial R | RF RMSE | RF Spatial R |
+|---|---|---|---|---|
+| ERA5 (as trained) | 0.59 | 0.9998 | 1.66 | 0.9988 |
+| CMIP6 CNRM-CM6-1 | 5.40 | 0.9880 | 4.81 | 0.9903 |
+| CMIP6 MPI-ESM1-2-HR | 6.71 | 0.9799 | 5.87 | 0.9848 |
+| CMIP6 ACCESS-CM2 | 6.35 | 0.9818 | 5.49 | 0.9865 |
+| **CMIP6 ensemble mean** | **4.82** | **0.9895** | **4.65** | **0.9903** |
 
-Swapping predictor source costs a factor of **2.80** in climatological RMSE (1.66 → 4.65) but skill does **not** collapse: spatial correlation holds at 0.99, and 4.65 sits well below the 10.30 validation RMSE, so transfer is a secondary error source. This is evidence for the study's central assumption rather than an assertion.
+**The assumption holds, and the deployed model is marginally the weaker of the two on this axis — stated because it cuts against the deployment.** Transfer costs XGBoost a factor of **8.15** (0.59 → 4.82) against RF's **2.80** (1.66 → 4.65). The ratio is the wrong statistic to read, though: it is large for XGBoost mainly because its ERA5-driven climatological error is nearly three times smaller to begin with (0.59 against 1.66), so the same absolute degradation divides into a bigger number. On the quantity that matters — the **absolute** error once driven by CMIP6 — the two are close, 4.82 against 4.65, and both sit well below their own validation RMSE (9.24 and 10.30), so transfer is a secondary error source for either. Spatial correlation holds at 0.99 for both.
+
+**The honest reading of the difference:** XGBoost fits the ERA5 predictor distribution more tightly, and a tighter fit to one predictor source is exactly what should transfer slightly less well. The gap is 0.17 W m⁻², about 2% of σ_DS, and does not approach reversing §7.10 or §7.11 — but it is a real cost of the deployment and belongs in the same paragraph as the bias cost in §9.
 
 **Two caveats, stated because they limit the claim.** First, this probes **climatological** transfer only. That is deliberate — CMIP6 is free-running, so a month-by-month comparison would be unfair by construction — but it means **nothing here tests whether *temporal* skill transfers**, and temporal skill is precisely what these models deliver (§7.2: the spatial pattern was already recoverable by interpolation). A model could reproduce the climatology under CMIP6 forcing while losing its month-to-month discrimination entirely, and this test would not detect it. Second, the EDCM correction is calibrated on this same period, so each variable's *marginal* distribution matches ERA5 almost by construction. The test is therefore optimistic on marginals. What it does genuinely probe — and what the projection actually depends on — is whether the learned multivariate mapping survives CMIP6's own inter-variable correlations, spatial covariance and temporal sequencing. Those are untouched by the correction.
 
@@ -278,11 +280,54 @@ Individual intervals overlap heavily — but that is the wrong comparison. Becau
 | Random Forest − U-Net | +0.193 | [−0.519, +0.970] | not distinguishable |
 | CNN − U-Net | +0.035 | [−0.287, +0.388] | not distinguishable |
 
-**XGBoost's aggregate advantage is real**: its RMSE deficit against all three others excludes zero. The comparison §3.8.4 rests on — Random Forest against XGBoost, +1.058 W m⁻² — survives at [+0.530, +1.671].
+**XGBoost's aggregate advantage is real**: its RMSE deficit against all three others excludes zero. The comparison §3.8.4 turned on — Random Forest against XGBoost, +1.058 W m⁻² — survives at [+0.530, +1.671].
 
-**Two consequences worth stating.** First, the deployment argument is now sharper, not weaker: RF is being preferred despite a *statistically distinguishable* aggregate deficit, so the spatial-fidelity case has to carry that weight explicitly. Second, **RF, CNN and U-Net are not distinguishable from one another on RMSE** — the ordering among those three is noise at this sample size, and any narrative ranking them should say so.
+**Two consequences worth stating.** First, the deployment argument could no longer be carried on aggregate grounds: RF would have to be preferred *despite* a statistically distinguishable deficit, so the spatial-fidelity case had to carry that weight explicitly — and the next subsection shows it cannot. Second, **RF, CNN and U-Net are not distinguishable from one another on RMSE** — the ordering among those three is noise at this sample size, and any narrative ranking them should say so.
 
-Mean bias is the weakest column: **every model's MBE interval spans zero**, including XGBoost's +1.20 [−0.14, +2.41]. The fivefold RF-vs-XGBoost bias ratio cited in §9 is a point-estimate ratio between two quantities that are individually indistinguishable from zero, and should be presented as indicative rather than established.
+Mean bias is the weakest column: **every model's MBE interval spans zero**, including XGBoost's +1.20 [−0.14, +2.41]. The fivefold RF-vs-XGBoost bias ratio discussed in §9 is a point-estimate ratio between two quantities that are individually indistinguishable from zero, and is presented there as indicative rather than established.
+
+### The spatial axis, tested — and the consequence for §3.8.4
+
+The same paired bootstrap applied to the two spatial quantities §3.8.4 actually relies on:
+
+| Comparison | Δ centred RMSE | 95% CI | Δ spatial R | 95% CI |
+|---|---|---|---|---|
+| **RF − XGBoost** | **−0.1445** | **[−0.3050, +0.0101]** | **+0.0016** | **[−0.0006, +0.0042]** |
+| RF − U-Net | −2.8237 | [−3.0244, −2.4857] | +0.0980 | [+0.0822, +0.1150] |
+| RF − CNN | −2.5250 | [−2.7584, −2.2169] | +0.0802 | [+0.0660, +0.0947] |
+| XGBoost − U-Net | −2.6791 | [−2.8978, −2.3699] | +0.0964 | [+0.0807, +0.1139] |
+
+**The pixel-wise/shared-weight distinction is established and large.** RF and XGBoost both beat both networks on spatial error structure by margins whose intervals are nowhere near zero. Everything §7.5 and §7.8 say about the U-Net stands.
+
+**The RF-vs-XGBoost spatial distinction is not established.** Both intervals span zero. The two pixel-wise models are indistinguishable from each other on centred RMSE and on spatial correlation.
+
+**This was decisive for the deployment argument, and §3.8.4 was rewritten accordingly (§9).** The composite criterion rested on two axes:
+
+| Axis | RF vs XGBoost | Status |
+|---|---|---|
+| Systematic offset (mean bias) | ratio 4.8× | **not established** — both MBEs span zero (§7.10 above) |
+| Spatial error structure (centred RMSE) | −0.1445 | **not established** — CI spans zero |
+| *Aggregate error (RMSE)* | *+1.0581* | ***established*** — *against RF* |
+
+Random Forest is **significantly worse on the one axis that is established, and not significantly better on either axis the deployment case invoked.** The composite criterion does not select RF over XGBoost; it fails to separate them, and the tie-break falls to the metric that does separate them, which favours XGBoost. §7.11 then removed any residual case for RF on independent grounds. **XGBoost is deployed (§9).**
+
+### 7.11 Scenario discrimination: the deployment test that validation cannot perform
+Validation measures how well a model reproduces 2011–2024. The product is a projection to 2100 under two emission scenarios, and nothing in Table 3.3 tests whether a model can tell those scenarios apart. It can be tested directly: the SSP5-8.5 minus SSP2-4.5 difference should be positive and should **grow** with lead time.
+
+| Model | Near-term | Mid-term | Long-term | Grows? | Cells with SSP5-8.5 > SSP2-4.5 |
+|---|---|---|---|---|---|
+| **Random Forest** | +0.465 | +0.307 | **+0.167** | **NO — shrinks** | **71.7%** |
+| XGBoost | +0.754 | +0.741 | +1.444 | yes, overall | 96.7% |
+| CNN | +1.397 | +4.059 | +9.654 | yes | 100.0% |
+| U-Net | +1.076 | +2.001 | +4.639 | yes | 100.0% |
+
+**Random Forest's scenario separation shrinks as forcing grows** — the opposite of the physical expectation — and it inverts outright on the long-term change signal (+1.648 under SSP2-4.5 against +1.349 under SSP5-8.5).
+
+**The mechanism is tree extrapolation.** A tree predicts a constant beyond the range it was trained on, so its response saturates once predictors leave the training envelope. Under SSP5-8.5 they increasingly do: temperature falls outside the 1985–2010 range **4.95%** of the time against 0.79% under SSP2-4.5, specific humidity 3.56% against 0.92%. The scenario that should produce the larger response is precisely the one where a tree's response is most clipped. XGBoost shares the limitation and shows it mildly; the neural models extrapolate through their linear layers and do not.
+
+This is the concrete form of the stationarity caveat in §14.2, and it matters more for a projection product than any validation metric: a suitability map that cannot distinguish emission pathways fails at the task it exists for.
+
+**A caution against over-reading it in the other direction.** All four scenario separations are small beside σ_DS ≈ 10 W m⁻². The CNN's +9.654 is not obviously *better* for being larger — it is comparable to the model's own error, and its long-term change of +16.6 W m⁻² is implausibly large for a 75-year irradiance trend. The honest reading is that RF is disqualified on this axis, XGBoost is adequate, and the neural models' larger responses are unverifiable rather than demonstrably right.
 
 ### 7.6 Cross-validation selected worse hyperparameters
 A 150-cell subsampled CV search picked configurations for both tree models that underperformed the untuned defaults on the full 5,751-cell holdout. Defaults retained. The search's own scores gave no warning.
@@ -295,10 +340,10 @@ A 150-cell subsampled CV search picked configurations for both tree models that 
 
 | Model | RMSE | MAE | Pearson R | MBE | SS vs climatology | R² |
 |---|---|---|---|---|---|---|
-| **XGBoost** | **9.24** | **6.85** | **0.9707** | +1.20 | **0.5155** | **0.9410** |
+| **XGBoost (deployed)** | **9.24** | **6.85** | **0.9707** | +1.20 | **0.5155** | **0.9410** |
 | U-Net | 10.11 | 7.64 | 0.9640 | +0.0003 | 0.4701 | 0.9294 |
 | CNN | 10.14 | 7.71 | 0.9646 | +1.20 | 0.4682 | 0.9289 |
-| **Random Forest (deployed)** | 10.30 | 7.73 | 0.9636 | +0.25 | 0.4601 | 0.9267 |
+| Random Forest | 10.30 | 7.73 | 0.9636 | +0.25 | 0.4601 | 0.9267 |
 
 Regenerate with `compute_table33.py` — a single canonical script scoring every model against
 identical references, so the table cannot drift between scripts and needs no retraining.
@@ -322,7 +367,7 @@ Targets are R > 0.90 and |MBE| < 5. **All four models clear both for the first t
 | CNN | 0.9176 | 0.9937 | 3.229 | 40.5% |
 | U-Net | 0.8995 | 0.9762 | 3.539 | 44.4% |
 
-The pixel-wise models reproduce the spatial climatology far more faithfully than the shared-weight ones.
+The pixel-wise models reproduce the spatial climatology far more faithfully than the shared-weight ones. **The gap between the two pixel-wise models is not one of them**: RF−XGBoost is −0.145 [−0.305, +0.010] on centred RMSE and +0.0016 [−0.0006, +0.0042] on spatial R, both spanning zero (§7.10). Read the bold on the RF row as the best point estimate, not as an established difference from XGBoost.
 
 ### Uncertainty decomposition — four components
 
@@ -333,19 +378,31 @@ which is what made the mismatch confusing.
 
 | Model | Period | σ_GCM | σ_SSP | σ_arch | σ_DS | σ_total | % var DS | % var arch |
 |---|---|---|---|---|---|---|---|---|
-| RF | Near-term | 1.24 | 0.26 | 2.34 | 10.30 | 10.64 | 93.73% | 4.86% |
-| RF | Mid-term | 1.42 | 0.18 | 3.90 | 10.30 | 11.11 | 85.99% | 12.35% |
-| RF | Long-term | 1.58 | 0.29 | 5.88 | 10.30 | 11.97 | 74.06% | **24.14%** |
+| **XGB (deployed)** | Near-term | 1.92 | 0.43 | 2.34 | 9.24 | 9.74 | 90.10% | 5.80% |
+| **XGB (deployed)** | Mid-term | 2.20 | 0.48 | 3.90 | 9.24 | 10.28 | 80.80% | 14.42% |
+| **XGB (deployed)** | Long-term | 2.54 | 0.83 | 5.88 | 9.24 | 11.28 | 67.19% | **27.20%** |
 | U-Net | Near-term | 2.03 | 0.56 | 2.34 | 10.11 | 10.59 | 91.16% | 4.90% |
 | U-Net | Mid-term | 3.20 | 1.02 | 3.90 | 10.11 | 11.35 | 79.39% | 11.84% |
 | U-Net | Long-term | 4.00 | 2.38 | 5.88 | 10.11 | 12.59 | 64.50% | **21.83%** |
+| RF | Near-term | 1.24 | 0.26 | 2.34 | 10.30 | 10.64 | 93.73% | 4.86% |
+| RF | Mid-term | 1.42 | 0.18 | 3.90 | 10.30 | 11.11 | 85.99% | 12.35% |
+| RF | Long-term | 1.58 | 0.29 | 5.88 | 10.30 | 11.97 | 74.06% | **24.14%** |
 
-**σ_arch rests on all four benchmarked architectures (n = 4)** — RF, XGBoost, CNN, U-Net — which exceeds σ_GCM's n = 3, so the comparison between them no longer favours the GCM term on sample size. Reaching n = 4 required persisting XGBoost (~400 MB at 200 fixed rounds, an order of magnitude below RF's ~4 GB) and projecting it.
+The Random Forest rows are retained because §3.8.4 deployed it until the bootstrap (§7.10) and the
+scenario test (§7.11) reversed that choice; keeping them makes the reversal auditable.
 
-**By 2076–2100 architecture choice accounts for 24.1% of projection variance against the GCM's 1.7%** — a factor of about fourteen. The estimate has been stable as members were added (14.2% at n=2, 27.8% at n=3, 24.1% at n=4), which is itself reassuring: the conclusion is not an artefact of which two models happened to be compared.
+**σ_arch rests on all four benchmarked architectures (n = 4)** — RF, XGBoost, CNN, U-Net — which exceeds σ_GCM's n = 3, so the comparison between them no longer favours the GCM term on sample size. Reaching n = 4 required persisting XGBoost (~400 MB at 200 fixed rounds, an order of magnitude below RF's ~4 GB) and projecting it — the same persisted models that now serve the deployment.
+
+**By 2076–2100 architecture choice accounts for 27.20% of projection variance against the GCM's 5.06%** — a factor of about five. The estimate has been stable as members were added (14.2% at n=2, 27.8% at n=3, 24–27% at n=4), which is itself reassuring: the conclusion is not an artefact of which two models happened to be compared.
+
+**σ_SSP was quietly reporting the scenario defect all along.** It is half the |SSP5-8.5 − SSP2-4.5|
+ensemble-mean difference — that is, it *is* the scenario separation. At long term the deployed
+XGBoost gives 0.83 and the U-Net 2.38, while the Random Forest gives 0.29: a model that cannot
+tell the pathways apart contributes almost no scenario uncertainty, which reads as confidence and
+is actually saturation (§7.11). Nothing flagged this until the scenarios were compared directly.
 
 **σ_DS is constant across horizons** — it is the validation RMSE carried forward, not something
-that varies with lead time. Its share falls from 93.7% to 74.1% only because σ_GCM and σ_arch
+that varies with lead time. Its share falls from 90.1% to 67.2% only because σ_GCM and σ_arch
 *grow*; the downscaling error itself does not improve. σ_DS is also a different **kind** of
 quantity: a historical error measured against a reference, where the other three are spreads
 across possible futures.
@@ -354,25 +411,50 @@ across possible futures.
 
 ### Projected change, and how much it depends on architecture
 
-| Long-term minus near-term, domain-mean GHI | RF (deployed) | U-Net |
+| Long-term minus near-term, domain-mean GHI | SSP2-4.5 | SSP5-8.5 |
 |---|---|---|
-| SSP2-4.5 | +1.65 W m⁻² | +5.43 W m⁻² |
-| SSP5-8.5 | +1.35 W m⁻² | +9.00 W m⁻² |
-| Spatial correlation of the change pattern | 0.67 (SSP2-4.5) | 0.71 (SSP5-8.5) |
+| **XGBoost (deployed)** | +4.08 W m⁻² | +4.77 W m⁻² |
+| Random Forest | +1.65 W m⁻² | +1.35 W m⁻² |
+| U-Net | +5.43 W m⁻² | +8.99 W m⁻² |
+| CNN | +8.31 W m⁻² | +16.57 W m⁻² |
 
-U-Net projects **3.3× to 6.7×** more brightening than RF and the two agree only moderately on where it occurs. All of these are small beside σ_DS ≈ 10 W m⁻²: **no projected change in this study is large relative to its own error bar.**
+The magnitude spans a factor of four to twelve across architectures, which is what σ_arch measures.
+All of it is small beside σ_DS ≈ 9–10 W m⁻²: **no projected change in this study is large relative
+to its own error bar.**
+
+**The change *pattern* is less robust than the magnitude, and this is the weaker part of the
+result.** Spatial correlation between architectures' change fields:
+
+| | SSP2-4.5 | SSP5-8.5 |
+|---|---|---|
+| XGBoost vs Random Forest | 0.43 | 0.18 |
+| XGBoost vs U-Net | 0.48 | 0.13 |
+| XGBoost vs CNN | 0.12 | 0.11 |
+| Random Forest vs U-Net | 0.67 | 0.71 |
+
+No pair exceeds 0.71, and the deployed model agrees with the others at 0.11–0.48. The models
+concur closely on the *historical* spatial climatology (spatial R ≥ 0.90 for all four, ≥ 0.996 for
+the pixel-wise pair) and diverge on *where* change occurs. Agreement on the present is therefore
+not evidence of agreement on the future, and **the projected change pattern should not be read at
+grid-cell resolution** — a caveat that holds whichever model is deployed, and one this study can
+state only because four architectures were carried through to projection rather than one.
 
 ---
 
 ## 9. Deployed model and its justification (Chapter 3 §3.8.4)
 
-**The pixel-wise Random Forest is deployed.** U-Net projections are retained solely to quantify architecture sensitivity.
+**The pixel-wise XGBoost is deployed.** RF, CNN and U-Net projections are retained to quantify architecture sensitivity (σ_arch, n = 4).
 
-Selection uses a **composite criterion**, and Chapter 3 §3.8.4 states plainly that it was adopted **after** the corrected-alignment run reversed the ranking (see §10a, A10). It is defended on the grounds that a suitability map is consulted one cell at a time, so per-cell reliability governs fitness for purpose in a way a domain average cannot — an argument that does not depend on which model it favours. A reader who rejects it should prefer XGBoost.
+**This reverses an earlier decision, and the reversal is the point.** §3.8.4 previously deployed the Random Forest on a **composite criterion** — mean bias plus spatial error structure — which Chapter 3 disclosed as having been adopted **after** the corrected-alignment run reversed the ranking (§10a, A10). Two tests then removed its basis:
 
-On aggregate RMSE alone the choice would be XGBoost (9.24 vs 10.30, a 10% gap).
+1. **The composite criterion does not separate the two models (§7.10).** RF−XGBoost is −0.145 [−0.305, **+0.010**] on centred RMSE and +0.0016 [−0.0006, +0.0042] on spatial R. Neither interval excludes zero, so neither leg of the criterion is established. The aggregate deficit it was meant to outweigh *is* established: +1.058 [+0.530, +1.671], confirmed by XGBoost winning all four rolling-origin folds (§7.9).
+2. **RF cannot separate the emission scenarios (§7.11).** Its SSP5-8.5 minus SSP2-4.5 separation *shrinks* with lead time (+0.465 → +0.307 → +0.167), it inverts on the long-term change signal, and only 71.7% of cells order the pathways correctly, against XGBoost's 96.7%. The mechanism is tree extrapolation: temperature leaves the 1985–2010 training range 4.95% of the time under SSP5-8.5 against 0.79% under SSP2-4.5, and a tree's prediction saturates outside the range it was fitted on.
 
-**The criterion rests on two independent axes, not three.** Centred RMSE of the time-mean field and the standard deviation of the per-cell bias are *the same quantity* — expanding the centred error gives var(m − r) — verified identical to 6 decimal places. Since RMSE² = bias² + centredRMSE², the genuinely independent axes are the **systematic offset** and the **spatial error structure**. RF wins on both: mean bias +0.25 against XGBoost's +1.20, a factor of nearly five; and the lowest centred error of the four, 0.571 against 0.742. The 10% penalty is small beside σ_DS ≈ 10.
+**XGBoost is the only model no other model is established to beat on any tested axis**, while it is established to beat all three on RMSE. Deploying it also **returns the study to §3.8.1's original pre-registered criterion** — lowest validation RMSE — which removes the post-hoc criterion change (A10) as an attack surface rather than defending it.
+
+**Why the two-axis analysis still matters.** Centred RMSE of the time-mean field and the standard deviation of the per-cell bias are *the same quantity* — expanding the centred error gives var(m − r) — verified identical to 6 decimal places. Since RMSE² = bias² + centredRMSE², the genuinely independent axes are the **systematic offset** and the **spatial error structure**. That analysis is what makes §7.10 testable, and it is what showed the criterion could not do the work asked of it. It also still holds against the shared-weight models, where the margins *are* established: RF and XGBoost both beat CNN and U-Net on centred RMSE by 2.4–2.8 W m⁻², intervals nowhere near zero. **The pixel-wise/shared-weight distinction stands; only the separation within the pixel-wise pair failed.**
+
+**The cost of the switch, stated plainly — two items, both against XGBoost.** Its mean bias is +1.20 W m⁻² against RF's +0.25, a factor of nearly five, the one validation axis on which RF is genuinely preferable (both intervals span zero, and +1.20 is an eighth of σ_DS). And it transfers marginally less well from ERA5 to CMIP6 predictors: 4.82 against RF's 4.65 in climatological RMSE (§7.7), a 0.17 W m⁻² gap that follows from XGBoost fitting the ERA5 predictor distribution more tightly. Set against a scenario-discrimination failure in the product's core function, both are the better trade; a reader who weights systematic offset and transfer robustness above scenario response should prefer RF, and should then also accept §7.11's consequence — that the resulting projections cannot reliably distinguish the pathways they are labelled with.
 
 **Why U-Net fails hardest** — three measured architectural causes: 17.8M parameters against 312 training fields (≈57,000 per field); the padded 96×96 domain compressed to **3×3** at the bottleneck; and one shared kernel set forced to fit a single predictor→irradiance relation from Lowveld to Eastern Highlands, so it learns the domain-*average* relation (hence competitive aggregate error) and fails where local relations depart. RF fits 5,751 independent local relations and structurally cannot trade one district against another. CNN sits between — shared weights but only 79k parameters plus a spatial-gradient penalty — and its scores sit between accordingly.
 
@@ -400,7 +482,9 @@ Tree defaults were retained after HPO (§7.6). Deployed values are now the **scr
 
 **A9 — the clip never binds in projection.** Across 31,055,400 values per family: RF 0.3084–0.6030, U-Net 0.2952–0.5914. Zero cells at either bound.
 
-**A10 — the criterion was changed after seeing the results.** Traced through the backups: `_preupdate` (Jun 28) *"lowest test-period RMSE"*; `_pre_rf_deploy` (Aug 6) *"the Random Forest, which achieved the lowest validation-period RMSE"* — and RF genuinely won it then (18.72 vs 23.15); `_pre_384_rewrite` (Aug 10) still single-metric; the composite criterion appears only in the Aug 11 file, **after** the corrected-alignment run reversed the ranking that morning. Now disclosed in Chapter 3 §3.8.4 in those words, with the justification resting on cell-by-cell reliability and an explicit statement that a reader who rejects the argument should prefer XGBoost.
+**A10 — the criterion was changed after seeing the results, and has since been changed back.** Traced through the backups: `_preupdate` (Jun 28) *"lowest test-period RMSE"*; `_pre_rf_deploy` (Aug 6) *"the Random Forest, which achieved the lowest validation-period RMSE"* — and RF genuinely won it then (18.72 vs 23.15); `_pre_384_rewrite` (Aug 10) still single-metric; the composite criterion appears only in the Aug 11 file, **after** the corrected-alignment run reversed the ranking that morning.
+
+**This is now resolved rather than merely disclosed.** The composite criterion was tested against sampling uncertainty (§7.10) and failed to separate the two models on either of its legs, and §7.11 then found an independent defect in RF. §3.8.4 was rewritten to deploy XGBoost under §3.8.1's **original** pre-registered rule, lowest validation RMSE. The full history — original rule, post-hoc criterion, and the evidence that retired it — is stated in §3.8.4 rather than removed, so the reversal is auditable. A10 is no longer a live objection: the study is back on the criterion it started with, and the deviation is on the record.
 
 **Also found:** Table 3.3's caption still called RMSE the *"primary model selection criterion"*, contradicting §3.8.4. Corrected.
 
@@ -449,7 +533,7 @@ Tree defaults were retained after HPO (§7.6). Deployed values are now the **scr
 
 Edited at run level with `python-docx` so all **26 live Zotero citation fields survived** (162 field characters, verified before and after every edit).
 
-"PROPOSED" dropped from the title; implemented sections converted to past tense. Factual corrections: actual retained grid (§3.2.1) · removed the xESMF/conservative-remapping claim, neither was used (§3.4.1) · areal block means not point-sampling, plus the SVF search-radius caveat (§3.5.2) · SZA computed analytically not via PVLIB (§3.5.3) · the U-Net/CNN ReLU distinction and the exact-cancellation property (§3.5.4) · upsampling factor (§3.6.1) · grid corrected 75×85=6,375 → **71×81=5,751** (§3.6.2) · dual-branch input, dropout, channel attention, pad-to-32; false "output ReLU" claim removed (§3.6.6) · never-performed Bayesian stage removed, CV-transfer caveat added (§3.6.7) · ENSO sampling corrected to **U-Net only** (§3.6.8) · Taylor stats clarified as time-mean (§3.7.2) · RF designated deployed (§3.8.1) · Table 3.2 search ranges replaced with grids actually searched. **New §3.6.9** (daily-resolution experiment) and **new §3.8.4** (deployed-model justification).
+"PROPOSED" dropped from the title; implemented sections converted to past tense. Factual corrections: actual retained grid (§3.2.1) · removed the xESMF/conservative-remapping claim, neither was used (§3.4.1) · areal block means not point-sampling, plus the SVF search-radius caveat (§3.5.2) · SZA computed analytically not via PVLIB (§3.5.3) · the U-Net/CNN ReLU distinction and the exact-cancellation property (§3.5.4) · upsampling factor (§3.6.1) · grid corrected 75×85=6,375 → **71×81=5,751** (§3.6.2) · dual-branch input, dropout, channel attention, pad-to-32; false "output ReLU" claim removed (§3.6.6) · never-performed Bayesian stage removed, CV-transfer caveat added (§3.6.7) · ENSO sampling corrected to **U-Net only** (§3.6.8) · Taylor stats clarified as time-mean (§3.7.2) · deployed model designated in §3.8.1 (RF at the time; now XGBoost, §9) · Table 3.2 search ranges replaced with grids actually searched. **New §3.6.9** (daily-resolution experiment) and **new §3.8.4** (deployed-model justification).
 
 **Three claims that were untrue and are now disclaimed:**
 1. **SARAH-2 and NSRDB were never acquired.** `data/raw/` holds only cmip6, era5, oni, srtm. Validation is entirely against withheld ERA5.

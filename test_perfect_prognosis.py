@@ -6,7 +6,7 @@ for 2026-2100. Nothing so far establishes that the learned predictor-to-
 irradiance mapping survives the change of predictor source.
 
 The test is standard and cheap: take bias-corrected CMIP6 output for the
-HISTORICAL period, feed it to the deployed Random Forest, and score the result
+HISTORICAL period, feed it to the deployed model, and score the result
 against the same ERA5 truth used for validation. Comparing that against the
 ERA5-driven figures isolates the cost of swapping predictor source, holding the
 model, the target and the period fixed.
@@ -36,8 +36,17 @@ TRAIN = os.path.join(ROOT, "data/processed/ml_ready/ml_training_dataset.nc")
 TOPO = os.path.join(ROOT, "data/processed/topography/zimbabwe_topographic_features_0.1deg.nc")
 CLEARSKY = os.path.join(ROOT, "data/processed/era5/csi_finegrid/clearsky_ghi_finegrid_climatology.nc")
 CMIP6_DIR = os.path.join(ROOT, "data/processed/cmip6_bias_corrected")
-RF_DIR = os.path.join(ROOT, "data/processed/models/pixelwise_rf")
-OUT_CSV = os.path.join(ROOT, "data/processed/evaluation/perfect_prognosis_transfer.csv")
+# Which pixel-wise family to test. The transfer assumption belongs to whichever
+# model is deployed, so this defaults to XGBoost (Section 3.8.4) and can be
+# pointed at the Random Forest with PP_MODEL=rf for the comparison.
+PP_MODEL = os.environ.get("PP_MODEL", "xgb").lower()
+_FAMILY = {"xgb": ("pixelwise_xgb", "xgb", "XGBoost"),
+           "rf": ("pixelwise_rf", "rf", "Random Forest")}[PP_MODEL]
+MODEL_DIR = os.path.join(ROOT, "data/processed/models", _FAMILY[0])
+CELL_PREFIX = _FAMILY[1]
+MODEL_LABEL = _FAMILY[2]
+OUT_CSV = os.path.join(
+    ROOT, f"data/processed/evaluation/perfect_prognosis_transfer_{PP_MODEL}.csv")
 
 GCMS = ["CNRM-CM6-1", "MPI-ESM1-2-HR", "ACCESS-CM2"]
 HIST_SLICE = slice("1985-01-01", "2010-12-31")
@@ -76,7 +85,7 @@ def main():
     fine_lon = ds_train["fine_lon"].values
     train_times = ds_train.time.values
 
-    with open(os.path.join(RF_DIR, "manifest.json")) as f:
+    with open(os.path.join(MODEL_DIR, "manifest.json")) as f:
         manifest = json.load(f)
     feature_vars = manifest["feature_vars"]
     n_la, n_lo = manifest["n_lat"], manifest["n_lon"]
@@ -96,7 +105,7 @@ def main():
     truth_clim = monthly_climatology(truth_ghi, train_times)
 
     # --- reference: the model driven by ERA5 predictors, same period ---
-    print("Running the deployed RF on ERA5 predictors (historical)...")
+    print(f"Running the deployed {MODEL_LABEL} on ERA5 predictors (historical)...")
     X_era5 = build_features(ds_train, fine_lat, fine_lon, feature_vars, topo_fields, train_times)
 
     # --- transfer: the model driven by bias-corrected CMIP6, same period ---
@@ -134,7 +143,7 @@ def main():
     pred_gcm = {g: np.zeros((len(gcm_times[g]), n_la, n_lo), dtype=np.float32) for g in gcm_X}
     for i in range(n_la):
         for j in range(n_lo):
-            p = os.path.join(RF_DIR, f"rf_cell_{i:03d}_{j:03d}.joblib")
+            p = os.path.join(MODEL_DIR, f"{CELL_PREFIX}_cell_{i:03d}_{j:03d}.joblib")
             if not os.path.exists(p):
                 continue
             model = joblib.load(p)
@@ -175,7 +184,7 @@ def main():
     df = pd.DataFrame(rows)
     df.to_csv(OUT_CSV, index=False)
     print("\n" + "=" * 84)
-    print(" PERFECT-PROGNOSIS TRANSFER TEST — historical climatology, deployed Random Forest")
+    print(f" PERFECT-PROGNOSIS TRANSFER TEST — historical climatology, deployed {MODEL_LABEL}")
     print("=" * 84)
     print(df.to_string(index=False, float_format=lambda x: f"{x:.4f}"))
     print("=" * 84)

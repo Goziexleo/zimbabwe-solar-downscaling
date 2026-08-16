@@ -46,6 +46,10 @@ SEED = 42
 MODELS = [("Random Forest", "ghi_rf"), ("XGBoost", "ghi_xgb"),
           ("CNN", "ghi_cnn"), ("U-Net", "ghi_unet")]
 
+# Aggregate metrics first, then the two SPATIAL metrics that Section 3.8.4's
+# case actually rests on. Both are properties of the time-mean field.
+METRICS = ["RMSE", "MBE", "Pearson R", "SS vs climatology", "centred RMSE", "spatial R"]
+
 
 def main():
     ds_f = xr.open_dataset(FIELDS)
@@ -68,26 +72,39 @@ def main():
     rng = np.random.default_rng(SEED)
 
     def stats(idx):
+        """Metrics on one resampled set of years.
+
+        The spatial metrics - centred RMSE and spatial correlation - are
+        properties of the TIME-MEAN field, so each replicate recomputes both
+        the model's and the truth's time-mean from the same resampled years.
+        Centred RMSE is the standard deviation of the difference between those
+        two maps, which is identical to the Taylor form
+        sqrt(sd_m^2 + sd_r^2 - 2 sd_m sd_r corr) and to the standard deviation
+        of the per-cell bias.
+        """
         out = {}
         t = truth[idx]
         c = clim[idx]
         rmse_clim = np.sqrt(((c - t) ** 2).mean())
+        t_map = t.mean(axis=0)
         for label in preds:
             p = preds[label][idx]
             err = p - t
             rmse = np.sqrt((err ** 2).mean())
+            p_map = p.mean(axis=0)
             out[label] = {
                 "RMSE": rmse,
                 "MBE": err.mean(),
                 "Pearson R": np.corrcoef(p.ravel(), t.ravel())[0, 1],
                 "SS vs climatology": 1.0 - rmse / rmse_clim,
+                "centred RMSE": (p_map - t_map).std(),
+                "spatial R": np.corrcoef(p_map.ravel(), t_map.ravel())[0, 1],
             }
         return out
 
     point = stats(np.arange(len(times)))
 
-    boot = {label: {k: [] for k in ["RMSE", "MBE", "Pearson R", "SS vs climatology"]}
-            for label in preds}
+    boot = {label: {k: [] for k in METRICS} for label in preds}
     diffs = {}
     for _ in range(N_BOOT):
         draw = rng.choice(uniq_years, size=len(uniq_years), replace=True)
@@ -102,10 +119,14 @@ def main():
                     continue
                 diffs.setdefault((a, b, "RMSE"), []).append(s[a]["RMSE"] - s[b]["RMSE"])
                 diffs.setdefault((a, b, "MBE"), []).append(abs(s[a]["MBE"]) - abs(s[b]["MBE"]))
+                diffs.setdefault((a, b, "centred RMSE"), []).append(
+                    s[a]["centred RMSE"] - s[b]["centred RMSE"])
+                diffs.setdefault((a, b, "spatial R"), []).append(
+                    s[a]["spatial R"] - s[b]["spatial R"])
 
     rows = []
     for label in preds:
-        for k in ["RMSE", "MBE", "Pearson R", "SS vs climatology"]:
+        for k in METRICS:
             arr = np.array(boot[label][k])
             lo, hi = np.percentile(arr, [2.5, 97.5])
             rows.append({"model": label, "metric": k, "estimate": point[label][k],
@@ -116,7 +137,7 @@ def main():
     print("\n" + "=" * 88)
     print(f" TABLE 3.3 WITH 95% CONFIDENCE INTERVALS ({N_BOOT} year-block bootstrap replicates)")
     print("=" * 88)
-    for k in ["RMSE", "Pearson R", "MBE", "SS vs climatology"]:
+    for k in ["RMSE", "centred RMSE", "spatial R", "Pearson R", "MBE", "SS vs climatology"]:
         print(f"\n{k}:")
         sub = df[df["metric"] == k].sort_values("estimate")
         for _, r in sub.iterrows():
@@ -133,18 +154,39 @@ def main():
         drows.append({"model_a": a, "model_b": b, "metric": metric,
                       "mean_difference": arr.mean(), "ci_lo": lo, "ci_hi": hi,
                       "excludes_zero": excludes_zero})
-        if metric == "RMSE":
-            verdict = "distinguishable" if excludes_zero else "NOT distinguishable"
-            print(f"  {a:<15} − {b:<15} RMSE  {arr.mean():+7.4f}  "
-                  f"95% CI [{lo:+7.4f}, {hi:+7.4f}]  {verdict}")
+    for metric in ["RMSE", "centred RMSE", "spatial R"]:
+        print(f"\n  --- {metric} ---")
+        for (a, b, mt), vals in sorted(diffs.items()):
+            if mt != metric:
+                continue
+            arr = np.array(vals)
+            lo, hi = np.percentile(arr, [2.5, 97.5])
+            verdict = ("distinguishable" if (lo > 0 or hi < 0)
+                       else "NOT distinguishable")
+            print(f"  {a:<15} − {b:<15} {arr.mean():+8.4f}  "
+                  f"95% CI [{lo:+8.4f}, {hi:+8.4f}]  {verdict}")
     pd.DataFrame(drows).to_csv(OUT_DIFF, index=False)
 
-    key = [d for d in drows if {d["model_a"], d["model_b"]} == {"XGBoost", "Random Forest"}
-           and d["metric"] == "RMSE"][0]
+    def rf_xgb(metric):
+        return [d for d in drows
+                if {d["model_a"], d["model_b"]} == {"XGBoost", "Random Forest"}
+                and d["metric"] == metric][0]
+
+    agg, cen, spa = rf_xgb("RMSE"), rf_xgb("centred RMSE"), rf_xgb("spatial R")
     print(f"""
-The comparison Section 3.8.4 turns on:
-  XGBoost against Random Forest, RMSE difference {key['mean_difference']:+.4f} W m-2,
-  95% CI [{key['ci_lo']:+.4f}, {key['ci_hi']:+.4f}] -> {'excludes zero' if key['excludes_zero'] else 'SPANS ZERO'}.
+{'=' * 84}
+ THE TRADE SECTION 3.8.4 MAKES, WITH INTERVALS ON BOTH SIDES
+{'=' * 84}
+  Random Forest pays on aggregate error:
+    RMSE difference        {agg['mean_difference']:+.4f}  CI [{agg['ci_lo']:+.4f}, {agg['ci_hi']:+.4f}]  {'ESTABLISHED' if agg['excludes_zero'] else 'not established'}
+
+  Random Forest gains on spatial error structure:
+    centred RMSE           {cen['mean_difference']:+.4f}  CI [{cen['ci_lo']:+.4f}, {cen['ci_hi']:+.4f}]  {'ESTABLISHED' if cen['excludes_zero'] else 'NOT ESTABLISHED'}
+    spatial correlation    {spa['mean_difference']:+.4f}  CI [{spa['ci_lo']:+.4f}, {spa['ci_hi']:+.4f}]  {'ESTABLISHED' if spa['excludes_zero'] else 'NOT ESTABLISHED'}
+
+  Both legs established -> the trade is between two tested quantities.
+  Spatial leg not established -> Random Forest is worse on a tested axis and
+  better on none, and Section 3.8.4 should be rewritten to deploy XGBoost.
 """)
     print(f"Saved: {OUT_CSV}\nSaved: {OUT_DIFF}")
 

@@ -63,9 +63,11 @@ def canonical_anchors():
     unc = os.path.join(EVAL, "uncertainty_decomposition_summary.csv")
     if os.path.exists(unc):
         df = pd.read_csv(unc)
-        rf_long = df[(df["model"] == "rf") & (df["period"] == "long_term_2076_2100")]
-        if not rf_long.empty:
-            r = rf_long.iloc[0]
+        # anchor on the DEPLOYED model's row, not whichever model happens to be
+        # first: this is what the document's headline percentages refer to
+        dep_long = df[(df["model"] == "xgb") & (df["period"] == "long_term_2076_2100")]
+        if not dep_long.empty:
+            r = dep_long.iloc[0]
             anchors.append(("sigma_arch long-term variance share",
                             _fmt(r["pct_var_arch"], 2)))
             anchors.append(("sigma_DS long-term variance share",
@@ -99,6 +101,12 @@ RETIRED = [
     ("~14 GB", "RF model footprint estimated from the daily experiment"),
     ("6,375", "grid cell count before the fine grid was aligned to coarse coverage"),
     ("75 latitude", "grid dimensions before the alignment fix"),
+    # Deployment reversed after the bootstrap (§7.10) and the scenario test (§7.11).
+    # These read as live claims unless the surrounding text marks them as history.
+    ("deployed Random Forest", "Section 3.8.4 now deploys XGBoost"),
+    ("deploy the Random Forest", "Section 3.8.4 now deploys XGBoost"),
+    ("Random Forest is deployed", "Section 3.8.4 now deploys XGBoost"),
+    ("Random Forest is the deployed", "Section 3.8.4 now deploys XGBoost"),
 ]
 
 
