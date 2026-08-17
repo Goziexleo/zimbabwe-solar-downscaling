@@ -39,8 +39,10 @@ ALPHA = 0.05
 
 MODELS = {"Random Forest": "ghi_rf", "XGBoost": "ghi_xgb",
           "CNN": "ghi_cnn", "U-Net": "ghi_unet"}
-PAIRS = [("Random Forest", "XGBoost"), ("CNN", "XGBoost"), ("U-Net", "XGBoost")]
-METRICS = ["centred RMSE", "spatial R", "RMSE", "std ratio dev"]
+import itertools as _it
+_ORDER = ["Random Forest", "XGBoost", "CNN", "U-Net"]
+PAIRS = [(a, b) for a, b in _it.combinations(_ORDER, 2)]
+METRICS = ["centred RMSE", "spatial R", "RMSE", "std ratio dev", "MBE", "|MBE|"]
 
 
 def statistic(pred_a, pred_b, truth, idx, metric):
@@ -49,6 +51,14 @@ def statistic(pred_a, pred_b, truth, idx, metric):
     a, b = pred_a[idx], pred_b[idx]
     if metric == "RMSE":
         return float(np.sqrt(((a - t) ** 2).mean()) - np.sqrt(((b - t) ** 2).mean()))
+    if metric == "MBE":
+        # signed difference in mean bias. Note this reduces to mean(a) - mean(b):
+        # the truth cancels, so it is a pure model-versus-model quantity.
+        return float((a - t).mean() - (b - t).mean())
+    if metric == "|MBE|":
+        # magnitude of systematic offset, which is the quantity the composite
+        # criterion of Section 3.8.4 actually invoked
+        return float(abs((a - t).mean()) - abs((b - t).mean()))
     t_map = t.mean(axis=0)
     a_map, b_map = a.mean(axis=0), b.mean(axis=0)
     if metric == "centred RMSE":

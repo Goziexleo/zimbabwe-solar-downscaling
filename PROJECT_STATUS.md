@@ -294,7 +294,7 @@ Individual intervals overlap heavily — but that is the wrong comparison. Becau
 | Centred RMSE | −2.525 [−2.758, −2.217] | −0.299 [−0.517, −0.070] | −2.824 [−3.024, −2.486] | **yes — all three pairs** |
 | Spatial R | +0.080 [+0.066, +0.095] | +0.018 [+0.006, +0.031] | +0.098 [+0.082, +0.115] | **yes — all three pairs** |
 
-*Intervals in this three-way table are **percentile**, not BCa: `compute_bca_centred_rmse.py` covers only the three comparisons against the deployed model. All six here exclude zero by wide margins, and the compression documented above pushes differences *toward* zero, so BCa would widen the exclusion rather than threaten it. The ordering conclusion is unaffected.*
+*Now measured under BCa for all six pairs rather than argued from the percentile intervals.* Centred RMSE: RF−CNN −2.658 [−2.923, −2.536], RF−U-Net −2.968 [−3.094, −2.868], CNN−U-Net −0.310 [−0.537, −0.090]. Spatial correlation: +0.080 [+0.066, +0.095], +0.098 [+0.084, +0.116], +0.018 [+0.007, +0.032]. **All six exclude zero**, so the ordering is established rather than assumed — though the CNN−U-Net gap on centred RMSE clears zero only just.
 
 **RF > CNN > U-Net is fully established on both spatial axes, including the narrow CNN-over-U-Net margin, and is established on none of the aggregate ones.** So the rule for the whole document is: *rank these three on spatial fidelity, never on RMSE.* Every ranking §7.5, §7.8 and §9 make is a spatial-fidelity ranking — the U-Net's ±15 W m⁻² per-cell bias range, its 0.08× spectral damping, the bottleneck argument — and each survives. Table 3.3's row order is an artefact of sorting by a column that does not separate them; read the Taylor table for the ordering that holds.
 
@@ -321,7 +321,17 @@ The same paired bootstrap applied to the two spatial quantities §3.8.4 actually
 | Basic / reverse percentile | [−0.3513, −0.0362] | excludes zero |
 | **BCa** | **[−0.3603, −0.0408]** | **excludes zero** |
 
-**The Random Forest's centred-RMSE advantage is established.** An earlier version of this document claimed neither leg of the composite criterion survived resampling. That was wrong, and wrong because of the interval method rather than the data. One leg survives. Spatial correlation does not: BCa gives [−0.0008, +0.0040], spanning zero under all three methods.
+**The composite criterion survives on BOTH of its legs.** The criterion was *mean bias plus spatial error structure*, and BCa establishes the Random Forest as better on each:
+
+| RF − XGBoost | Plug-in | BCa 95% CI | |
+|---|---|---|---|
+| Mean bias, \|MBE\| | −0.953 | [−1.499, −0.475] | established |
+| Centred RMSE | −0.171 | [−0.360, −0.041] | established |
+| Spatial correlation | +0.0015 | [−0.0008, +0.0040] | not established — and never a leg of the criterion |
+
+**This document has now been wrong about this twice, in the same way.** First it claimed neither leg survived, on a percentile interval that is invalid for centred RMSE. Then it claimed one leg survived, having dismissed the bias leg on *marginal* MBE intervals — the very fallacy this section refutes two paragraphs earlier. Both errors are the same habit: reaching for whichever interval was to hand rather than the one the quantity required. The paired MBE difference reduces to mean(a) − mean(b), since the truth cancels, so it is precisely the quantity a paired bootstrap is built for.
+
+**Nothing about the deployment changes, and that is the point.** A criterion that fully survives and still loses to a categorical disqualification is a stronger result than one that half-survives, because it removes any suspicion the scorecard was arranged. The Random Forest reproduces the historical field better in both level and spatial error structure. It still cannot produce a projection to 2100, because it inverts the scenario signal (§7.11).
 
 **What this does not touch.** RF's aggregate deficit is established *more* strongly under BCa, +1.0576 [+0.5976, +1.7684], than under the percentile interval. The two comparisons previously asserted rather than shown are also settled: CNN−XGBoost +0.9023 [+0.5264, +1.2032] and U-Net−XGBoost +0.8671 [+0.3995, +1.2729], both excluding zero under all three methods.
 
@@ -333,7 +343,7 @@ The same paired bootstrap applied to the two spatial quantities §3.8.4 actually
 
 | Axis | RF vs XGBoost | Status |
 |---|---|---|
-| Systematic offset (mean bias) | ratio 4.8× | **not established** — both MBEs span zero (§7.10 above) |
+| Systematic offset (mean bias) | −0.953 on \|MBE\| | **ESTABLISHED** — BCa [−1.499, −0.475]. The earlier "both MBEs span zero" reasoning used *marginal* intervals, the fallacy §7.10 itself refutes |
 | Spatial error structure (centred RMSE) | −0.1706 plug-in | **ESTABLISHED** — BCa [−0.3603, −0.0408]; the percentile interval that spanned zero was the wrong tool |
 | *Aggregate error (RMSE)* | *+1.0581* | ***established*** — *against RF* |
 
@@ -585,7 +595,7 @@ state only because four architectures were carried through to projection rather 
 
 3. **The ranking is not an artefact of the chosen split (§7.9).** This is the consequence of the rolling-origin result, and it belongs here rather than only in §7. The entire deployment argument rests on a comparison measured over one 1985–2010 / 2011–2024 division of the record. A rolling-origin design, refitting on an expanding window and testing on the block immediately after it, puts XGBoost ahead in **all four** forward-in-time folds by margins of 0.89 to 2.26 W m⁻². The preference is therefore a property of the models rather than of the validation period, and no fold reverses it. The negative form matters more than the positive one: had the ranking flipped between folds, *any* selection rule — the original single-metric one included — would have been arbitrating noise, and the honest conclusion would have been that the four models are not separable at this sample size. That is precisely the conclusion §7.10 forces for RF against CNN against U-Net, whose RMSE differences are not distinguishable. It is not the conclusion for XGBoost, which is separable from all three and stays separable in every fold.
 
-**The scorecard, stated as a scorecard rather than a clean sweep.** XGBoost is beaten on exactly one tested axis — centred RMSE, by 0.171 W m⁻², established under BCa — and it beats all three rivals on aggregate RMSE with BCa intervals excluding zero, wins all four rolling-origin folds, and is one of only three models that pass the scenario screen. It also carries one unestablished soft spot: the largest spatial-variance damping in the Taylor table, std-ratio deviation 0.0392, though every pairwise BCa interval on that metric spans zero. An earlier version of this section claimed no model was established to beat XGBoost on any axis; that was an absolute claim requiring only one counterexample, and §7.10 now supplies it. Deploying XGBoost still **returns the study to §3.8.1's original pre-registered criterion** — lowest validation RMSE — which removes the post-hoc criterion change (A10) as an attack surface rather than defending it.
+**The scorecard, stated as a scorecard rather than a clean sweep.** XGBoost is beaten on two tested axes — mean bias by 0.953 W m⁻² and centred RMSE by 0.171, both established under BCa — and it beats all three rivals on aggregate RMSE with BCa intervals excluding zero, wins all four rolling-origin folds, and is one of only three models that pass the scenario screen. It also carries one unestablished soft spot: the largest spatial-variance damping in the Taylor table, std-ratio deviation 0.0392, though every pairwise BCa interval on that metric spans zero. An earlier version of this section claimed no model was established to beat XGBoost on any axis; that was an absolute claim requiring only one counterexample, and §7.10 now supplies it. Deploying XGBoost still **returns the study to §3.8.1's original pre-registered criterion** — lowest validation RMSE — which removes the post-hoc criterion change (A10) as an attack surface rather than defending it.
 
 **And the surviving leg is answered on relevance, not size.** The Random Forest draws a marginally better historical map. The deliverable is a projected irradiance layer to 2100, which it cannot produce because it inverts the scenario signal — a categorical disqualification rather than a magnitude trade. Comparing 0.171 against 1.058 is tempting but treats a centred error on a climatological field as commensurable with a space-time aggregate, which is the comparison §7.14 and §8 both warn against elsewhere. Keep it as a secondary remark with both quantities named.
 
