@@ -108,6 +108,7 @@ The retained domain is narrower than Chapter 3's nominal box (15.0–22.5°S, 25
 | `compute_feature_importance.py` | RF MDI + permutation, XGBoost gain + cover |
 | `compute_rolling_origin.py` | Rolling-origin evaluation across 4 expanding-window folds (C3) |
 | `compute_bootstrap_ci.py` | Paired year-block bootstrap: CIs on Table 3.3 and on model differences |
+| `compute_bca_centred_rmse.py` | **BCa intervals** on the paired differences. Required because the percentile interval is invalid for centred RMSE, whose bootstrap distribution is biased by construction. Reports percentile, basic and BCa side by side. |
 | `check_status_consistency.py` | Guards this document against stale numbers; run by `pytest` |
 
 ### Projection and verification
@@ -293,6 +294,8 @@ Individual intervals overlap heavily — but that is the wrong comparison. Becau
 | Centred RMSE | −2.525 [−2.758, −2.217] | −0.299 [−0.517, −0.070] | −2.824 [−3.024, −2.486] | **yes — all three pairs** |
 | Spatial R | +0.080 [+0.066, +0.095] | +0.018 [+0.006, +0.031] | +0.098 [+0.082, +0.115] | **yes — all three pairs** |
 
+*Intervals in this three-way table are **percentile**, not BCa: `compute_bca_centred_rmse.py` covers only the three comparisons against the deployed model. All six here exclude zero by wide margins, and the compression documented above pushes differences *toward* zero, so BCa would widen the exclusion rather than threaten it. The ordering conclusion is unaffected.*
+
 **RF > CNN > U-Net is fully established on both spatial axes, including the narrow CNN-over-U-Net margin, and is established on none of the aggregate ones.** So the rule for the whole document is: *rank these three on spatial fidelity, never on RMSE.* Every ranking §7.5, §7.8 and §9 make is a spatial-fidelity ranking — the U-Net's ±15 W m⁻² per-cell bias range, its 0.08× spectral damping, the bottleneck argument — and each survives. Table 3.3's row order is an artefact of sorting by a column that does not separate them; read the Taylor table for the ordering that holds.
 
 Mean bias is the weakest column: **every model's MBE interval spans zero**, including XGBoost's +1.20 [−0.14, +2.41]. The fivefold RF-vs-XGBoost bias ratio discussed in §9 is a point-estimate ratio between two quantities that are individually indistinguishable from zero, and is presented there as indicative rather than established.
@@ -308,7 +311,19 @@ The same paired bootstrap applied to the two spatial quantities §3.8.4 actually
 | RF − CNN | −2.5250 | [−2.7584, −2.2169] | +0.0802 | [+0.0660, +0.0947] |
 | XGBoost − U-Net | −2.6791 | [−2.8978, −2.3699] | +0.0964 | [+0.0807, +0.1139] |
 
-**A reading caveat on these numbers, because subtracting the Taylor table gives different values.** The differences above are **bootstrap resample means**; Taylor reports the **plug-in** full-sample statistic. For centred RMSE they differ: RF−XGBoost is −0.1706 plug-in against −0.1445 as a resample mean, and CNN−XGBoost 2.4873 against 2.3804. Each replicate recomputes the time-mean map from resampled years, so its centred RMSE carries sampling noise added in quadrature (≈ √(c² + n²)), and since √(a²+n²) − √(b²+n²) < a − b, replicate differences compress toward zero. Spatial correlation, bounded near 1, is barely affected — which is why both of its differences reproduce Taylor to 4 dp. The `estimate` column of `bootstrap_ci.csv` is the plug-in and matches Taylor exactly. **The compression is conservative here:** the plug-in RF advantage is larger than the resample mean and the interval still spans zero, so *not established* holds either way.
+**A reading caveat, and a correction it forced.** The differences above are **bootstrap resample means**; Taylor reports the **plug-in** full-sample statistic. For centred RMSE they differ: RF−XGBoost is −0.1706 plug-in against −0.1445 as a resample mean, and CNN−XGBoost 2.4873 against 2.3804. Each replicate recomputes the time-mean map from resampled years, so its centred RMSE carries sampling noise added in quadrature (≈ √(c² + n²)), and since √(a²+n²) − √(b²+n²) < a − b, replicate differences compress toward zero. Spatial correlation, bounded near 1, is barely affected — which is why both of its differences reproduce Taylor to 4 dp. The `estimate` column of `bootstrap_ci.csv` is the plug-in and matches Taylor exactly; the `mean_difference` column of `bootstrap_differences.csv` does not, and that distinction is the whole of the discrepancy.
+
+**Naming the bias forced the obvious next step, and it reversed a verdict.** A percentile interval assumes an approximately unbiased, symmetric bootstrap distribution. For centred RMSE that assumption fails *by construction*, so the percentile interval was the wrong tool. `compute_bca_centred_rmse.py` reports BCa, which corrects for bias and skewness:
+
+| RF − XGBoost, centred RMSE | Interval | Verdict |
+|---|---|---|
+| Percentile (as originally reported) | [−0.3050, +0.0101] | spans zero |
+| Basic / reverse percentile | [−0.3513, −0.0362] | excludes zero |
+| **BCa** | **[−0.3603, −0.0408]** | **excludes zero** |
+
+**The Random Forest's centred-RMSE advantage is established.** An earlier version of this document claimed neither leg of the composite criterion survived resampling. That was wrong, and wrong because of the interval method rather than the data. One leg survives. Spatial correlation does not: BCa gives [−0.0008, +0.0040], spanning zero under all three methods.
+
+**What this does not touch.** RF's aggregate deficit is established *more* strongly under BCa, +1.0576 [+0.5976, +1.7684], than under the percentile interval. The two comparisons previously asserted rather than shown are also settled: CNN−XGBoost +0.9023 [+0.5264, +1.2032] and U-Net−XGBoost +0.8671 [+0.3995, +1.2729], both excluding zero under all three methods.
 
 **The pixel-wise/shared-weight distinction is established and large.** RF and XGBoost both beat both networks on spatial error structure by margins whose intervals are nowhere near zero. Everything §7.5 and §7.8 say about the U-Net stands.
 
@@ -319,7 +334,7 @@ The same paired bootstrap applied to the two spatial quantities §3.8.4 actually
 | Axis | RF vs XGBoost | Status |
 |---|---|---|
 | Systematic offset (mean bias) | ratio 4.8× | **not established** — both MBEs span zero (§7.10 above) |
-| Spatial error structure (centred RMSE) | −0.1445 | **not established** — CI spans zero |
+| Spatial error structure (centred RMSE) | −0.1706 plug-in | **ESTABLISHED** — BCa [−0.3603, −0.0408]; the percentile interval that spanned zero was the wrong tool |
 | *Aggregate error (RMSE)* | *+1.0581* | ***established*** — *against RF* |
 
 Random Forest is **significantly worse on the one axis that is established, and not significantly better on either axis the deployment case invoked.** The composite criterion does not select RF over XGBoost; it fails to separate them, and the tie-break falls to the metric that does separate them, which favours XGBoost. §7.11 then removed any residual case for RF on independent grounds. **XGBoost is deployed (§9).**
@@ -335,6 +350,22 @@ Validation measures how well a model reproduces 2011–2024. The product is a pr
 | U-Net | +1.076 | +2.001 | +4.639 | yes | 100.0% |
 
 **Random Forest's scenario separation shrinks as forcing grows** — the opposite of the physical expectation — and it inverts outright on the long-term change signal (+1.648 under SSP2-4.5 against +1.349 under SSP5-8.5).
+
+**The out-of-range rates, resolved by horizon — this is the sharper form of the evidence.** Percentage of predictor values falling outside the 1985–2010 ERA5 training range, post-QC-clamp:
+
+| Predictor | Scenario | Near | Mid | Long |
+|---|---|---|---|---|
+| `tas` | SSP2-4.5 | 0.32% | 0.72% | 1.34% |
+| `tas` | **SSP5-8.5** | 0.36% | 3.01% | **11.48%** |
+| `huss` | SSP2-4.5 | 0.31% | 1.09% | 1.37% |
+| `huss` | **SSP5-8.5** | 0.49% | 2.53% | **7.65%** |
+| `clt` | SSP2-4.5 | 0.30% | 0.46% | 0.52% |
+| `clt` | **SSP5-8.5** | 0.61% | 1.08% | **2.03%** |
+| `ps` | both | 0.00% | 0.00% | 0.00% |
+
+**The clipping grows with lead time under SSP5-8.5 and barely grows under SSP2-4.5** — temperature from 0.36% to 11.48% against 0.32% to 1.34%. That is precisely why the Random Forest's scenario separation *shrinks* with horizon rather than merely being too small: the higher-emission pathway is progressively more clipped, so its response saturates while the lower pathway's does not.
+
+**Cloud fraction is included because its absence would be conspicuous, and the answer is two-sided.** `clt` is the dominant predictor by importance (0.33 / 0.39 / 0.47) and its out-of-range rate *is* differentially higher under SSP5-8.5 — 2.03% against 0.52% at long term, a factor of 3.9 — so it supports the mechanism. But its absolute rate is low: at long term the dominant *source of clipping* is temperature at 11.48% and humidity at 7.65%, not cloud at 2.03%. **The dominant predictor is not the dominant source of extrapolation failure**, and saying so is more accurate than implying the two coincide.
 
 **The mechanism is tree extrapolation.** A tree predicts a constant beyond the range it was trained on, so its response saturates once predictors leave the training envelope. Under SSP5-8.5 they increasingly do: temperature falls outside the 1985–2010 range **4.95%** of the time against 0.79% under SSP2-4.5, specific humidity 3.56% against 0.92%. The scenario that should produce the larger response is precisely the one where a tree's response is most clipped. XGBoost shares the limitation and shows it mildly; the neural models extrapolate through their linear layers and do not.
 
@@ -549,7 +580,7 @@ state only because four architectures were carried through to projection rather 
 
 **This reverses an earlier decision, and the reversal is the point.** §3.8.4 previously deployed the Random Forest on a **composite criterion** — mean bias plus spatial error structure — which Chapter 3 disclosed as having been adopted **after** the corrected-alignment run reversed the ranking (§10a, A10). Two tests then removed its basis:
 
-1. **The composite criterion does not separate the two models (§7.10).** RF−XGBoost is −0.145 [−0.305, **+0.010**] on centred RMSE and +0.0016 [−0.0006, +0.0042] on spatial R. Neither interval excludes zero, so neither leg of the criterion is established. The aggregate deficit it was meant to outweigh *is* established: +1.058 [+0.530, +1.671], confirmed by XGBoost winning all four rolling-origin folds (§7.9).
+1. **One leg of the composite criterion survives; it is outweighed, not absent (§7.10).** Under BCa the Random Forest **is** established better on centred RMSE, −0.1706 [−0.3603, −0.0408]. It is *not* established better on spatial correlation, [−0.0008, +0.0040]. An earlier version of this argument claimed neither leg survived; that was an artefact of applying a percentile interval to a statistic whose bootstrap distribution is biased by construction. **The deployment does not rest on that leg and never needed to.** The advantage is 0.17 W m⁻² on a time-mean field, against an established aggregate deficit of +1.0576 [+0.5976, +1.7684] — six times larger — plus four losses out of four rolling-origin folds (§7.9). Granting the Random Forest the point costs the argument nothing.
 2. **RF cannot separate the emission scenarios (§7.11).** Its SSP5-8.5 minus SSP2-4.5 separation *shrinks* with lead time (+0.465 → +0.307 → +0.167), it inverts on the long-term change signal, and only 71.7% of cells order the pathways correctly, against XGBoost's 96.7%. The mechanism is tree extrapolation: temperature leaves the 1985–2010 training range 4.95% of the time under SSP5-8.5 against 0.79% under SSP2-4.5, and a tree's prediction saturates outside the range it was fitted on.
 
 3. **The ranking is not an artefact of the chosen split (§7.9).** This is the consequence of the rolling-origin result, and it belongs here rather than only in §7. The entire deployment argument rests on a comparison measured over one 1985–2010 / 2011–2024 division of the record. A rolling-origin design, refitting on an expanding window and testing on the block immediately after it, puts XGBoost ahead in **all four** forward-in-time folds by margins of 0.89 to 2.26 W m⁻². The preference is therefore a property of the models rather than of the validation period, and no fold reverses it. The negative form matters more than the positive one: had the ranking flipped between folds, *any* selection rule — the original single-metric one included — would have been arbitrating noise, and the honest conclusion would have been that the four models are not separable at this sample size. That is precisely the conclusion §7.10 forces for RF against CNN against U-Net, whose RMSE differences are not distinguishable. It is not the conclusion for XGBoost, which is separable from all three and stays separable in every fold.

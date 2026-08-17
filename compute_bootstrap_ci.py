@@ -41,10 +41,24 @@ ONE READING CAVEAT, because it looks like an inconsistency and is not.
   Spatial correlation is bounded near 1 and barely affected, which is why both
   of its differences reproduce the Taylor table to four decimals.
 
-  The compression is conservative for the conclusions drawn here: the plug-in
-  advantage is LARGER than the resample mean, and the interval still spans zero,
-  so 'not established' holds either way. Quote the plug-in difference when
-  comparing against the Taylor table, and the interval from here.
+  DO NOT READ THE PERCENTILE INTERVAL ON CENTRED RMSE AS THE ANSWER.
+
+  A percentile interval assumes an approximately unbiased, symmetric bootstrap
+  distribution. The compression above means that assumption fails for centred
+  RMSE by construction, so the percentile interval is the wrong tool for this
+  metric and an earlier version of the project's write-up drew a wrong
+  conclusion from it. compute_bca_centred_rmse.py reports BCa, which corrects
+  for bias and skewness, alongside the basic (reverse percentile) interval:
+
+    RF - XGBoost centred RMSE   percentile [-0.3050, +0.0101]  spans zero
+                                basic      [-0.3513, -0.0362]  excludes zero
+                                BCa        [-0.3603, -0.0408]  excludes zero
+
+  So the Random Forest's centred-RMSE advantage IS established; the percentile
+  interval said otherwise only because of the bias. Spatial correlation is
+  unaffected and spans zero under all three methods. Quote the plug-in
+  difference when comparing against the Taylor table, and take the interval
+  from compute_bca_centred_rmse.py rather than from here.
 """
 
 import os
