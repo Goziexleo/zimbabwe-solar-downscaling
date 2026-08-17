@@ -40,7 +40,7 @@ ALPHA = 0.05
 MODELS = {"Random Forest": "ghi_rf", "XGBoost": "ghi_xgb",
           "CNN": "ghi_cnn", "U-Net": "ghi_unet"}
 PAIRS = [("Random Forest", "XGBoost"), ("CNN", "XGBoost"), ("U-Net", "XGBoost")]
-METRICS = ["centred RMSE", "spatial R", "RMSE"]
+METRICS = ["centred RMSE", "spatial R", "RMSE", "std ratio dev"]
 
 
 def statistic(pred_a, pred_b, truth, idx, metric):
@@ -53,6 +53,11 @@ def statistic(pred_a, pred_b, truth, idx, metric):
     a_map, b_map = a.mean(axis=0), b.mean(axis=0)
     if metric == "centred RMSE":
         return float((a_map - t_map).std() - (b_map - t_map).std())
+    if metric == "std ratio dev":
+        # |std ratio - 1| : distance from the ideal, so a POSITIVE difference
+        # means model a is further from ideal spatial variance than model b
+        ref = t_map.std()
+        return float(abs(a_map.std() / ref - 1.0) - abs(b_map.std() / ref - 1.0))
     return float(np.corrcoef(a_map.ravel(), t_map.ravel())[0, 1]
                  - np.corrcoef(b_map.ravel(), t_map.ravel())[0, 1])
 
