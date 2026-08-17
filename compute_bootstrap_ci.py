@@ -23,6 +23,28 @@ Design:
 A difference whose 95 per cent interval excludes zero is one that survives
 resampling; one whose interval spans zero is not distinguishable from noise at
 this sample size, whatever the point estimates suggest.
+
+ONE READING CAVEAT, because it looks like an inconsistency and is not.
+
+  The 'estimate' column of bootstrap_ci.csv is the PLUG-IN statistic on the full
+  sample, so it matches taylor_diagram_stats.csv exactly. The
+  'mean_difference' column of bootstrap_differences.csv is the MEAN ACROSS
+  REPLICATES, and for centred RMSE the two are not the same thing.
+
+  Each replicate recomputes the time-mean map from resampled years, so its
+  centred RMSE carries sampling noise added in quadrature, roughly
+  sqrt(c^2 + n^2). Because sqrt(a^2+n^2) - sqrt(b^2+n^2) < a - b whenever
+  a > b > 0, replicate differences are COMPRESSED TOWARD ZERO relative to the
+  plug-in difference. Measured: RF-XGBoost plug-in -0.1706 against a resample
+  mean of -0.1445; CNN-XGBoost plug-in 2.4873 against 2.3804.
+
+  Spatial correlation is bounded near 1 and barely affected, which is why both
+  of its differences reproduce the Taylor table to four decimals.
+
+  The compression is conservative for the conclusions drawn here: the plug-in
+  advantage is LARGER than the resample mean, and the interval still spans zero,
+  so 'not established' holds either way. Quote the plug-in difference when
+  comparing against the Taylor table, and the interval from here.
 """
 
 import os

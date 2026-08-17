@@ -308,6 +308,8 @@ The same paired bootstrap applied to the two spatial quantities §3.8.4 actually
 | RF − CNN | −2.5250 | [−2.7584, −2.2169] | +0.0802 | [+0.0660, +0.0947] |
 | XGBoost − U-Net | −2.6791 | [−2.8978, −2.3699] | +0.0964 | [+0.0807, +0.1139] |
 
+**A reading caveat on these numbers, because subtracting the Taylor table gives different values.** The differences above are **bootstrap resample means**; Taylor reports the **plug-in** full-sample statistic. For centred RMSE they differ: RF−XGBoost is −0.1706 plug-in against −0.1445 as a resample mean, and CNN−XGBoost 2.4873 against 2.3804. Each replicate recomputes the time-mean map from resampled years, so its centred RMSE carries sampling noise added in quadrature (≈ √(c² + n²)), and since √(a²+n²) − √(b²+n²) < a − b, replicate differences compress toward zero. Spatial correlation, bounded near 1, is barely affected — which is why both of its differences reproduce Taylor to 4 dp. The `estimate` column of `bootstrap_ci.csv` is the plug-in and matches Taylor exactly. **The compression is conservative here:** the plug-in RF advantage is larger than the resample mean and the interval still spans zero, so *not established* holds either way.
+
 **The pixel-wise/shared-weight distinction is established and large.** RF and XGBoost both beat both networks on spatial error structure by margins whose intervals are nowhere near zero. Everything §7.5 and §7.8 say about the U-Net stands.
 
 **The RF-vs-XGBoost spatial distinction is not established.** Both intervals span zero. The two pixel-wise models are indistinguishable from each other on centred RMSE and on spatial correlation.
@@ -372,6 +374,8 @@ Confirmed by inspection: in `ACCESS-CM2_ssp245`, the negative values at the wors
 | Scenario ordering, cells correct | RF 71.7%, XGB 96.7% | **unchanged** |
 | σ_arch share, long term (deployed) | 27.20% | 27.18% |
 | C1 transfer, XGBoost ensemble | 4.8226 | **4.8226** (identical to 4 dp) |
+
+**Scope, because the scope is what makes this evidence.** EDCM is applied to CMIP6 only, so the ERA5 training and validation pipeline was never touched — ERA5 `clt` has zero negative values, minimum 0.1123% — and Table 3.3 is unaffected *by construction*, not by any property of the models. The comparison below is on the **CMIP6-driven projections and the transfer test**, which is where the defect actually lived.
 
 **The two tree models are bit-identical; only the two networks moved.** That is exactly what §7.11 predicts and is measured here independently. The out-of-bound cloud values were *already* outside the 1985–2010 training range, and a tree returns the same leaf for every input beyond that range — so moving the input from −5.93 to 0 moves the prediction not at all. The networks extrapolate through their linear layers, so the same input change propagates, in the third decimal. **The QC's null effect on the deployed model is the saturation mechanism showing up in a completely different experiment.**
 
