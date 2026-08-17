@@ -69,7 +69,7 @@ The retained domain is narrower than Chapter 3's nominal box (15.0–22.5°S, 25
 - Predictors are **ERA5, not bias-corrected CMIP6** — this is perfect-prognosis training; CMIP6 enters only at projection time
 - `MODEL_PREDICTORS="clt,tas,ps,huss,rsds,od550aer"` reproduces the §7.3 ablation
 
-**Target:** `CSI = ssrd_fine / clearsky_ghi`, clipped to [0, 1.1]. Recovered as `GHI = CSI × clearsky_ghi`. Observed CSI spans 0.256–0.632, so **the clip never binds** and the normalisation is an exact inverse — verified to machine precision (max difference 1.14 × 10⁻¹³ W m⁻²). The clear-sky specification therefore fixes the physical meaning of the intermediate CSI the models learn, but **cancels entirely from the GHI product**.
+**Target:** `CSI = ssrd_fine / clearsky_ghi`, clipped to [0, 1.1]. Recovered as `GHI = CSI × clearsky_ghi`. Observed CSI spans 0.246–0.632 across both splits (0.2464 training, 0.2564 validation), so **the clip never binds** and the normalisation is an exact inverse — verified to machine precision (max difference 1.14 × 10⁻¹³ W m⁻²). The clear-sky specification therefore fixes the physical meaning of the intermediate CSI the models learn, but **cancels entirely from the GHI product**.
 
 ---
 
@@ -277,7 +277,7 @@ Every metric had been a point estimate, including the gaps §3.8.4 turns on. A *
 
 Individual intervals overlap heavily — but that is the wrong comparison. Because the bootstrap is paired, the interval on each *difference* removes the year-to-year variation common to all models:
 
-| Comparison | ΔRMSE | 95% CI | Verdict |
+| Comparison | ΔRMSE | 95% CI (percentile) | Verdict |
 |---|---|---|---|
 | Random Forest − XGBoost | +1.058 | [+0.530, +1.671] | **distinguishable** |
 | CNN − XGBoost | +0.900 | [+0.561, +1.228] | **distinguishable** |
@@ -308,7 +308,7 @@ Mean bias needs the paired/marginal distinction stated carefully, because an ear
 
 The same paired bootstrap applied to the two spatial quantities §3.8.4 actually relies on:
 
-| Comparison | Δ centred RMSE | 95% CI | Δ spatial R | 95% CI |
+| Comparison | Δ centred RMSE | 95% CI (percentile) | Δ spatial R | 95% CI (percentile) |
 |---|---|---|---|---|
 | **RF − XGBoost** | **−0.1445** | **[−0.3050, +0.0101]** | **+0.0016** | **[−0.0006, +0.0042]** |
 | RF − U-Net | −2.8237 | [−3.0244, −2.4857] | +0.0980 | [+0.0822, +0.1150] |
@@ -360,8 +360,8 @@ Validation measures how well a model reproduces 2011–2024. The product is a pr
 |---|---|---|---|---|---|
 | **Random Forest** | +0.465 | +0.307 | **+0.167** | **NO — shrinks** | **71.7%** |
 | XGBoost | +0.754 | +0.741 | +1.444 | yes, overall | 96.7% |
-| CNN | +1.397 | +4.059 | +9.654 | yes | 100.0% |
-| U-Net | +1.076 | +2.001 | +4.639 | yes | 100.0% |
+| CNN | +1.393 | +4.053 | +9.643 | yes | 100.0% |
+| U-Net | +1.075 | +1.998 | +4.631 | yes | 100.0% |
 
 **Random Forest's scenario separation shrinks as forcing grows** — the opposite of the physical expectation — and it inverts outright on the long-term change signal (+1.648 under SSP2-4.5 against +1.349 under SSP5-8.5).
 
@@ -385,7 +385,7 @@ Validation measures how well a model reproduces 2011–2024. The product is a pr
 
 This is the concrete form of the stationarity caveat in §14.2, and it matters more for a projection product than any validation metric: a suitability map that cannot distinguish emission pathways fails at the task it exists for.
 
-**A caution against over-reading it in the other direction.** All four scenario separations are small beside σ_DS ≈ 10 W m⁻². The CNN's +9.654 is not obviously *better* for being larger — it is comparable to the model's own error, and its long-term change of +16.6 W m⁻² is implausibly large for a 75-year irradiance trend. The honest reading is that RF is disqualified on this axis, XGBoost is adequate, and the neural models' larger responses are unverifiable rather than demonstrably right.
+**A caution against over-reading it in the other direction.** All four scenario separations are small beside σ_DS ≈ 10 W m⁻². The CNN's +9.643 is not obviously *better* for being larger — it is comparable to the model's own error, and its long-term change of +16.6 W m⁻² is implausibly large for a 75-year irradiance trend. The honest reading is that RF is disqualified on this axis, XGBoost is adequate, and the neural models' larger responses are unverifiable rather than demonstrably right.
 
 ### 7.12 §3.4.3's quality control did not exist, and the null result is the interesting part
 
@@ -514,7 +514,7 @@ Targets are R > 0.90 and |MBE| < 5. **All four models clear both for the first t
 | CNN | 0.9176 | 0.9937 | 3.229 | 40.5% |
 | U-Net | 0.8995 | 0.9762 | 3.539 | 44.4% |
 
-The pixel-wise models reproduce the spatial climatology far more faithfully than the shared-weight ones. **The gap between the two pixel-wise models is not one of them**: RF−XGBoost is −0.145 [−0.305, +0.010] on centred RMSE and +0.0016 [−0.0006, +0.0042] on spatial R, both spanning zero (§7.10). Read the bold on the RF row as the best point estimate, not as an established difference from XGBoost.
+The pixel-wise models reproduce the spatial climatology far more faithfully than the shared-weight ones. **The gap between the two pixel-wise models splits, and §7.10 settles it under BCa.** On **centred RMSE** the Random Forest's advantage **is established**: −0.171 [−0.360, −0.041]. On **spatial correlation** it is not: +0.0015 [−0.0008, +0.0040]. So read the bold on the RF row as an established advantage on centred RMSE and a point estimate only on spatial R. An earlier version of this note said both spanned zero, on percentile intervals that are invalid for centred RMSE — see §7.10.
 
 ### Uncertainty decomposition — four components
 
@@ -577,7 +577,7 @@ across possible futures.
 | U-Net | +5.43 W m⁻² | +8.99 W m⁻² |
 | CNN | +8.31 W m⁻² | +16.56 W m⁻² |
 
-The magnitude spans a factor of four to twelve across architectures, which is what σ_arch measures.
+The magnitude spans a factor of five to twelve (8.31/1.65 = 5.04, 16.56/1.35 = 12.27) across architectures, which is what σ_arch measures.
 All of it is small beside σ_DS ≈ 9–10 W m⁻²: **no projected change in this study is large relative
 to its own error bar.**
 
@@ -606,7 +606,8 @@ state only because four architectures were carried through to projection rather 
 
 **This reverses an earlier decision, and the reversal is the point.** §3.8.4 previously deployed the Random Forest on a **composite criterion** — mean bias plus spatial error structure — which Chapter 3 disclosed as having been adopted **after** the corrected-alignment run reversed the ranking (§10a, A10). Two tests then removed its basis:
 
-1. **One leg of the composite criterion survives; it is outweighed, not absent (§7.10).** Under BCa the Random Forest **is** established better on centred RMSE, −0.1706 [−0.3603, −0.0408]. It is *not* established better on spatial correlation, [−0.0008, +0.0040]. An earlier version of this argument claimed neither leg survived; that was an artefact of applying a percentile interval to a statistic whose bootstrap distribution is biased by construction. **The deployment does not rest on that leg and never needed to.** The advantage is 0.17 W m⁻² on a time-mean field, against an established aggregate deficit of +1.0576 [+0.5976, +1.7684] — six times larger — plus four losses out of four rolling-origin folds (§7.9). Granting the Random Forest the point costs the argument nothing.
+1. **Both legs of the composite criterion survive; they are outweighed, not absent (§7.10).** The criterion was *mean bias plus spatial error structure*, and under BCa the Random Forest is established better on each: **mean bias by −0.953 [−1.499, −0.475]** on |MBE|, the larger of the two, and **centred RMSE by −0.171 [−0.360, −0.041]**. Spatial *correlation* is the one axis where it is not established, +0.0015 [−0.0008, +0.0040], and that was never a leg of the criterion. This section has been wrong about this twice — first claiming neither leg survived, on a percentile interval invalid for centred RMSE; then claiming one did, having dismissed the bias leg on *marginal* intervals. Both errors were the same habit: reaching for whichever interval was to hand rather than the one the quantity required.
+   **Grant the whole criterion, and answer it on relevance rather than size.** The Random Forest reproduces the historical field better in both its level and its spatial error structure. It still cannot produce the deliverable, which is a projection to 2100, because it inverts the scenario signal (§7.11) — a **categorical disqualification, not a magnitude trade**. Resist the shortcut of comparing 0.171 against +1.058 and calling it six times smaller: that treats a centred error on a climatological field as commensurable with a space-time aggregate, which is exactly what the composite criterion denied and what §7.14 and §8 warn against elsewhere. Secondarily, and with both quantities named as different kinds: 0.171 W m⁻² of centred error against +1.058 [+0.598, +1.768] of space-time aggregate error, plus four losses from four rolling-origin folds (§7.9).
 2. **RF cannot separate the emission scenarios (§7.11).** Its SSP5-8.5 minus SSP2-4.5 separation *shrinks* with lead time (+0.465 → +0.307 → +0.167), it inverts on the long-term change signal, and only 71.7% of cells order the pathways correctly, against XGBoost's 96.7%. The mechanism is tree extrapolation: temperature leaves the 1985–2010 training range 4.95% of the time under SSP5-8.5 against 0.79% under SSP2-4.5, and a tree's prediction saturates outside the range it was fitted on.
 
 3. **The ranking is not an artefact of the chosen split (§7.9).** This is the consequence of the rolling-origin result, and it belongs here rather than only in §7. The entire deployment argument rests on a comparison measured over one 1985–2010 / 2011–2024 division of the record. A rolling-origin design, refitting on an expanding window and testing on the block immediately after it, puts XGBoost ahead in **all four** forward-in-time folds by margins of 0.89 to 2.26 W m⁻². The preference is therefore a property of the models rather than of the validation period, and no fold reverses it. The negative form matters more than the positive one: had the ranking flipped between folds, *any* selection rule — the original single-metric one included — would have been arbitrating noise, and the honest conclusion would have been that the four models are not separable at this sample size. That is precisely the conclusion §7.10 forces for RF against CNN against U-Net, whose RMSE differences are not distinguishable. It is not the conclusion for XGBoost, which is separable from all three and stays separable in every fold.
@@ -676,7 +677,7 @@ Tree defaults were retained after HPO (§7.6). Deployed values are now the **scr
 | B12 degenerate baselines | **Done** — interpolation and delta-mapping relabelled circularity diagnostics in §3.7.3, `compute_table33.py` and the CSV; climatology named the only admissible reference |
 | B13 σ_DS constant | **Done** — stated in the script output and here |
 | B14 σ_DS a different kind of quantity | **Done** — stated alongside |
-| B15 σ_arch from more members | **Done — n = 4**, all benchmarked architectures. CNN projected from its existing checkpoint; XGBoost persisted (~400 MB) and projected. Exceeds σ_GCM's n = 3. Long-term variance share settled at 24.1% (14.2% at n=2, 27.8% at n=3). |
+| B15 σ_arch from more members | **Done — n = 4**, all benchmarked architectures. CNN projected from its existing checkpoint; XGBoost persisted (~400 MB) and projected. Exceeds σ_GCM's n = 3. Long-term variance share settled at 27.18% for the deployed XGBoost (24.12% is the Random Forest row, a relic from when RF was deployed) (14.2% at n=2, 27.8% at n=3). |
 | B16 U-Net R² | **Done** — 0.9294 |
 | C1 perfect prognosis | **Done** — §7.7. Required extending EDCM to emit a historical pseudo-scenario (`EDCM_INCLUDE_HISTORICAL=1`) |
 | C2 power spectra | **Done** — §7.8 |
@@ -767,9 +768,7 @@ Under **git** since the second audit: 61 files tracked, two commits, `data/` exc
 3. **Cloud is unresolved.** The dominant control on surface irradiance is parameterised inside the GCM and available only as a grid mean. Feature importance confirms cloud fraction dominates the fit.
 4. **Defensive NaN handling hides failures.** Two of the three severe silent bugs were `np.nan_to_num` converting a loud failure into a plausible field. Both were caught by inspecting fields, not scores. `safe_nan_to_num` now makes this loud.
 5. **Two bugs cancelled each other** (§6.11). A bug invisible in one data split because a second bug reverses it is the hardest class to find — the lesson is that identical logic must be used at every join, not merely logic that works.
-6. **Prose drifts from tables — and the sentence half is the harder half.** Six audit rounds found the same failure in the interview brief: a table corrected while a sentence summarising it was left behind. "Neither leg survived", "one real point", "every severe bug was silent", "beaten by no model on any tested axis" — none is a wrong *number*, each is a wrong *claim built on a right number*, so no numeric check can see them. `check_brief_consistency.py` therefore carries a retired-**sentence** list alongside its cell checks, and the discipline is to re-read every counting or characterising sentence whenever a table changes.
-
-6. **Prose drifts from tables.** Four audit rounds found the same failure: a number corrected in a table while the sentence beneath kept the old value, every time caught by an external reader. The tables had a defence — `compute_table33.py` as the single canonical source — and the prose had none. `check_status_consistency.py` now supplies one, checking that canonical CSV values appear and that superseded values do not reappear outside an explanatory context. It runs under `pytest`. Its own first version had exactly the bug it exists to prevent: it scanned a whole paragraph for any explanatory word, so a stale figure passed because an unrelated clause elsewhere in the same line said "no longer". It now searches a 90-character window around the value.
+6. **Prose drifts from tables — and the sentence half is the harder half.** Six audit rounds found the same failure in the interview brief: a table corrected while a sentence summarising it was left behind. "Neither leg survived", "one real point", "every severe bug was silent", "beaten by no model on any tested axis" — none is a wrong *number*, each is a wrong *claim built on a right number*, so no numeric check can see them. `check_brief_consistency.py` therefore carries a retired-**sentence** list alongside its cell checks, and the discipline is to re-read every counting or characterising sentence whenever a table changes. `check_status_consistency.py` guards the value side of this document, and its own first version had exactly the bug it exists to prevent: it scanned a whole line for any explanatory word, so a stale figure passed because an unrelated clause elsewhere in the same line said "no longer". It now searches a 90-character window around the value. **The sentence list in `check_brief_consistency.py` covers this document too** — restricting it to the brief is how two contradictions survived here while the guard reported clean.
 
 ---
 

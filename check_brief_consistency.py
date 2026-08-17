@@ -207,6 +207,15 @@ RETIRED = [
      "the paired MBE difference is established under BCa"),
     ("individually indistinguishable from zero",
      "marginal intervals; the paired difference is established"),
+    # live in PROJECT_STATUS after the brief had been corrected, round seven
+    ("both spanning zero (§7.10)",
+     "centred RMSE IS established under BCa at -0.171 [-0.360, -0.041]"),
+    ("not as an established difference from XGBoost",
+     "centred RMSE is established; only spatial correlation is not"),
+    ("One leg of the composite criterion survives",
+     "both legs survive; mean bias is the larger"),
+    ("Four audit rounds found the same failure",
+     "six, and the caveat was duplicated"),
 ]
 
 EXPLANATORY = (r"earlier version|previously|an earlier|was wrong|were wrong|no longer|"
