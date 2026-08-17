@@ -110,6 +110,8 @@ The retained domain is narrower than Chapter 3's nominal box (15.0–22.5°S, 25
 | `compute_bootstrap_ci.py` | Paired year-block bootstrap: CIs on Table 3.3 and on model differences |
 | `compute_bca_centred_rmse.py` | **BCa intervals** on the paired differences. Required because the percentile interval is invalid for centred RMSE, whose bootstrap distribution is biased by construction. Reports percentile, basic and BCa side by side. |
 | `check_status_consistency.py` | Guards this document against stale numbers; run by `pytest` |
+| `check_brief_consistency.py` | Guards the interview brief. Checks table cells against the canonical CSVs (cell-level, not substring — `9.24` appears 17 times), a list of **superseded sentences** that must not reappear, and that the markdown is regenerable from the HTML. Run by `pytest`. |
+| `brief/build_brief_formats.py` | `brief/viva-brief.html` is the single source; this generates the print HTML, the PDF (`--pdf`) and the markdown. Print CSS lives in `brief/print.css` so a clean checkout can build. |
 
 ### Projection and verification
 | Script | Role |
@@ -765,6 +767,8 @@ Under **git** since the second audit: 61 files tracked, two commits, `data/` exc
 3. **Cloud is unresolved.** The dominant control on surface irradiance is parameterised inside the GCM and available only as a grid mean. Feature importance confirms cloud fraction dominates the fit.
 4. **Defensive NaN handling hides failures.** Two of the three severe silent bugs were `np.nan_to_num` converting a loud failure into a plausible field. Both were caught by inspecting fields, not scores. `safe_nan_to_num` now makes this loud.
 5. **Two bugs cancelled each other** (§6.11). A bug invisible in one data split because a second bug reverses it is the hardest class to find — the lesson is that identical logic must be used at every join, not merely logic that works.
+6. **Prose drifts from tables — and the sentence half is the harder half.** Six audit rounds found the same failure in the interview brief: a table corrected while a sentence summarising it was left behind. "Neither leg survived", "one real point", "every severe bug was silent", "beaten by no model on any tested axis" — none is a wrong *number*, each is a wrong *claim built on a right number*, so no numeric check can see them. `check_brief_consistency.py` therefore carries a retired-**sentence** list alongside its cell checks, and the discipline is to re-read every counting or characterising sentence whenever a table changes.
+
 6. **Prose drifts from tables.** Four audit rounds found the same failure: a number corrected in a table while the sentence beneath kept the old value, every time caught by an external reader. The tables had a defence — `compute_table33.py` as the single canonical source — and the prose had none. `check_status_consistency.py` now supplies one, checking that canonical CSV values appear and that superseded values do not reappear outside an explanatory context. It runs under `pytest`. Its own first version had exactly the bug it exists to prevent: it scanned a whole paragraph for any explanatory word, so a stale figure passed because an unrelated clause elsewhere in the same line said "no longer". It now searches a 90-character window around the value.
 
 ---

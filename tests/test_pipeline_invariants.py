@@ -223,6 +223,29 @@ def test_safe_nan_to_num_raises_above_threshold():
 
 
 # ------------------------------------------------- documentation drift ----
+@pytest.mark.skipif(not os.path.exists(os.path.join(ROOT, "brief/viva-brief.html")),
+                    reason="interview brief not present")
+def test_brief_has_no_stale_numbers_or_sentences():
+    """The brief must agree with the canonical CSVs cell by cell, carry no
+    superseded sentence, and be regenerable into the committed markdown.
+
+    Six audit rounds found the same failure in this document: a table corrected
+    while a sentence summarising it was left behind. Those are wrong CLAIMS built
+    on right numbers, so a numeric check cannot see them - hence the retired
+    SENTENCE list. Cell-level rather than substring matching, because "9.24"
+    appears seventeen times and a presence check passed a corrupted table.
+    """
+    from check_brief_consistency import check
+    missing, resurrected, fmt = check()
+    problems = []
+    problems += ["%s: expected %r, brief has %r" % (lab, exp, got)
+                 for lab, exp, got in missing]
+    problems += ["superseded sentence present: %r — %s" % (p, why)
+                 for p, why in resurrected]
+    problems += fmt
+    assert not problems, "interview brief is out of date:\n  " + "\n  ".join(problems)
+
+
 @pytest.mark.skipif(not os.path.exists(os.path.join(ROOT, "PROJECT_STATUS.md")),
                     reason="status document not present")
 def test_status_document_has_no_stale_numbers():

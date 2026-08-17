@@ -13,3 +13,6 @@ __pycache__/
 
 # OS
 .DS_Store
+# brief: regenerable from brief/viva-brief.html via brief/build_brief_formats.py
+brief/viva-brief-print.html
+brief/viva-brief.pdf
