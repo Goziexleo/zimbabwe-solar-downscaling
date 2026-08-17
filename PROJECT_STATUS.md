@@ -373,6 +373,37 @@ A negative cloud fraction is not a small error in kind, and it was reaching mode
 
 **This does not make the fix optional.** A defect that happens not to move the current answer is still a defect: it would matter for any model that extrapolates, for any rerun with different data, and for a reader entitled to expect that a documented QC step exists. The honest statement is that §3.4.3 was wrong, is now correct, and that correcting it changed no conclusion in this study.
 
+### 7.13 RQ2 answered against its own comparator: the attribution ladder
+§7.2 measures sub-grid information against the product's **own coarse grid** and finds essentially none. RQ2 asks a different question — what is resolved *that is absent in raw GCM output* — and against that comparator the answer is positive. Both were measured; only one had been reported.
+
+Climatological RMSE against ERA5 truth, 1985–2010, all on the 0.1° grid:
+
+| Product | RMSE | Spatial R | Bias |
+|---|---|---|---|
+| Raw CMIP6 `rsds`, uncorrected | 11.29 | 0.7667 | +6.52 |
+| Bias-corrected, interpolated to 0.1° | 6.24 | 0.9998 | — |
+| **Deployed XGBoost** | **4.82** | 0.9895 | −0.13 |
+
+Per-GCM raw RMSE spans 10.35 (CNRM-CM6-1) to 16.44 (MPI-ESM1-2-HR), with spatial correlations of 0.49, 0.68 and 0.89.
+
+**The chain cuts climatological error by 57% and lifts spatial correlation from 0.77 to 0.99. The attribution is shared and not mostly the ML's:** bias correction does 11.29 → 6.24 and essentially all of the pattern gain; the ML adds 6.24 → 4.82, a further 23% on magnitude. **The interpolated bias-corrected GCM has a marginally *higher* spatial correlation than the deployed model** (0.9998 vs 0.9895) — the ML improves the level and very slightly softens the pattern, for the same reason the interpolation baseline reaches 0.233 (§7.1).
+
+What bias correction cannot do is discriminate month to month: it operates on distributions. The skill score of 0.5155 against a 19.08 climatology is entirely the ML's.
+
+### 7.14 The irradiance field is atmospheric, not topographic
+RQ2's third clause asks how the patterns correspond to Zimbabwe's physiographic zones. Time-mean GHI and deployed-model error by elevation band:
+
+| Zone | Elevation | Cells | Mean GHI | Spatial sd | XGB bias | XGB RMSE |
+|---|---|---|---|---|---|---|
+| Lowveld | < 600 m | 936 | 230.67 | 8.36 | +1.73 | 1.86 |
+| Middleveld | 600–1200 m | 3,858 | 240.84 | 7.38 | +1.04 | 1.27 |
+| Highveld | 1200–1500 m | 904 | 240.32 | 3.43 | +1.31 | 1.44 |
+| Eastern Highlands | ≥ 1500 m | 53 | 239.01 | 3.32 | +1.56 | 1.58 |
+
+The Lowveld sits ~10 W m⁻² below the rest of the country and is the most spatially variable zone; it is also where the deployed model is least accurate (RMSE 1.86 against 1.27 in the Middleveld). **Elevation explains only 22.1% of the spatial variance in time-mean GHI (r = 0.4702).**
+
+**This unifies three findings that otherwise read as separate weaknesses.** Elevation explains 22% of the spatial variance; the topographic predictors carry *exactly* zero importance for the pixel-wise models (§7.4); and the product holds almost no sub-0.25° information (§7.2). All three say the same thing: over this domain, at this resolution, irradiance is governed by large-scale atmospheric structure rather than terrain — which is what the feature importances independently show, with cloud fraction and humidity dominating. It is a result about the physics of the domain, not a deficiency of the method.
+
 ### 7.6 Cross-validation selected worse hyperparameters
 A 150-cell subsampled CV search picked configurations for both tree models that underperformed the untuned defaults on the full 5,751-cell holdout. Defaults retained. The search's own scores gave no warning.
 
