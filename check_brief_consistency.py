@@ -34,12 +34,15 @@ import pandas as pd
 ROOT = os.path.dirname(os.path.abspath(__file__))
 BRIEF = os.path.join(ROOT, "brief/viva-brief.html")
 MD = os.path.join(ROOT, "brief/CR_Madukwe_Interview_Brief.md")
+STATUS = os.path.join(ROOT, "PROJECT_STATUS.md")
 EVAL = os.path.join(ROOT, "data/processed/evaluation")
 MINUS = "\u2212"
 
 
 def prose(path=BRIEF):
-    """Brief text with tags stripped and entities resolved, whitespace collapsed."""
+    """Document text with tags stripped and entities resolved, whitespace collapsed."""
+    if not os.path.exists(path):
+        return ""
     s = open(path).read()
     if path.endswith('.html'):
         s = s.split('</style>', 1)[1]
@@ -196,6 +199,14 @@ RETIRED = [
     ("loses on every axis the study can actually test",
      "the CNN is better on std ratio; say every axis the study can establish"),
     ("Five external audit rounds", "six"),
+    # live in PROJECT_STATUS after the brief had been corrected - the paired
+    # RF-XGBoost MBE difference IS established at -0.953 [-1.499, -0.475]
+    ("every model's MBE interval spans zero",
+     "true of the MARGINAL intervals; the paired difference is established"),
+    ("both intervals span zero, and +1.20 is an eighth",
+     "the paired MBE difference is established under BCa"),
+    ("individually indistinguishable from zero",
+     "marginal intervals; the paired difference is established"),
 ]
 
 EXPLANATORY = (r"earlier version|previously|an earlier|was wrong|were wrong|no longer|"
@@ -212,13 +223,18 @@ def check():
         if expected != found:
             missing.append((label, expected, found))
 
-    for phrase, why in RETIRED:
-        for m in re.finditer(re.escape(phrase), text):
-            lo = max(0, m.start() - WINDOW)
-            hi = min(len(text), m.end() + WINDOW)
-            if re.search(EXPLANATORY, text[lo:hi], re.I):
-                continue  # the brief is discussing its own correction
-            resurrected.append((phrase, why))
+    # The sentence list applies to BOTH documents. Restricting it to the brief is
+    # how "both intervals span zero" and "individually indistinguishable from
+    # zero" survived in PROJECT_STATUS after being corrected in the brief - the
+    # authoritative record contradicting itself while the guard reported clean.
+    for label, doc in (("brief", text), ("PROJECT_STATUS", prose(STATUS))):
+        for phrase, why in RETIRED:
+            for m in re.finditer(re.escape(phrase), doc):
+                lo = max(0, m.start() - WINDOW)
+                hi = min(len(doc), m.end() + WINDOW)
+                if re.search(EXPLANATORY, doc[lo:hi], re.I):
+                    continue  # the document is discussing its own correction
+                resurrected.append(("%s: %s" % (label, phrase), why))
 
     # the markdown must be exactly what the builder produces from the HTML
     if os.path.exists(MD):
@@ -239,7 +255,7 @@ def check():
 def main():
     missing, resurrected, fmt = check()
     print("=" * 84)
-    print(" Interview brief consistency check")
+    print(" Interview brief + PROJECT_STATUS consistency check")
     print("=" * 84)
 
     if missing:
