@@ -201,7 +201,9 @@ MBE of **+0.0003 W m⁻²** is the strongest bias figure in Table 3.3 and is *ca
 | XGBoost | +1.200 | 0.742 | −1.00 to +3.46 |
 | **U-Net** | **+0.000** | **3.539** | **−14.81 to +10.18** |
 
-It over-predicts some districts by +10 and under-predicts others by −15; they average to nothing. For a map read cell by cell to choose sites, this is the most damaging error structure available.
+It over-predicts some districts by +10 and under-predicts others by −15; they average to nothing.
+
+**The principle that reconciles this with §7.10, where mean bias is conceded as a real loss for XGBoost.** The U-Net beats XGBoost on mean bias by **1.200**, *larger* than the Random Forest's 0.953, and the U-Net passes the scenario screen — so why is one a concession and the other a trap? **Mean bias counts as evidence only when centred RMSE points the same way.** Random Forest: better bias (0.25) *and* better centred RMSE (0.571 vs 0.742) — they agree, so the advantage is real. U-Net: better bias (0.0003) *and* far worse centred RMSE (3.539), per-cell range −14.81 to +10.18 — they contradict, which is the signature of cancellation. A domain-mean bias near zero means something only if the per-cell biases are also small. For a map read cell by cell to choose sites, this is the most damaging error structure available.
 
 ### 7.7 The perfect-prognosis assumption holds (C1)
 The study trains on ERA5 predictors and applies the relationship to bias-corrected CMIP6. That transfer was previously **asserted, never tested**. Test: feed bias-corrected CMIP6 *historical* predictors to the model and compare against ERA5 truth for the same period, on climatology (CMIP6 is free-running, so it reproduces the statistics of the period, not its specific months — a month-by-month comparison would be unfair by construction). Run for **both** pixel-wise models: `PP_MODEL=xgb` (deployed) and `PP_MODEL=rf`.
@@ -284,7 +286,7 @@ Individual intervals overlap heavily — but that is the wrong comparison. Becau
 
 **XGBoost's aggregate advantage is real**: its RMSE deficit against all three others excludes zero. The comparison §3.8.4 turned on — Random Forest against XGBoost, +1.058 W m⁻² — survives at [+0.530, +1.671].
 
-**Two consequences worth stating.** First, the deployment argument could no longer be carried on aggregate grounds: RF would have to be preferred *despite* a statistically distinguishable deficit, so the spatial-fidelity case had to carry that weight explicitly — and the next subsection shows it cannot. Second, **RF, CNN and U-Net are not distinguishable from one another on RMSE** — the ordering among those three is noise at this sample size, and any narrative ranking them should say so.
+**Two consequences worth stating.** First, the deployment argument could no longer be carried on aggregate grounds: RF would have to be preferred *despite* a statistically distinguishable deficit, so the spatial-fidelity case had to carry that weight explicitly — and the next subsection shows it cannot. Second, **RF, CNN and U-Net are not distinguishable from one another on RMSE** — BCa: RF−CNN +0.155 [−0.447, +1.007], RF−U-Net +0.191 [−0.439, +1.110], CNN−U-Net +0.035 [−0.258, +0.417], all spanning zero — the ordering among those three is noise at this sample size, and any narrative ranking them should say so.
 
 **Reconciling that with the sections that do rank them.** §7.5, §7.8 and §9 all order these three, and Table 3.3 lists them in an RMSE order (U-Net 10.11, CNN 10.14, RF 10.30) that the bootstrap says is not real. Both are correct because **they are rankings on different axes, and only one of the two axes supports a ranking**:
 
@@ -536,7 +538,19 @@ scenario test (§7.11) reversed that choice; keeping them makes the reversal aud
 
 **σ_arch rests on all four benchmarked architectures (n = 4)** — RF, XGBoost, CNN, U-Net — which exceeds σ_GCM's n = 3, so the comparison between them no longer favours the GCM term on sample size. Reaching n = 4 required persisting XGBoost (~400 MB at 200 fixed rounds, an order of magnitude below RF's ~4 GB) and projecting it — the same persisted models that now serve the deployment.
 
-**By 2076–2100 architecture choice accounts for 27.18% of projection variance against the GCM's 5.06%** — a factor of about five. The estimate has been stable as members were added (14.2% at n=2, 27.8% at n=3, 24–27% at n=4), which is itself reassuring: the conclusion is not an artefact of which two models happened to be compared.
+**By 2076–2100 architecture choice accounts for 27.18% of projection variance against the GCM's 5.06%** — a factor of about five.
+
+**The attack on this, and the answer.** σ_arch is the spread across *all four* architectures, including the two this study argues against. Removing them shrinks it:
+
+| Members | σ_arch | arch % var | GCM % var |
+|---|---|---|---|
+| **All four, as reported** | **5.88** | **27.18%** | 5.06% |
+| Drop RF (fails the scenario screen) | 4.89 | 20.53% | 5.52% |
+| Drop RF and CNN (CNN change implausible) | 2.56 | 6.63% | 6.49% |
+
+**Excluding architectures on grounds of implausibility is circular:** it uses an unvalidated judgement about the future to shrink an estimate of how uncertain the future is. Nothing here validates projection magnitude — which is precisely why §7.11 refuses to *rank* the models that pass the scenario screen by the size of their response. The same refusal must apply to σ_arch, or the two positions contradict each other. The full spread is both the conservative and the only non-circular choice.
+
+**And the finding should be stated in the form the evidence supports.** Not "architecture choice contributes 27% and here is the right architecture", but **"a single-architecture study would have reported zero architecture uncertainty and been wrong by 27%"** — which holds whichever architecture that study picked. The sensitivity is volunteered rather than hidden: 20.5% across the three that pass the screen, still four times the GCM term; 6.6% across the two whose projections are credible, comparable to it. The estimate has been stable as members were added (14.2% at n=2, 27.8% at n=3, 24–27% at n=4), which is itself reassuring: the conclusion is not an artefact of which two models happened to be compared.
 
 **σ_SSP was quietly reporting the scenario defect all along.** It is half the |SSP5-8.5 − SSP2-4.5|
 ensemble-mean difference — that is, it *is* the scenario separation. At long term the deployed
