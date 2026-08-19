@@ -691,7 +691,7 @@ Tree defaults were retained after HPO (§7.6). Deployed values are now the **scr
 | C3 multiple temporal splits | **Done** — `compute_rolling_origin.py`, 4 expanding-origin folds. XGBoost lowest RMSE in all four; all models within a 1.4 spread relative to their own deployed-split fold. See §7.9. |
 | C4 join logic | **Done** — no nearest-neighbour temporal joins survive outside the guarded, warned carry-forward inside `align_to_months` |
 | D1 version control | **Done** — git initialised, 61 files committed, `data/` (16 GB) excluded; staged content scanned for credentials before committing |
-| D2 regression tests | **Done** — `pytest tests/` 16 passed; reintroducing the §6.11 lag turns it red, restoring turns it green |
+| D2 regression tests | **Done** — `pytest tests/` passes; reintroducing the §6.11 lag turns it red, restoring turns it green. *No count is quoted: it changes whenever a test is added, and quoting it produced three different numbers across three documents.* |
 | D3 pin environment | **Done** — `environment.yml`, 247 packages |
 | D4 OpenMP workaround | **Done** — documented in README with the actual cause and the proper fix |
 | E1 dashboard | **Done** — withdrawn and replaced with a retraction notice |

@@ -35,6 +35,7 @@ ROOT = os.path.dirname(os.path.abspath(__file__))
 BRIEF = os.path.join(ROOT, "brief/viva-brief.html")
 MD = os.path.join(ROOT, "brief/CR_Madukwe_Interview_Brief.md")
 STATUS = os.path.join(ROOT, "PROJECT_STATUS.md")
+UPDATE = os.path.join(ROOT, "UPDATE_BRIEF.md")
 EVAL = os.path.join(ROOT, "data/processed/evaluation")
 MINUS = "\u2212"
 
@@ -228,6 +229,29 @@ EXPLANATORY = (r"earlier version|previously|an earlier|was wrong|were wrong|no l
 WINDOW = 260
 
 
+# Numbers that are DERIVABLE must not be written into prose. The test count was
+# maintained by hand in three documents and reached three different values - 16,
+# 18 and 19 - while the suite actually held 20. No canonical-value check can catch
+# that, because the count lives in the test suite rather than in any CSV. The fix
+# is to forbid the claim rather than to track it.
+DERIVABLE = [
+    (re.compile(r"\b\d+\s+tests?\b(?!\s*/)", re.I),
+     "the test count changes whenever a test is added, and quoting it produced three "
+     "different numbers across three documents. Refer to `pytest tests/` or 'the suite'."),
+]
+
+
+def check_derivable(label, text):
+    out = []
+    for pat, why in DERIVABLE:
+        for m in pat.finditer(text):
+            lo = max(0, m.start() - 90)
+            if re.search(r"different numbers|no count is quoted|changes whenever", text[lo:m.end() + 120], re.I):
+                continue  # the document is explaining why it does not quote one
+            out.append(("%s: %r" % (label, m.group(0).strip()), why))
+    return out
+
+
 def check():
     text = prose()
     missing, resurrected, fmt = [], [], []
@@ -240,7 +264,11 @@ def check():
     # how "both intervals span zero" and "individually indistinguishable from
     # zero" survived in PROJECT_STATUS after being corrected in the brief - the
     # authoritative record contradicting itself while the guard reported clean.
-    for label, doc in (("brief", text), ("PROJECT_STATUS", prose(STATUS))):
+    docs = (("brief", text), ("PROJECT_STATUS", prose(STATUS)), ("UPDATE_BRIEF", prose(UPDATE)))
+    for label, doc in docs:
+        resurrected += check_derivable(label, doc)
+
+    for label, doc in docs:
         for phrase, why in RETIRED:
             for m in re.finditer(re.escape(phrase), doc):
                 lo = max(0, m.start() - WINDOW)

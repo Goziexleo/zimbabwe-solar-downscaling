@@ -44,6 +44,20 @@ repairs.
 conclusion — and the reason is itself evidence: the tree models came back bit-identical
 because the out-of-bound values were already outside the training range.
 
+**The resolution chain was stated wrongly, and this one is worth knowing precisely.** 0.25° is
+**ERA5's** grid, not CMIP6's. The three GCMs run natively at 0.94° to 1.88° — 100 to 250 km nominal —
+so this domain is covered by as few as **24 native cells** in ACCESS-CM2. CMIP6 is regridded *linearly*
+onto the 0.25° ERA5 grid first, bias corrected there, and only then does the ERA5-learned 0.25° → 0.1°
+relationship apply. **The models never see native CMIP6.** Their step is a factor of 2.5; the gap from
+GCM to product is 9.3 to 18.8 per axis, and most of it is closed by regridding and bias correction
+rather than by the machine learning. Chapter 3 §3.2.1 had claimed "a spatial upscaling factor of
+approximately 23x", which divided a nominal 250 km label by 11 km *and* implied the ML bridged it.
+Chapters 1 and 2 were checked and are clean — Chapter 1 ¶31 states the 100–250 km range correctly.
+
+**RQ1 understated its own target.** It asked how well the models downscale "to ERA5 resolution"; the
+product is 0.1°, *finer* than ERA5's 0.25°. Now reads "to 0.1° resolution … against an ERA5-derived
+target".
+
 **RQ2 was answered against the wrong comparator.** Measured against *raw GCM output*, which is
 what RQ2 actually asks, the chain cuts climatological RMSE 11.29 → 4.82 and lifts spatial
 correlation 0.77 → 0.99. Most of the spatial gain is the bias correction, not the ML.
@@ -55,6 +69,9 @@ correlation 0.77 → 0.99. Most of the spatial gain is the bias correction, not 
 | Chapter | Section | What changed |
 |---|---|---|
 | 3 | **§3.4.4** | **New:** names the perfect-prognosis design and why MOS was not viable. The old opening implied CMIP6 was a training input. |
+| 3 | **§3.2.1** | **New:** the 23× factor claim corrected; the ML bridges 2.5, not 23 |
+| 3 | §3.6.2 | Native range corrected from "approximately 1° to 2.5°" to the measured 0.94°–1.88° |
+| 1 | **RQ1** | "to ERA5 resolution" → "to 0.1° … against an ERA5-derived target" |
 | 3 | §3.4.3 | Rewritten: the QC that now exists, with counts |
 | 3 | §3.8.4 | Rewritten three times — deployment, then BCa, then both legs |
 | 3 | §3.6.6, §3.8.1 | Deployed model corrected to XGBoost |
@@ -81,4 +98,5 @@ Backups sit beside each file with `_BACKUP_pre_*` names.
 - `brief/viva-brief.html` — **the single source for the interview brief.** Edit this, never a generated copy.
 - `PROJECT_STATUS.md` — the full work record.
 - `brief/build_brief_formats.py --pdf --combined` — rebuilds the PDF, the markdown and the combined reference.
-- `check_brief_consistency.py`, `check_status_consistency.py` — guard both documents against stale numbers *and* superseded sentences. Both run under `pytest tests/` (19 tests).
+- `brief/build_brief_formats.py --sync` — copies this file, `PROJECT_STATUS.md` and the briefs into `PROJECT CHAPTERS`. Run it with every rebuild.
+- `check_brief_consistency.py`, `check_status_consistency.py`, `check_chapter3_consistency.py` — guard all three documents against stale numbers *and* superseded sentences, and run under `pytest tests/`.
