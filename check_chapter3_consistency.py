@@ -104,6 +104,8 @@ RETIRED = [
      "the same claim in different words; the paired MBE difference is established at -0.953"),
     ("approximately 1° to 2.5°",
      "measured native range is 0.94 to 1.88 degrees across the three GCMs"),
+    ("spatial upscaling factor of approximately 23x",
+     "conflates the whole chain with the ML step; the ML bridges 0.25 to 0.1, a factor of 2.5"),
     # the MOS framing that described a pipeline never built
     ("would contaminate the ML training process",
      "CMIP6 is not a training input; the biases are carried into the projections"),

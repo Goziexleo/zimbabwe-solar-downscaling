@@ -43,6 +43,8 @@ The prediction target is the **clear-sky index** (measured irradiance ÷ modelle
 
 | Property | Value |
 |---|---|
+*Chapter 3 §3.2.1 previously described this as "a spatial upscaling factor of approximately 23x" — the nominal 250 km label divided by 11 km. Corrected: ACCESS-CM2's actual spacing is 1.25° × 1.875°, and the factor the ML bridges is 2.5, not 23. The rest is regridding and bias correction.*
+
 | CMIP6 native grid | 0.94°–1.88° (100–250 km nominal): CNRM-CM6-1 1.40°, MPI-ESM1-2-HR 0.94°, ACCESS-CM2 1.25° × 1.88°. **24 to 64 cells over this domain.** |
 | Coarse (predictor) grid — **ERA5's, and what the models see** | 0.25°, 29 × 33 = 957 |
 | Fine (target) grid | 0.1°, 71 × 81 = **5,751 cells** |
@@ -113,6 +115,7 @@ The retained domain is narrower than Chapter 3's nominal box (15.0–22.5°S, 25
 | `check_status_consistency.py` | Guards this document against stale numbers; run by `pytest` |
 | `check_brief_consistency.py` | Guards the interview brief. Checks table cells against the canonical CSVs (cell-level, not substring — `9.24` appears 17 times), a list of **superseded sentences** that must not reappear, and that the markdown is regenerable from the HTML. Run by `pytest`. |
 | `check_chapter3_consistency.py` | Guards **Chapter 3**, which lives outside the repo. Canonical values from the CSVs, superseded figures and design claims, and **Zotero field integrity** — begin/end pairs must match, since the edits here are run-level surgery on live citation fields. Skips cleanly if the chapter is absent; `CHAPTER3_PATH` overrides the location. Run by `pytest`. |
+| `brief/build_brief_formats.py --sync` | Copies the deliverables **including `PROJECT_STATUS.md`** into `PROJECT CHAPTERS`. The status document previously lived only in the repo, so the project folder held a stale picture. Run it with every rebuild. |
 | `brief/build_brief_formats.py` | `brief/viva-brief.html` is the single source; this generates the print HTML, the PDF (`--pdf`) and the markdown. Print CSS lives in `brief/print.css` so a clean checkout can build. |
 
 ### Projection and verification
