@@ -223,6 +223,27 @@ def test_safe_nan_to_num_raises_above_threshold():
 
 
 # ------------------------------------------------- documentation drift ----
+def test_chapter3_has_no_stale_numbers_or_claims():
+    """Chapter 3 must agree with the canonical CSVs, carry no superseded figure
+    or design claim, and keep its citation fields structurally intact.
+
+    Skips cleanly when the chapter is absent - it lives outside the repository -
+    so a fresh clone still runs green. Everything this catches was previously
+    found by eye: three figures that survived a deployment change, and a section
+    describing a Model Output Statistics pipeline that was never built. The field
+    check exists because the edits here are run-level surgery on live Zotero
+    fields, and a broken begin/end pair silently destroys the bibliography.
+    """
+    from check_chapter3_consistency import check, CHAPTER
+    missing, resurrected, fields = check()
+    if missing is None:
+        pytest.skip("Chapter 3 not found at %s" % CHAPTER)
+    problems = ["canonical value absent: %s (expected %r)" % (lab, v) for lab, v in missing]
+    problems += ["superseded text present: %r — %s" % (p, why) for p, why in resurrected]
+    problems += fields
+    assert not problems, "Chapter 3 is out of date:\n  " + "\n  ".join(problems)
+
+
 @pytest.mark.skipif(not os.path.exists(os.path.join(ROOT, "brief/viva-brief.html")),
                     reason="interview brief not present")
 def test_brief_has_no_stale_numbers_or_sentences():
