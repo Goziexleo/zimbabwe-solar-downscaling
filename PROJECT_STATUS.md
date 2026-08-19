@@ -43,6 +43,8 @@ The prediction target is the **clear-sky index** (measured irradiance ÷ modelle
 
 | Property | Value |
 |---|---|
+*Chapter 1's RQ1 previously asked how well the models downscale "to ERA5 resolution". The product is 0.1°, **finer** than ERA5's 0.25°, so the question understated its own target. Reworded to "to 0.1° resolution … against an ERA5-derived target", which is what the study does.*
+
 *Chapter 3 §3.2.1 previously described this as "a spatial upscaling factor of approximately 23x" — the nominal 250 km label divided by 11 km. Corrected: ACCESS-CM2's actual spacing is 1.25° × 1.875°, and the factor the ML bridges is 2.5, not 23. The rest is regridding and bias correction.*
 
 | CMIP6 native grid | 0.94°–1.88° (100–250 km nominal): CNRM-CM6-1 1.40°, MPI-ESM1-2-HR 0.94°, ACCESS-CM2 1.25° × 1.88°. **24 to 64 cells over this domain.** |
