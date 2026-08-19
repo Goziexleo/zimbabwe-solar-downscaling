@@ -235,7 +235,9 @@ WINDOW = 260
 # that, because the count lives in the test suite rather than in any CSV. The fix
 # is to forbid the claim rather than to track it.
 DERIVABLE = [
-    (re.compile(r"\b\d+\s+tests?\b(?!\s*/)", re.I),
+    # the lookbehind excludes section references: "Table 3.3 tests whether" and
+    # "§7.11 tests the scenario response" both contain "N tests" and neither is a count
+    (re.compile(r"(?<![.\d])\b\d+\s+tests?\b(?!\s*/)", re.I),
      "the test count changes whenever a test is added, and quoting it produced three "
      "different numbers across three documents. Refer to `pytest tests/` or 'the suite'."),
 ]
