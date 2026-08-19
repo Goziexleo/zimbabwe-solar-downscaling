@@ -17,7 +17,7 @@ This is the authoritative record of what the pipeline does, what was built and f
 
 ## 1. What the project does
 
-Statistical downscaling of coarse CMIP6 global-climate-model output to 0.1° over Zimbabwe, to produce a solar-resource product for siting analysis. Four architectures are benchmarked on identical inputs:
+Statistical downscaling of coarse CMIP6 global-climate-model output to 0.1° over Zimbabwe. **The resolution chain has three steps, not two, and the middle one is easy to omit:** CMIP6 is regridded *linearly* from its native 0.94°–1.88° grid onto the 0.25° ERA5 grid, bias corrected there, and only then does the ERA5-learned 0.25° → 0.1° relationship apply. The models never see native CMIP6; their step is a factor of 2.5, while the gap from GCM to product is 9.3–18.8 per axis, most of which regridding and bias correction close rather than the machine learning. to produce a solar-resource product for siting analysis. Four architectures are benchmarked on identical inputs:
 
 - **Random Forest** and **XGBoost** — *pixel-wise*: one independent model fitted per output grid cell (5,751 of each)
 - **CNN** and **U-Net** — *shared-weight*: one model applied across the whole domain
@@ -43,7 +43,8 @@ The prediction target is the **clear-sky index** (measured irradiance ÷ modelle
 
 | Property | Value |
 |---|---|
-| Coarse (predictor) grid | 0.25°, 29 × 33 |
+| CMIP6 native grid | 0.94°–1.88° (100–250 km nominal): CNRM-CM6-1 1.40°, MPI-ESM1-2-HR 0.94°, ACCESS-CM2 1.25° × 1.88°. **24 to 64 cells over this domain.** |
+| Coarse (predictor) grid — **ERA5's, and what the models see** | 0.25°, 29 × 33 = 957 |
 | Fine (target) grid | 0.1°, 71 × 81 = **5,751 cells** |
 | Domain retained | 22.0°S–15.0°S, 25.0°E–33.0°E |
 | Upsampling factor | 2.5 by resolution; ≈2.45 along each axis (71/29 = 2.448, 81/33 = 2.455); **6.01 by total cell count** (5,751/957) |

@@ -100,6 +100,10 @@ RETIRED = [
     ("neither leg of the composite criterion", "both legs survive under BCa"),
     ("on one axis of two rather than none", "both legs survive"),
     ("Both intervals contain zero", "the paired differences are established under BCa"),
+    ("both intervals span zero",
+     "the same claim in different words; the paired MBE difference is established at -0.953"),
+    ("approximately 1° to 2.5°",
+     "measured native range is 0.94 to 1.88 degrees across the three GCMs"),
     # the MOS framing that described a pipeline never built
     ("would contaminate the ML training process",
      "CMIP6 is not a training input; the biases are carried into the projections"),
