@@ -106,6 +106,8 @@ RETIRED = [
      "measured native range is 0.94 to 1.88 degrees across the three GCMs"),
     ("downscale CMIP6 GCM solar radiation outputs to ERA5 resolution",
      "the product is 0.1 deg, finer than ERA5's 0.25 deg; RQ1 now says 0.1 deg against an ERA5-derived target"),
+    ("Models INJECT small-scale power",
+     "the GHI-space reading Section 7.8 overturned; judge in CSI space"),
     ("spatial upscaling factor of approximately 23x",
      "conflates the whole chain with the ML step; the ML bridges 0.25 to 0.1, a factor of 2.5"),
     # the MOS framing that described a pipeline never built
@@ -122,6 +124,7 @@ RETIRED = [
 ]
 
 EXPLANATORY = (r"earlier version|previously|an earlier|was wrong|no longer|superseded|"
+               r"overturned|retired|contradicted|"
                r"rather than|instead of|not\s+what|this section|had been")
 WINDOW = 300
 

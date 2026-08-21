@@ -219,11 +219,14 @@ RETIRED = [
      "six, and the caveat was duplicated"),
     ("from 0.25° to 0.1°",
      "0.25 deg is ERA5's grid, not CMIP6's; the GCMs run natively at 0.94-1.88 deg"),
+    ("Models INJECT small-scale power",
+     "the GHI-space reading Section 7.8 overturned; judge in CSI space"),
     ("downscale CMIP6 to ERA5 resolution",
      "the product is finer than ERA5: 0.1 deg against 0.25 deg"),
 ]
 
 EXPLANATORY = (r"earlier version|previously|an earlier|was wrong|were wrong|no longer|"
+               r"overturned|retired|contradicted|until 19 August|"
                r"superseded|corrected|said first|twice over|used to|instead of|rather than|"
                r"the old |this brief said|versions of this brief")
 WINDOW = 260

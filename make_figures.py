@@ -139,27 +139,72 @@ def fig_uncertainty():
 
 # ------------------------------------------------------ 5. spectra ---------
 def fig_spectra():
-    df = pd.read_csv(os.path.join(EVAL, "power_spectra.csv"))
-    fig, (a1, a2) = plt.subplots(1, 2, figsize=(11.4, 4.4))
-    cols = ["Truth (ERA5)", "Baseline (bilinear)", "Random Forest", "XGBoost", "CNN", "U-Net"]
-    for c in cols:
-        a1.loglog(df["wavelength_km"], df[c], lw=1.9, color=C[c],
-                  label=c, ls="--" if c == "Truth (ERA5)" else "-")
-    a1.invert_xaxis()
-    a1.set_xlabel("Wavelength (km)"); a1.set_ylabel("Power")
-    a1.set_title("Radially averaged power spectrum\ntime-mean GHI field")
-    a1.legend(frameon=False, fontsize=8.2)
-    a1.axvline(2 * 0.25 * 111, color="0.5", lw=1, ls=":")
-    a1.text(2 * 0.25 * 111, a1.get_ylim()[1] * .3, " 2 coarse cells", fontsize=8, color="0.4")
+    """Judge the models in CSI space, which is where their loss operates.
 
+    An earlier version of this figure plotted GHI only and titled the ratio
+    panel "Models INJECT small-scale power the target does not contain". That is
+    the interpretation Section 7.8 overturned: the CSI target was built by
+    DIVIDING irradiance by the clear-sky field, so multiplying back cancels its
+    fine structure. A model that reproduces CSI correctly recovers the
+    cancellation and yields a smooth GHI; one that smooths CSI destroys the
+    structure that would have cancelled, and the clear-sky field's own structure
+    then survives into its GHI. GHI-space excess is therefore a SYMPTOM of
+    getting CSI wrong, not evidence that a model invented detail.
+    """
+    df = pd.read_csv(os.path.join(EVAL, "power_spectra.csv"))
+    summ = pd.read_csv(os.path.join(EVAL, "effective_resolution.csv")).set_index("field")
+    cols = ["Truth (ERA5)", "Baseline (bilinear)", "Random Forest", "XGBoost", "CNN", "U-Net"]
+    fig, (a1, a2, a3) = plt.subplots(1, 3, figsize=(15.6, 4.5))
+
+    wl = df["wavelength_km"]
+    TICKS = [t for t in (800, 400, 200, 100, 50, 25) if wl.min() <= t <= wl.max()]
+
+    def wavelength_axis(ax):
+        """Log wavelength axis with readable labels. Matplotlib's minor tick
+        labels overlap into an unreadable smear on an inverted log axis."""
+        ax.invert_xaxis()
+        ax.set_xticks(TICKS)
+        ax.set_xticklabels([str(t) for t in TICKS])
+        ax.xaxis.set_minor_formatter(plt.NullFormatter())
+        ax.set_xlabel("Wavelength (km)")
+
+    # --- CSI spectra: the space the models are actually judged in
+    for c in cols:
+        a1.loglog(df["wavelength_km"], df["CSI " + c], lw=1.9, color=C[c],
+                  label=c, ls="--" if c == "Truth (ERA5)" else "-")
+    wavelength_axis(a1)
+    a1.set_ylabel("Power")
+    a1.set_title("CSI power spectrum — the space judged in\nthe models predict CSI, not GHI")
+    a1.legend(frameon=False, fontsize=8.2)
+
+    # --- CSI ratio: this is where 1.04x and 0.08x live
     for c in cols[1:]:
-        a2.loglog(df["wavelength_km"], df[c] / df["Truth (ERA5)"], lw=1.9, color=C[c], label=c)
+        a2.loglog(df["wavelength_km"], df["CSI " + c] / df["CSI Truth (ERA5)"],
+                  lw=1.9, color=C[c], label=c)
     a2.axhline(1, color="k", lw=0.9, ls="--")
-    a2.invert_xaxis()
-    a2.set_xlabel("Wavelength (km)"); a2.set_ylabel("Power ratio to truth")
-    a2.set_title("Models INJECT small-scale power\nthe target does not contain")
+    wavelength_axis(a2)
+    a2.set_ylabel("CSI power ratio to truth")
+    a2.set_title("U-Net DAMPS fine scales; the CNN does not\n"
+                 "beyond k=10: CNN 1.04x, U-Net 0.08x")
     a2.legend(frameon=False, fontsize=8.2)
-    fig.tight_layout(); fig.savefig(f"{FIG}/05_power_spectra.png"); plt.close(fig)
+    for c, dy in [("CNN", 1.5), ("U-Net", 0.55)]:
+        if c in summ.index:
+            a2.text(a2.get_xlim()[1] * 1.05, dy, summ.loc[c, "CSI vs truth"],
+                    fontsize=9, color=C[c], va="center", fontweight="bold")
+
+    # --- GHI ratio, correctly labelled as a symptom rather than as invention
+    for c in cols[1:]:
+        a3.loglog(df["wavelength_km"], df[c] / df["Truth (ERA5)"], lw=1.9, color=C[c], label=c)
+    a3.axhline(1, color="k", lw=0.9, ls="--")
+    wavelength_axis(a3)
+    a3.set_ylabel("GHI power ratio to truth")
+    a3.set_title("GHI-space excess is a SYMPTOM of getting CSI wrong\n"
+                 "not evidence a model invented detail")
+    a3.legend(frameon=False, fontsize=8.2)
+
+    fig.suptitle("Power spectra — read the CSI panels, not the GHI one", y=1.03, fontsize=11)
+    fig.tight_layout()
+    fig.savefig(f"{FIG}/05_power_spectra.png", bbox_inches="tight"); plt.close(fig)
 
 
 # --------------------------------------------- 6. deployed error maps ------

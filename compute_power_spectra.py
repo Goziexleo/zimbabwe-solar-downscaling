@@ -119,6 +119,11 @@ def main():
     df = pd.DataFrame({"wavenumber": k, "wavelength_km": wavelength_km})
     for label in spectra:
         df[label] = spectra[label]
+    # CSI spectra per wavenumber as well, not only the k>10 summary. The models
+    # are judged in CSI space, so a figure that plots only GHI plots the space
+    # this analysis says is the wrong one.
+    for label in spectra_csi:
+        df["CSI " + label] = spectra_csi[label]
     os.makedirs(os.path.dirname(OUT_CSV), exist_ok=True)
     df.to_csv(OUT_CSV, index=False)
 

@@ -234,6 +234,8 @@ The study trains on ERA5 predictors and applies the relationship to bias-correct
 ### 7.8 Spectral diagnostic: the U-Net damps, the CNN does not (C2)
 Ullrich et al. recommend power spectra because ML emulators typically damp high wavenumbers, making effective resolution coarser than the stated grid. **The models must be judged in CSI space, which is where their loss operates.** GHI is recovered as CSI × clear-sky, and because the CSI target was built by *dividing* by that same clear-sky field, its fine structure is nearly the inverse of the clear-sky field's — multiplying back cancels it. That is why the GHI target is smooth (0.02% of power beyond k=10) while the CSI target is not (0.25%).
 
+**The figure said the opposite of this section until 19 August.** `figures/05_power_spectra.png` plotted GHI only and titled its ratio panel *"Models INJECT small-scale power the target does not contain"* — the reading this section overturned. It survived the deployment switch because `fig_uncertainty` and `fig_error_maps` were repointed to XGBoost and `fig_spectra` was not re-read. Now three panels: CSI spectrum, CSI ratio carrying the 1.04× / 0.08× result, and GHI ratio labelled as a symptom. `compute_power_spectra.py` was extended to emit CSI spectra per wavenumber, which it computed but never saved. **Figure titles are prose and drift like prose; no guard covered them.**
+
 | Field | CSI power beyond k=10 | vs truth | Verdict |
 |---|---|---|---|
 | Truth | 0.00249 | reference | reference |
