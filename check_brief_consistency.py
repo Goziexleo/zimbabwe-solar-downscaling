@@ -257,6 +257,34 @@ def check_derivable(label, text):
     return out
 
 
+def _explained(text, start, end):
+    """Is the retired phrase being DISCUSSED as a correction, or asserted?
+
+    Two signals, and the first is the reliable one.
+
+    QUOTED. Every legitimate mention of a retired phrase in these documents
+    quotes it - 'the old title said "Models INJECT small-scale power"' - while a
+    recurrence asserts it bare. Quoting is what distinguishes use from mention,
+    and it does not depend on how near some explanatory word happens to fall.
+
+    EXPLANATORY IN THE SAME SENTENCE. A narrow fallback for unquoted discussion.
+    Two wider versions were tried and both suppressed a real recurrence: a
+    260-character window, because the unrelated words "superseded sentences" -
+    describing what these guards do - sat 48 characters away; and a
+    two-sentence lookback, for the same reason. If an explanation spans
+    sentences, quote the phrase; that is better writing anyway.
+    """
+    before = text[max(0, start - 4):start]
+    after = text[end:end + 4]
+    QUOTES = '"\u201c\u201d\u2018\u2019\'*_'
+    if any(c in QUOTES for c in before) and any(c in QUOTES for c in after):
+        return True
+
+    lo = max(text.rfind('. ', 0, start), text.rfind('\n', 0, start)) + 1
+    hi = text.find('. ', end)
+    hi = len(text) if hi == -1 else hi + 1
+    return re.search(EXPLANATORY, text[lo:hi], re.I) is not None
+
 def check():
     text = prose()
     missing, resurrected, fmt = [], [], []
@@ -276,9 +304,7 @@ def check():
     for label, doc in docs:
         for phrase, why in RETIRED:
             for m in re.finditer(re.escape(phrase), doc):
-                lo = max(0, m.start() - WINDOW)
-                hi = min(len(doc), m.end() + WINDOW)
-                if re.search(EXPLANATORY, doc[lo:hi], re.I):
+                if _explained(doc, m.start(), m.end()):
                     continue  # the document is discussing its own correction
                 resurrected.append(("%s: %s" % (label, phrase), why))
 
