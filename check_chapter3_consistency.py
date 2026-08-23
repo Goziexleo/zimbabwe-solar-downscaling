@@ -42,18 +42,29 @@ CHAPTER = os.environ.get("CHAPTER3_PATH", DEFAULT)
 
 
 def load():
-    """(prose, xml) or (None, None) if the chapter or python-docx is unavailable."""
+    """(prose, xml, tables) or a triple of None if unavailable.
+
+    Tables come back as a list of row-lists so cells can be checked
+    individually. Flattening them into the prose is not enough: Section 3.7.4's
+    figures also appear in the paragraph beneath the table, so a corrupted cell
+    passes a substring search over the whole document. That is the same defect
+    the brief guard had, and the fix is the same - anchor the cell, not the
+    number.
+    """
     try:
         import docx
     except ImportError:
-        return None, None
+        return None, None, None
     if not os.path.exists(CHAPTER):
-        return None, None
+        return None, None, None
     d = docx.Document(CHAPTER)
     parts = [p.text for p in d.paragraphs]
+    grids = []
     for t in d.tables:
-        parts += [c.text for r in t.rows for c in r.cells]
-    return re.sub(r"\s+", " ", " ".join(parts)), d.element.xml
+        rows = [[re.sub(r"\s+", " ", c.text).strip() for c in r.cells] for r in t.rows]
+        grids.append(rows)
+        parts += [c for r in rows for c in r]
+    return re.sub(r"\s+", " ", " ".join(parts)), d.element.xml, grids
 
 
 def canonical_anchors():
@@ -84,6 +95,19 @@ def canonical_anchors():
             hit = key[key.metric == metric]
             if not hit.empty:
                 a.append((label, "%.3f" % abs(hit.iloc[0]["plug_in"])))
+
+    # Section 3.7.4's ablation. Configurations A and B are one-off refits that
+    # no script re-emits, so unlike everything above these cannot be read from a
+    # CSV and are transcribed from Section 7.3 of PROJECT_STATUS.md. They are
+    # anchored anyway: the chapter now rests an argument on them, and a silent
+    # divergence between the two documents is exactly the drift this file
+    # exists to catch. Configuration C is already covered by the Table 3.3
+    # anchors above.
+    a += [("ablation A RMSE", "22.94"),
+          ("ablation A Pearson R", "0.817"),
+          ("ablation B RMSE", "5.54"),
+          ("ablation B Pearson R", "0.9894"),
+          ("ablation B skill", "0.7096")]
     return a
 
 
@@ -121,6 +145,15 @@ RETIRED = [
     ("closes all four gaps", "three closed, the fourth addressed in part"),
     ("per-cell flag counts were not separately tabulated",
      "they are tabulated, and are identically zero for ERA5"),
+    # predictor-count claims: both described configuration B of the Section
+    # 3.7.4 ablation - the circular one - as the deployed design
+    ("C = 6 atmospheric predictors",
+     "the deployed CNN takes C = 5; rsds is excluded per Section 3.5.1"),
+    ("were used directly as atmospheric predictor features",
+     "five of the six are model inputs; rsds is excluded per Section 3.5.1"),
+    ("direct radiation flux (rsds)",
+     "rsds is not a model input; listing it among the selected predictors "
+     "describes configuration B"),
 ]
 
 EXPLANATORY = (r"earlier version|previously|an earlier|was wrong|no longer|superseded|"
@@ -173,10 +206,42 @@ def _explained(text, start, end):
     hi = len(text) if hi == -1 else hi + 1
     return re.search(EXPLANATORY, text[lo:hi], re.I) is not None
 
+# Section 3.7.4, by row label -> (RMSE, Pearson R, skill). Section 7.3 of
+# PROJECT_STATUS.md is the source; configuration C must also match Table 3.3.
+ABLATION = {
+    "A.": ("22.94", "0.817", "-0.203"),
+    "B.": ("5.54", "0.9894", "0.7096"),
+    "C.": ("9.24", "0.9707", "0.5155"),
+}
+
+
+def check_ablation_table(grids):
+    """Anchor Section 3.7.4's cells individually."""
+    for rows in grids:
+        if not rows or not rows[0] or not rows[0][0].startswith("Configuration"):
+            continue
+        problems = []
+        seen = set()
+        for row in rows[1:]:
+            tag = row[0][:2]
+            if tag not in ABLATION:
+                continue
+            seen.add(tag)
+            for got, want, col in zip(row[1:4], ABLATION[tag],
+                                      ("RMSE", "Pearson R", "skill")):
+                if got != want:
+                    problems.append("Section 3.7.4 config %s %s is %r, expected %r"
+                                    % (tag[0], col, got, want))
+        for tag in sorted(set(ABLATION) - seen):
+            problems.append("Section 3.7.4 is missing configuration %s" % tag[0])
+        return problems
+    return ["Section 3.7.4's ablation table is missing"]
+
+
 def check():
-    prose, xml = load()
+    prose, xml, grids = load()
     if prose is None:
-        return None, None, None
+        return None, None, None, None
 
     missing = [(lab, v) for lab, v in canonical_anchors() if v not in prose]
 
@@ -187,11 +252,11 @@ def check():
                 continue
             resurrected.append((phrase, why))
 
-    return missing, resurrected, check_fields(xml)
+    return missing, resurrected, check_fields(xml), check_ablation_table(grids)
 
 
 def main():
-    missing, resurrected, fields = check()
+    missing, resurrected, fields, ablation = check()
     print("=" * 84)
     print(" Chapter 3 consistency check")
     print("=" * 84)
@@ -215,6 +280,13 @@ def main():
     else:
         print("No superseded figure or claim appears outside an explanatory context.")
 
+    if ablation:
+        print("\nSECTION 3.7.4 ABLATION TABLE (%d):" % len(ablation))
+        for a_ in ablation:
+            print("  " + a_)
+    else:
+        print("Section 3.7.4's ablation table matches PROJECT_STATUS Section 7.3.")
+
     if fields:
         print("\nCITATION FIELD PROBLEMS (%d):" % len(fields))
         for f in fields:
@@ -223,7 +295,7 @@ def main():
         print("Zotero citation fields are structurally intact.")
 
     print()
-    return 1 if (missing or resurrected or fields) else 0
+    return 1 if (missing or resurrected or fields or ablation) else 0
 
 
 if __name__ == "__main__":

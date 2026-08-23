@@ -233,14 +233,18 @@ def test_chapter3_has_no_stale_numbers_or_claims():
     describing a Model Output Statistics pipeline that was never built. The field
     check exists because the edits here are run-level surgery on live Zotero
     fields, and a broken begin/end pair silently destroys the bibliography.
+
+    Section 3.7.4's ablation table is checked cell by cell rather than by
+    substring, because its figures also appear in the paragraph beneath it - a
+    presence check over the whole document passes a corrupted cell.
     """
     from check_chapter3_consistency import check, CHAPTER
-    missing, resurrected, fields = check()
+    missing, resurrected, fields, ablation = check()
     if missing is None:
         pytest.skip("Chapter 3 not found at %s" % CHAPTER)
     problems = ["canonical value absent: %s (expected %r)" % (lab, v) for lab, v in missing]
     problems += ["superseded text present: %r — %s" % (p, why) for p, why in resurrected]
-    problems += fields
+    problems += fields + ablation
     assert not problems, "Chapter 3 is out of date:\n  " + "\n  ".join(problems)
 
 

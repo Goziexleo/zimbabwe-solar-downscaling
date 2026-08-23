@@ -5,11 +5,17 @@
 **Project root:** `/Users/gozie/Documents/MCSM PROJECT AGY` (git repository since the second audit; `data/` untracked)
 **Chapter 3:** `.../UNI ZIM/PROJECT CHAPTERS/CR_Madukwe_Chapter3_Final.docx`
 
-**Chapter 3 backups (same folder), in order:**
+**Chapter 3 backups (same folder), oldest first:**
 `..._BACKUP_preupdate.docx` (before the proposal→implemented rewrite) ·
 `..._BACKUP_pre_rf_deploy.docx` (before §3.8.4 was first added) ·
 `..._BACKUP_pre_384_rewrite.docx` (before §3.8.4 was rewritten for the corrected predictor set) ·
-`..._BACKUP_pre_validation_scope.docx` (before §3.3.3 was reworded to treat SARAH-2/NSRDB as planned)
+`..._BACKUP_pre_validation_scope.docx` (before §3.3.3 was reworded to treat SARAH-2/NSRDB as planned) ·
+`..._BACKUP_pre_audit2.docx` · `..._BACKUP_pre_xgb_deploy.docx` (before the deployment moved to XGBoost) ·
+`..._BACKUP_pre_bca.docx` (before §3.8.4 took the BCa intervals) ·
+`..._BACKUP_pre_both_legs.docx` (before the composite criterion was conceded on both legs) ·
+`..._BACKUP_pre_perfect_prognosis.docx` (before the §3.4.4 perfect-prognosis paragraph) ·
+`..._BACKUP_pre_resolution_fix.docx` · `..._BACKUP_pre_factor_fix.docx` ·
+`..._BACKUP_pre_ablation.docx` (before §3.7.4 and the five-predictor corrections)
 
 This is the authoritative record of what the pipeline does, what was built and fixed, the current numbers, the honest limitations, and what remains. All figures below are from the final corrected-alignment / 5-predictor run and are mutually consistent.
 
@@ -116,7 +122,7 @@ The retained domain is narrower than Chapter 3's nominal box (15.0–22.5°S, 25
 | `compute_bca_centred_rmse.py` | **BCa intervals** on the paired differences. Required because the percentile interval is invalid for centred RMSE, whose bootstrap distribution is biased by construction. Reports percentile, basic and BCa side by side. |
 | `check_status_consistency.py` | Guards this document against stale numbers; run by `pytest` |
 | `check_brief_consistency.py` | Guards the interview brief. Checks table cells against the canonical CSVs (cell-level, not substring — `9.24` appears 17 times), a list of **superseded sentences** that must not reappear, and that the markdown is regenerable from the HTML. Run by `pytest`. |
-| `check_chapter3_consistency.py` | Guards **Chapter 3**, which lives outside the repo. Canonical values from the CSVs, superseded figures and design claims, and **Zotero field integrity** — begin/end pairs must match, since the edits here are run-level surgery on live citation fields. Skips cleanly if the chapter is absent; `CHAPTER3_PATH` overrides the location. Run by `pytest`. |
+| `check_chapter3_consistency.py` | Guards **Chapter 3**, which lives outside the repo. Canonical values from the CSVs, superseded figures and design claims, **Section 3.7.4's ablation table cell by cell**, and **Zotero field integrity** — begin/end pairs must match, since the edits here are run-level surgery on live citation fields. Skips cleanly if the chapter is absent; `CHAPTER3_PATH` overrides the location. Run by `pytest`. |
 | `brief/build_brief_formats.py --sync` | Copies the deliverables **including `PROJECT_STATUS.md`** into `PROJECT CHAPTERS`. The status document previously lived only in the repo, so the project folder held a stale picture. Run it with every rebuild. |
 | `brief/build_brief_formats.py` | `brief/viva-brief.html` is the single source; this generates the print HTML, the PDF (`--pdf`) and the markdown. Print CSS lives in `brief/print.css` so a clean checkout can build. |
 
@@ -193,6 +199,8 @@ Ablation (XGBoost, all else constant):
 Skill is against the corrected 19.08 climatology, so configuration C agrees with §8 (0.5155). An earlier version used the leaky 17.98 reference and gave 0.6922 and 0.4932 — putting the same model at two different skill scores in two sections of this document.
 
 A→B is the fix alone and accounts for essentially all the improvement. B→C shows **dropping `rsds` made the models measurably worse** — it merely left them above threshold. The ~20 points of climatology skill lost (0.69 → 0.49) is precisely the circular portion. *"We removed a predictor and R improved" is the wrong causal claim* and an examiner comparing B and C would catch it.
+
+**This table is now in Chapter 3 as §3.7.4 (Table 3.4)**, immediately after §3.7.3's discussion of the interpolation baseline. Configurations A and B are one-off refits that no script re-emits, so `check_chapter3_consistency.py` anchors their five figures as literals transcribed from here — the one place in that guard where a value does not come from a CSV, and therefore the one place where this document and the chapter can silently diverge.
 
 ### 7.4 The topographic predictors are inert for the pixel-wise models
 Feature importance gives elevation, slope and SVF **exactly 0.00000** on every measure (RF MDI, RF permutation, XGBoost gain, XGBoost cover). This is structural: within one cell's 312-sample time series these fields are *constants*, so zero variance, so no tree can split on them. **RF and XGBoost effectively use 8 features, not 11.** CNN and U-Net are unaffected — they see topography varying spatially.
@@ -707,6 +715,8 @@ Tree defaults were retained after HPO (§7.6). Deployed values are now the **scr
 Edited at run level with `python-docx` so all **26 live Zotero citation fields survived** (162 field characters, verified before and after every edit).
 
 "PROPOSED" dropped from the title; implemented sections converted to past tense. Factual corrections: actual retained grid (§3.2.1) · removed the xESMF/conservative-remapping claim, neither was used (§3.4.1) · areal block means not point-sampling, plus the SVF search-radius caveat (§3.5.2) · SZA computed analytically not via PVLIB (§3.5.3) · the U-Net/CNN ReLU distinction and the exact-cancellation property (§3.5.4) · upsampling factor (§3.6.1) · grid corrected 75×85=6,375 → **71×81=5,751** (§3.6.2) · dual-branch input, dropout, channel attention, pad-to-32; false "output ReLU" claim removed (§3.6.6) · never-performed Bayesian stage removed, CV-transfer caveat added (§3.6.7) · ENSO sampling corrected to **U-Net only** (§3.6.8) · Taylor stats clarified as time-mean (§3.7.2) · deployed model designated in §3.8.1 (RF at the time; now XGBoost, §9) · Table 3.2 search ranges replaced with grids actually searched. **New §3.6.9** (daily-resolution experiment) and **new §3.8.4** (deployed-model justification).
+
+**The five-predictor correction (§3.5.1, §3.6.5, new §3.7.4).** Two claims still described the *six*-predictor configuration — configuration B of the §7.3 ablation, the circular one — as the deployed design: §3.5.1 said all six CMIP6 variables "were used directly as atmospheric predictor features" and listed "direct radiation flux (rsds)" among them, and §3.6.5 gave the CNN input as **C = 6**. The deployed models take five; `rsds` is excluded. Both are corrected, §3.5.1 now states the exclusion and why, and **new §3.7.4** carries the ablation table that justifies it. The chapter's own MCE table was renumbered **3.4 → 3.5** to make room — Table 3.3 keeps its number, which matters because `table_3_3.csv`, the brief and the interview deck all reference it. All three claims are on the guard's retired list; the ablation table is checked cell by cell, because its figures also appear in the paragraph beneath it and a whole-document substring check passes a corrupted cell.
 
 **Three claims that were untrue and are now disclaimed:**
 1. **SARAH-2 and NSRDB were never acquired.** `data/raw/` holds only cmip6, era5, oni, srtm. Validation is entirely against withheld ERA5.
