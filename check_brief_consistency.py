@@ -200,6 +200,11 @@ RETIRED = [
     ("loses on every axis the study can actually test",
      "the CNN is better on std ratio; say every axis the study can establish"),
     ("Five external audit rounds", "six"),
+    # the CSI intermediate is not a clear-sky index: its denominator averages
+    # 13 daytime hours while the ssrd numerator is a 24-hour mean (7.15)
+    ("fixes the physical meaning of the intermediate CSI",
+     "it does not; the denominator is on a different temporal basis, so the "
+     "ratio runs 1.724 below a true clear-sky index"),
     # live in PROJECT_STATUS after the brief had been corrected - the paired
     # RF-XGBoost MBE difference IS established at -0.953 [-1.499, -0.475]
     ("every model's MBE interval spans zero",

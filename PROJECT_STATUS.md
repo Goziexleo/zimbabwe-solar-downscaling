@@ -80,7 +80,9 @@ The retained domain is narrower than Chapter 3's nominal box (15.0–22.5°S, 25
 - Predictors are **ERA5, not bias-corrected CMIP6** — this is perfect-prognosis training; CMIP6 enters only at projection time
 - `MODEL_PREDICTORS="clt,tas,ps,huss,rsds,od550aer"` reproduces the §7.3 ablation
 
-**Target:** `CSI = ssrd_fine / clearsky_ghi`, clipped to [0, 1.1]. Recovered as `GHI = CSI × clearsky_ghi`. Observed CSI spans 0.246–0.632 across both splits (0.2464 training, 0.2564 validation), so **the clip never binds** and the normalisation is an exact inverse — verified to machine precision (max difference 1.14 × 10⁻¹³ W m⁻²). The clear-sky specification therefore fixes the physical meaning of the intermediate CSI the models learn, but **cancels entirely from the GHI product**.
+**Target:** `CSI = ssrd_fine / clearsky_ghi`, clipped to [0, 1.1]. Recovered as `GHI = CSI × clearsky_ghi`. Observed CSI spans 0.246–0.632 across both splits (0.2464 training, 0.2564 validation), so **the clip never binds** and the normalisation is an exact inverse — verified to machine precision (max difference 1.14 × 10⁻¹³ W m⁻²), which is what matters for the product: the clear-sky field **cancels entirely from the GHI**.
+
+**The intermediate CSI is not a clear-sky index in the physical sense, and should not be described as one (§7.15).** The denominator averages thirteen daytime hours while the ERA5 `ssrd` numerator is a 24-hour monthly mean, so the ratio runs a factor of **1.724** below a true clear-sky index. That is also why the observed range tops out at 0.632 rather than approaching 1 in the dry season — the range is evidence about the denominator, not only about the clip.
 
 ---
 
@@ -119,6 +121,7 @@ The retained domain is narrower than Chapter 3's nominal box (15.0–22.5°S, 25
 | `compute_feature_importance.py` | RF MDI + permutation, XGBoost gain + cover |
 | `compute_rolling_origin.py` | Rolling-origin evaluation across 4 expanding-window folds (C3) |
 | `compute_bootstrap_ci.py` | Paired year-block bootstrap: CIs on Table 3.3 and on model differences |
+| `compare_sarah_clearsky.py` | Compares the PVLIB clear-sky ceiling against SARAH's `SISC` by calendar month. The near-constant 1.724 ratio is the evidence for §7.15 |
 | `compute_bca_centred_rmse.py` | **BCa intervals** on the paired differences. Required because the percentile interval is invalid for centred RMSE, whose bootstrap distribution is biased by construction. Reports percentile, basic and BCa side by side. |
 | `check_status_consistency.py` | Guards this document against stale numbers; run by `pytest` |
 | `check_brief_consistency.py` | Guards the interview brief. Checks table cells against the canonical CSVs (cell-level, not substring — `9.24` appears 17 times), a list of **superseded sentences** that must not reappear, and that the markdown is regenerable from the HTML. Run by `pytest`. |
@@ -474,6 +477,33 @@ The Lowveld sits ~10 W m⁻² below the rest of the country and is the most spat
 
 **This unifies three findings that otherwise read as separate weaknesses.** Elevation explains 22% of the spatial variance; the topographic predictors carry *exactly* zero importance for the pixel-wise models (§7.4); and the product holds almost no sub-0.25° information (§7.2). All three say the same thing: over this domain, at this resolution, irradiance is governed by large-scale atmospheric structure rather than terrain — which is what the feature importances independently show, with cloud fraction and humidity dominating. It is a result about the physics of the domain, not a deficiency of the method.
 
+### 7.15 The clear-sky denominator is on the wrong temporal basis
+
+Found by acquiring SARAH, which ships its own clear-sky field (`SISC`) beside all-sky `SIS` on the same grid and the same monthly basis, making the comparison direct rather than inferential.
+
+`compute_finegrid_clearsky_ghi.py` builds the clear-sky ceiling as the mean over **thirteen daytime hours**, `np.linspace(6.0, 18.0, 13)`. The ERA5 `ssrd` it divides is a **24-hour monthly mean**. Numerator and denominator are therefore on different temporal bases and the quotient is not a clear-sky index.
+
+| Month | PVLIB ceiling | SARAH `SISC` | ratio | SARAH CSI |
+|---|---|---|---|---|
+| Jan | 598.11 | 349.81 | 1.710 | 0.740 |
+| Apr | 464.63 | 270.96 | 1.715 | 0.860 |
+| Aug | 442.86 | 252.17 | 1.756 | 0.947 |
+| Dec | 599.84 | 351.03 | 1.709 | 0.735 |
+
+Across all twelve months the ratio is **1.724, sd 0.0326, range 1.670–1.780** (`compare_sarah_clearsky.py` → `sarah_clearsky_comparison.csv`).
+
+**The flatness is the evidence.** Two clear-sky *models* disagreeing would diverge seasonally, through air mass and turbidity. A near-constant multiplicative offset is what an averaging-window mismatch produces, and 06:00–18:00 against 24 hours predicts roughly a factor of two. SARAH's own CSI meanwhile shows the seasonality that ought to be there — 0.74 in the January wet season rising to 0.95 in the August dry season — which a field capped at 0.632 cannot express.
+
+**What this does not affect: anything in the product.** `csi_to_ghi` multiplies the same field back, an exact inverse to 1.14 × 10⁻¹³ W m⁻². Table 3.3, the projections, the uncertainty decomposition and the deployment argument are all untouched, and nothing needs recomputing. The models learn a well-defined quantity; it is only mis-named.
+
+**What it does affect** is two statements. That the clear-sky specification "fixes the physical meaning of the intermediate CSI" — it does not. And the use of the 0.246–0.632 range as evidence about the clip alone, when it is at least as much evidence about the denominator. An examiner who knows solar resource is likely to ask why a clear-sky index never exceeds 0.63; the answer is that the normalisation is a fixed rescaling that cancels exactly, so the intermediate's absolute level carries no meaning.
+
+**Not yet done:** rebuilding the ceiling on a 24-hour basis. It would change no reported number, since it cancels, so it is cosmetic for the product and worth doing only when §3.5.4 is next revised. **SARAH's `SISC` is now the better reference** if it is rebuilt.
+
+### 7.16 First independent signal: ERA5 sits below SARAH
+
+Preliminary and not a result. For January 2021, domain mean, the ERA5-derived GHI is **206.86 W m⁻²** against SARAH's **237.61** — about **13% low**. One month, one statistic, no spatial or temporal analysis behind it. It is recorded because it is the first quantity in this project measured against something that is not ERA5, and because §14.1 turns on exactly this comparison.
+
 ### 7.6 Cross-validation selected worse hyperparameters
 A 150-cell subsampled CV search picked configurations for both tree models that underperformed the untuned defaults on the full 5,751-cell holdout. Defaults retained. The search's own scores gave no warning.
 
@@ -719,7 +749,7 @@ Edited at run level with `python-docx` so all **26 live Zotero citation fields s
 **The five-predictor correction (§3.5.1, §3.6.5, new §3.7.4).** Two claims still described the *six*-predictor configuration — configuration B of the §7.3 ablation, the circular one — as the deployed design: §3.5.1 said all six CMIP6 variables "were used directly as atmospheric predictor features" and listed "direct radiation flux (rsds)" among them, and §3.6.5 gave the CNN input as **C = 6**. The deployed models take five; `rsds` is excluded. Both are corrected, §3.5.1 now states the exclusion and why, and **new §3.7.4** carries the ablation table that justifies it. The chapter's own MCE table was renumbered **3.4 → 3.5** to make room — Table 3.3 keeps its number, which matters because `table_3_3.csv`, the brief and the interview deck all reference it. All three claims are on the guard's retired list; the ablation table is checked cell by cell, because its figures also appear in the paragraph beneath it and a whole-document substring check passes a corrupted cell.
 
 **Three claims that were untrue and are now disclaimed:**
-1. **SARAH-2 and NSRDB were never acquired.** `data/raw/` holds only cmip6, era5, oni, srtm. Validation is entirely against withheld ERA5.
+1. **SARAH-2 and NSRDB were never acquired.** Validation is entirely against withheld ERA5. `data/raw/` now also holds `osm/` and `worldpop/` for §3.9, but neither is a validation product and neither touches the ML stage.
 2. **The delta-mapping baseline was never implemented** — now it is (B9).
 3. **RF/XGBoost feature importance was never extracted** — now it is (B8).
 
@@ -758,9 +788,30 @@ Under **git** since the second audit: 61 files tracked, two commits, `data/` exc
 ## 13. Outstanding
 
 **Not started**
-- **§3.9 Multi-Criteria Suitability Analysis** — the largest remaining piece. Needs ESA CCI land cover, OpenStreetMap roads and transmission lines, WDPA/ZimParks protected areas, WorldPop. **None acquired.**
+- **§3.9 Multi-Criteria Suitability Analysis** — the largest remaining piece. Data acquisition is now partly done (`download_suitability_data.py`); the analysis itself is not started.
+
+  | Criterion | Source | State |
+  |---|---|---|
+  | Annual mean GHI | this study | held |
+  | Terrain slope | SRTM 90 m | held (§3.5.2) |
+  | Proximity to roads | OSM `highway` | **acquired** — `data/raw/osm/zimbabwe-latest.osm.pbf`, 171 MB, verified |
+  | Proximity to ZETDC grid | OSM `power` | **acquired**, same extract — but see the two caveats below |
+  | Population density | WorldPop 100 m | **acquired** — `data/raw/worldpop/zwe_ppp_2020_constrained.tif`, 22.3 MB, verified |
+  | Land cover class | ESA CCI 300 m | blocked: needs the `satellite-land-cover` and `vito-proba-v` licences accepted on the CDS account |
+  | Proximity to settlements | OSM / GADM | GADM boundary not yet acquired |
+  | *(exclusion mask)* | WDPA / ZimParks | blocked: protectedplanet.net requires accepting terms in a browser |
+
+  **Two caveats on the OSM power layer.** GDAL's OSM driver does not promote `power` to a column — it lands in `other_tags` as an hstore string, so the grid layer needs either a string filter or a custom `osmconf.ini` that promotes `power` and `voltage`. And the country extract carries **cross-border** infrastructure: the first `power=line` found is tagged `operator=Zesco`, which is Zambia's utility. The grid layer must be clipped to the domain and operator-checked, or proximity is computed to a grid that cannot be connected to.
+
+  **WorldPop is clipped to the national outline, not the domain box** — it spans 25.24–33.06°E, 22.42–15.61°S, falling short of the 25–33°E / 15–22°S grid by 0.24° west and 0.61° north, where the box lies in Zambia and Mozambique. This is correct behaviour for a Zimbabwe-only product, and it means **a national-boundary mask (GADM) is required** so out-of-country cells become clean exclusions rather than nodata holes in the weighted linear combination.
 - **Chapter 4** (results and discussion)
-- **SARAH-2 / NSRDB independent validation — COMMITTED, deferred.** Will be implemented, but deliberately **out of scope for the 24 August interview**. It is the only route to genuine sub-0.25° resolution (§7.2) and the fix for the validation-independence gap (§14.1).
+- **SARAH independent validation — data now ACQUIRED, analysis not started.** 480 monthly SIS fields at 0.05° over the domain, 1985-01 to 2024-12, complete and gapless, MD5-verified against both order emails (`data/raw/sarah/`, orders ORD68669 CDR + ORD68670 ICDR, identical extraction spec so they join cleanly). Reproduce with `fetch_sarah_order.py`. Covers **both** the training and validation periods, so it serves both purposes: the validation-independence gap (§14.1) and use as an alternative high-resolution *target*, the only route to genuine sub-0.25° resolution (§7.2).
+
+  Two things to know before building on it. **The grids do not coincide:** SARAH is cell-centred (25.025, 25.075, …) and the target grid is node-centred (25.0, 25.1, …), so *none* of the 81 longitudes or 71 latitudes match and the 0.05° → 0.1° step is interpolation, not block-averaging. **The perimeter needs one-sided treatment:** 300 of 5,751 cells (5.2%) sit 0.025° (~2.8 km) outside SARAH's cell-centre hull, because the order was placed with no margin. Clamping is adequate at that distance.
+
+  Note the filename suffix differs across the join — `…UD1000101UD` for the CDR, `…UD10001I1UD` for the ICDR — so a naive glob silently picks up only one half.
+
+- **NSRDB — COMMITTED, not acquired.** Needs an NREL API key.
 
 **Needs your hand — one item, and it needs the Zotero desktop app**
 - **Dozier & Frew (1990) is not in the Zotero library.** Verified precisely: it appears once, as plain text at Chapter 3 paragraph 75 ("the Dozier and Frew (1990) sky-view integral"), and is in **none** of the 26 `ZOTERO_ITEM` citation fields. Chapter 3's bibliography is Zotero-generated (`ZOTERO_BIBL` field present), so **the reference will not appear in the reference list** as things stand. I cannot add it — the library is the desktop application's own database. Add this item, then re-cite the plain text as a live field:
