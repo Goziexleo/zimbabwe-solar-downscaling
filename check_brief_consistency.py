@@ -36,6 +36,40 @@ BRIEF = os.path.join(ROOT, "brief/viva-brief.html")
 MD = os.path.join(ROOT, "brief/CR_Madukwe_Interview_Brief.md")
 STATUS = os.path.join(ROOT, "PROJECT_STATUS.md")
 UPDATE = os.path.join(ROOT, "UPDATE_BRIEF.md")
+DECK = os.path.join(ROOT, "brief/CR_Madukwe_Interview_Deck.pptx")
+
+
+def deck_prose():
+    """Every text frame and speaker note in the interview deck, as one string.
+
+    The deck is a fourth document making the same claims, and it was unguarded:
+    an injected "which made the task genuine perfect prognosis" survived here
+    while the same claim was caught in the brief and in PROJECT_STATUS. Speaker
+    notes are included because they are what gets said out loud.
+
+    Returns "" when the deck or python-pptx is absent, so the guard still runs
+    on a machine that only has the markdown.
+    """
+    try:
+        from pptx import Presentation
+    except ImportError:
+        return ""
+    if not os.path.exists(DECK):
+        return ""
+    parts = []
+    for slide in Presentation(DECK).slides:
+        for shape in slide.shapes:
+            if shape.has_text_frame and shape.text_frame.text.strip():
+                parts.append(shape.text_frame.text)
+        if slide.has_notes_slide:
+            parts.append(slide.notes_slide.notes_text_frame.text)
+    # the deck sets typographic quotes and dashes that the ASCII retired
+    # phrases would otherwise slip past
+    t = " ".join(parts)
+    for bad, good in (("\u2019", "'"), ("\u201c", '"'), ("\u201d", '"'),
+                      ("\u2013", "-"), ("\u2014", "-")):
+        t = t.replace(bad, good)
+    return re.sub(r"\s+", " ", t)
 EVAL = os.path.join(ROOT, "data/processed/evaluation")
 MINUS = "\u2212"
 
@@ -202,6 +236,12 @@ RETIRED = [
     ("Five external audit rounds", "six"),
     # the CSI intermediate is not a clear-sky index: its denominator averages
     # 13 daytime hours while the ssrd numerator is a 24-hour mean (7.15)
+    # verb-agnostic: PROJECT_STATUS said "making", the brief said "makes"
+    ("the task a genuine perfect-prognosis problem",
+     "training is ERA5-to-ERA5 either way, so both configurations qualify; "
+     "what dropping rsds changes is whether the ML step does anything"),
+    ("which made the task genuine perfect prognosis",
+     "same overstatement in the deck's wording"),
     ("fixes the physical meaning of the intermediate CSI",
      "it does not; the denominator is on a different temporal basis, so the "
      "ratio runs 1.724 below a true clear-sky index"),
@@ -302,7 +342,8 @@ def check():
     # how "both intervals span zero" and "individually indistinguishable from
     # zero" survived in PROJECT_STATUS after being corrected in the brief - the
     # authoritative record contradicting itself while the guard reported clean.
-    docs = (("brief", text), ("PROJECT_STATUS", prose(STATUS)), ("UPDATE_BRIEF", prose(UPDATE)))
+    docs = (("brief", text), ("PROJECT_STATUS", prose(STATUS)),
+            ("UPDATE_BRIEF", prose(UPDATE)), ("deck", deck_prose()))
     for label, doc in docs:
         resurrected += check_derivable(label, doc)
 

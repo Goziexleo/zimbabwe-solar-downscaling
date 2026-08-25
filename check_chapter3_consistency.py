@@ -151,6 +151,9 @@ RETIRED = [
      "the deployed CNN takes C = 5; rsds is excluded per Section 3.5.1"),
     ("were used directly as atmospheric predictor features",
      "five of the six are model inputs; rsds is excluded per Section 3.5.1"),
+    ("determines the physical meaning of the intermediate CSI",
+     "it does not; the ceiling averages 13 daytime hours against a 24-hour "
+     "numerator, so the ratio runs 1.724 below a true clear-sky index"),
     ("direct radiation flux (rsds)",
      "rsds is not a model input; listing it among the selected predictors "
      "describes configuration B"),

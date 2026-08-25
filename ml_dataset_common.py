@@ -53,9 +53,16 @@ COARSE_PREDICTOR_VARS = ["clt", "tas", "ps", "huss", "rsds", "od550aer"]
 # interpolation, and any apparent skill mostly reflects the model recovering
 # its own input. This was first observed at daily resolution and was masked at
 # monthly resolution by a one-month misalignment in the validation predictor
-# file (since fixed). Dropping rsds makes the task a genuine perfect-prognosis
-# problem: infer surface irradiance from atmospheric state, not from a copy of
-# the irradiance itself.
+# file (since fixed).
+#
+# Dropping rsds does not change WHETHER this is perfect prognosis - training is
+# ERA5-to-ERA5 either way, so both configurations qualify. What it changes is
+# whether the ML step does anything. With rsds present the learned relationship
+# is essentially interpolation, so at projection time the product reduces to
+# bias-corrected GCM rsds regridded: the Section 3.7.3 baseline, reached at
+# considerably more expense. Dropping it forces the model to infer surface
+# irradiance from atmospheric state rather than from a copy of the irradiance
+# itself.
 #
 # Set MODEL_PREDICTORS="clt,tas,ps,huss,rsds,od550aer" to restore rsds for the
 # ablation that separates the effect of dropping it from the effect of fixing
