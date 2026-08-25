@@ -50,6 +50,7 @@ ROOT = os.path.dirname(os.path.abspath(__file__))
 FIELDS = os.path.join(ROOT, "data/processed/evaluation/validation_spatial_fields.nc")
 OUT_CSV = os.path.join(ROOT, "data/processed/evaluation/power_spectra.csv")
 OUT_SUMMARY = os.path.join(ROOT, "data/processed/evaluation/effective_resolution.csv")
+OUT_SENSITIVITY = os.path.join(ROOT, "data/processed/evaluation/effective_resolution_cut_sensitivity.csv")
 
 FINE_RES_DEG = 0.1
 KM_PER_DEG = 111.0
@@ -147,6 +148,34 @@ def main():
     summary = pd.DataFrame(rows)
     summary.to_csv(OUT_SUMMARY, index=False)
 
+    # Cut sensitivity. The k>10 verdict above rests on one arbitrary cut, and
+    # the CNN's 1.04x turns out to be the most flattering point of the sweep -
+    # it ranges 0.91 to 1.29 as the cut moves, on a tail holding at most a few
+    # per cent of the variance. The U-Net's damping, by contrast, holds at every
+    # cut and deepens monotonically. Reporting only the single cut would state
+    # the robust and the fragile result in the same voice, so the sweep is
+    # emitted alongside and the verdict wording distinguishes them.
+    cuts = [2, 4, 7, 10, 14, 19]           # array index; wavenumber = index + 1
+    sens = []
+    for label, _ in SERIES:
+        pc = spectra_csi[label]
+        row = {"field": label}
+        for c in cuts:
+            r = ((np.nansum(pc[c:]) / np.nansum(pc)) /
+                 (np.nansum(ref_csi[c:]) / np.nansum(ref_csi)))
+            row["k>=%d" % (c + 1)] = float(r)
+        vals = [row["k>=%d" % (c + 1)] for c in cuts]
+        row["min"], row["max"] = min(vals), max(vals)
+        row["robust"] = ("damped at every cut" if max(vals) < 0.75
+                         else "stable across cuts" if (max(vals) - min(vals)) < 0.15
+                         else "CUT-DEPENDENT")
+        sens.append(row)
+    sens_df = pd.DataFrame(sens)
+    sens_df.to_csv(OUT_SENSITIVITY, index=False)
+    truth_share = {"field": "truth share of CSI power"}
+    for c in cuts:
+        truth_share["k>=%d" % (c + 1)] = np.nansum(ref_csi[c:]) / np.nansum(ref_csi)
+
     print("=" * 96)
     print(" RADIALLY AVERAGED POWER SPECTRA — time-mean GHI field")
     print(f" Domain {domain_km:.0f} km across; grid spacing {FINE_RES_DEG}deg "
@@ -154,6 +183,16 @@ def main():
     print("=" * 96)
     print(summary.to_string(index=False, float_format=lambda x: f"{x:.4f}"))
     print("=" * 96)
+    print("\n CUT SENSITIVITY - does the verdict survive moving the cut?")
+    print(pd.concat([sens_df, pd.DataFrame([truth_share])], ignore_index=True)
+          .to_string(index=False, float_format=lambda x: f"{x:.2f}", na_rep=""))
+    print("""
+The U-Net is damped at EVERY cut and deepens monotonically: that verdict is
+robust. The CNN is not damped at any cut, but its distance from truth is not
+resolved by this test - 1.04x at k>10 is the closest point of the sweep, and the
+tail carries too little variance to call 4 per cent a meaningful agreement. Say
+"the CNN does not damp", not "the CNN matches truth to within 4 per cent".
+""")
     print("""
 READ THE CSI COLUMNS, NOT THE GHI ONE. The models predict CSI; GHI is recovered
 as CSI x clearsky. The CSI target's fine structure is nearly the inverse of the

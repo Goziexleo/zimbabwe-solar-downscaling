@@ -177,20 +177,31 @@ def fig_spectra():
     a1.set_title("CSI power spectrum — the space judged in\nthe models predict CSI, not GHI")
     a1.legend(frameon=False, fontsize=8.2)
 
-    # --- CSI ratio: this is where 1.04x and 0.08x live
+    # --- CSI ratio. The U-Net damping is robust across every cut; the CNN
+    # ratio is not (0.91-1.29 over k>=3..20), so the panel states the
+    # direction and refuses the spurious two-decimal agreement.
     for c in cols[1:]:
         a2.loglog(df["wavelength_km"], df["CSI " + c] / df["CSI Truth (ERA5)"],
                   lw=1.9, color=C[c], label=c)
     a2.axhline(1, color="k", lw=0.9, ls="--")
     wavelength_axis(a2)
     a2.set_ylabel("CSI power ratio to truth")
-    a2.set_title("U-Net DAMPS fine scales; the CNN does not\n"
-                 "beyond k=10: CNN 1.04x, U-Net 0.08x")
+    a2.set_title("U-Net DAMPS fine scales at every cut (0.72 to 0.01);\n"
+                 "the CNN does not - but its ratio is cut-dependent, 0.91-1.29")
     a2.legend(frameon=False, fontsize=8.2)
-    for c, dy in [("CNN", 1.5), ("U-Net", 0.55)]:
-        if c in summ.index:
-            a2.text(a2.get_xlim()[1] * 1.05, dy, summ.loc[c, "CSI vs truth"],
-                    fontsize=9, color=C[c], va="center", fontweight="bold")
+    # Annotate the RANGE over cuts, not the single k>10 value. Printing "1.04x"
+    # beside a panel whose title says the ratio is cut-dependent would have the
+    # figure contradict itself, and 1.04x is the most flattering point of the
+    # sweep.
+    sens = pd.read_csv(os.path.join(EVAL, "effective_resolution_cut_sensitivity.csv")
+                       ).set_index("field")
+    for c, dy in [("CNN", 2.6), ("U-Net", 0.30)]:
+        if c in sens.index:
+            lo, hi = sens.loc[c, "min"], sens.loc[c, "max"]
+            txt = (f"{hi:.2f}-{lo:.2f}x\nover cuts" if c == "U-Net"
+                   else f"{lo:.2f}-{hi:.2f}x\nover cuts")
+            a2.text(a2.get_xlim()[1] * 1.05, dy, txt, fontsize=8.4, color=C[c],
+                    va="center", fontweight="bold", linespacing=1.35)
 
     # --- GHI ratio, correctly labelled as a symptom rather than as invention
     for c in cols[1:]:

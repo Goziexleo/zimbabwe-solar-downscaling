@@ -237,6 +237,13 @@ RETIRED = [
     # the CSI intermediate is not a clear-sky index: its denominator averages
     # 13 daytime hours while the ssrd numerator is a 24-hour mean (7.15)
     # verb-agnostic: PROJECT_STATUS said "making", the brief said "makes"
+    # the CNN's spectral ratio is cut-dependent (0.91-1.29 over k>=3..20);
+    # 1.04x is the most flattering point of the sweep, so the claim is that it
+    # does not damp, not that it matches truth to within 4 per cent
+    ("sits at 1.04",
+     "cut-dependent; the ratio runs 0.91-1.29 across cuts. Say the CNN does not damp"),
+    ("sits within 4% of the target",
+     "same claim; the tail carries 0.25% of the variance and cannot support that precision"),
     ("the task a genuine perfect-prognosis problem",
      "training is ERA5-to-ERA5 either way, so both configurations qualify; "
      "what dropping rsds changes is whether the ML step does anything"),

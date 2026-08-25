@@ -256,7 +256,24 @@ Ullrich et al. recommend power spectra because ML emulators typically damp high 
 | CNN | 0.00259 | 1.04× | matches truth |
 | **U-Net** | **0.00021** | **0.08×** | **DAMPED** |
 
-**The U-Net damps CSI power beyond k=10 by a factor of twelve** — the Ullrich failure mode, tied to loss and architecture. The CNN sits within 4% of the target: its explicit spatial-gradient penalty, which acts on CSI, is doing its job.
+**The U-Net damps CSI power beyond k=10 by a factor of twelve** — the Ullrich failure mode, tied to loss and architecture.
+
+**The two verdicts in that table are not equally robust, and the table alone does not show it.** `k=10` is one arbitrary cut. Sweeping it (`compute_power_spectra.py` → `effective_resolution_cut_sensitivity.csv`):
+
+| Field | k≥3 | k≥5 | k≥8 | **k≥11** | k≥15 | k≥20 | verdict |
+|---|---|---|---|---|---|---|---|
+| Baseline | 0.99 | 0.97 | 1.00 | 0.99 | 1.00 | 1.03 | stable |
+| Random Forest | 1.02 | 0.95 | 0.95 | 0.98 | 1.01 | 1.03 | stable |
+| XGBoost | 1.03 | 0.97 | 0.98 | 1.01 | 1.08 | 1.11 | stable |
+| **CNN** | 1.13 | 1.21 | 1.19 | **1.04** | 0.91 | 1.29 | **CUT-DEPENDENT** |
+| **U-Net** | 0.72 | 0.45 | 0.20 | **0.08** | 0.04 | 0.01 | **damped at every cut** |
+| *truth's share of CSI power* | *10.0%* | *2.7%* | *0.6%* | *0.25%* | *0.10%* | *0.03%* | |
+
+**The U-Net result is robust**: damped at every cut, deepening monotonically, and already halved at k≥5 where the truth still holds 2.7% of its variance. That is a real finding about loss and architecture.
+
+**The CNN's "1.04×, within 4%" is not.** Across the sweep it runs 0.91 to 1.29, and **k=10 is the closest point to unity of any cut tested** — the most flattering choice, arrived at innocently but flattering nonetheless. The tail also carries too little variance for the ratio to be stable: 0.25% at k≥11, 0.03% at k≥20.
+
+**So state the robust half and stop.** The CNN **does not damp** — it never falls below 0.91 and never approaches the U-Net's collapse, so the spatial-gradient penalty is doing its job. But *how close* the CNN sits to truth is not resolved by this test, and "matches truth to within 4%" claims a precision the measurement does not support.
 
 **Correction to an earlier version of this document.** It reported all four models *injecting* ~30× the truth's fine-scale power, measured in GHI space, and named the CNN the worst offender. That was an artefact of the measurement space. GHI-space excess is a *symptom* of getting CSI wrong: a model that reproduces CSI's fine structure recovers the cancellation and yields a smooth GHI, while one that smooths CSI destroys the structure that would have cancelled and lets the clear-sky field's own structure survive. The U-Net's GHI excess is therefore caused by its CSI damping, not by invented detail — and the CNN's apparent excess is the smallest real discrepancy of the group.
 
