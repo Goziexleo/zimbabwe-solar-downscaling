@@ -40,7 +40,7 @@ def should_download(filename, exp):
 
     There is no "day" frequency case here: Section 3.3.1 states CMIP6
     predictor extraction uses monthly mean fields only. The daily-
-    resolution validation products in Section 3.3.3 (SARAH-2, NSRDB) are
+    resolution validation product in Section 3.3.3 (SARAH) is
     satellite products, not CMIP6 GCM output, and are not retrieved from
     ESGF at all.
     """

@@ -75,7 +75,7 @@ correlation 0.77 → 0.99. Most of the spatial gain is the bias correction, not 
 | 3 | §3.4.3 | Rewritten: the QC that now exists, with counts |
 | 3 | §3.8.4 | Rewritten three times — deployment, then BCa, then both legs |
 | 3 | §3.6.6, §3.8.1 | Deployed model corrected to XGBoost |
-| 2 | ¶69, ¶71 | SARAH-2/NSRDB now read as planned, not performed |
+| 2 | ¶69, ¶71 | SARAH now reads as planned, not performed |
 | 2 | ¶128 | "confirm" → "report"; forward reference to §3.8.4 |
 | 2 | gap claim | "closes all four gaps" → three closed, fourth partly |
 | 1 | §1.9 | Calibration period corrected to 1985–2010, not 1985–2024 |
@@ -89,7 +89,7 @@ Backups sit beside each file with `_BACKUP_pre_*` names.
 - **Dozier & Frew (1990)** is not in Zotero, so it will not reach the reference list.
 - **§3.9 suitability analysis and the maps** — next dissertation phase, deliberately not interview scope.
 - **Chapters 4–5**, which follow the suitability analysis.
-- **SARAH-2 / NSRDB validation** — committed, deferred.
+- **SARAH validation** — committed; the data is now acquired.
 
 ---
 

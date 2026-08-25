@@ -9,7 +9,7 @@
 `..._BACKUP_preupdate.docx` (before the proposal→implemented rewrite) ·
 `..._BACKUP_pre_rf_deploy.docx` (before §3.8.4 was first added) ·
 `..._BACKUP_pre_384_rewrite.docx` (before §3.8.4 was rewritten for the corrected predictor set) ·
-`..._BACKUP_pre_validation_scope.docx` (before §3.3.3 was reworded to treat SARAH-2/NSRDB as planned) ·
+`..._BACKUP_pre_validation_scope.docx` (before §3.3.3 was reworded to treat SARAH as planned) ·
 `..._BACKUP_pre_audit2.docx` · `..._BACKUP_pre_xgb_deploy.docx` (before the deployment moved to XGBoost) ·
 `..._BACKUP_pre_bca.docx` (before §3.8.4 took the BCa intervals) ·
 `..._BACKUP_pre_both_legs.docx` (before the composite criterion was conceded on both legs) ·
@@ -188,7 +188,7 @@ NaN poisoning of BatchNorm producing all-NaN projections · bias-correction glob
 This was first seen at daily resolution and misdiagnosed as daily-specific; it was masked at monthly resolution by bug §6.11. The response was to drop `rsds` from the model inputs. **Note what that does and does not change.** It does not change whether this is perfect prognosis — training is ERA5-to-ERA5 with or without `rsds`, so both configurations qualify, and describing the exclusion as what *makes* it perfect prognosis is wrong. What it changes is whether the ML step does anything: with `rsds` present the learned relationship is essentially interpolation, so at projection the product reduces to bias-corrected GCM `rsds` regridded — the §3.7.3 baseline, reached at considerably more expense.
 
 ### 7.2 The product contains no information finer than its input grid
-Degrading the 0.1° GHI product to 0.25° and interpolating back recovers it at **correlation 0.999991**, losing **0.0019%** of variance. Elevation, a genuinely fine-scale field, loses 0.898% under the same test — so the test does detect sub-grid structure when present. **The product is a bias-and-variability correction evaluated on a finer mesh, not spatial super-resolution.** Only a genuinely high-resolution target (SARAH-2, NSRDB) could change this.
+Degrading the 0.1° GHI product to 0.25° and interpolating back recovers it at **correlation 0.999991**, losing **0.0019%** of variance. Elevation, a genuinely fine-scale field, loses 0.898% under the same test — so the test does detect sub-grid structure when present. **The product is a bias-and-variability correction evaluated on a finer mesh, not spatial super-resolution.** Only a genuinely high-resolution target could change this. **SARAH is now held** (§13), so this is actionable rather than hypothetical.
 
 ### 7.3 The alignment fix, not the predictor removal, cleared R > 0.90
 Ablation (XGBoost, all else constant):
@@ -748,8 +748,10 @@ Edited at run level with `python-docx` so all **26 live Zotero citation fields s
 
 **The five-predictor correction (§3.5.1, §3.6.5, new §3.7.4).** Two claims still described the *six*-predictor configuration — configuration B of the §7.3 ablation, the circular one — as the deployed design: §3.5.1 said all six CMIP6 variables "were used directly as atmospheric predictor features" and listed "direct radiation flux (rsds)" among them, and §3.6.5 gave the CNN input as **C = 6**. The deployed models take five; `rsds` is excluded. Both are corrected, §3.5.1 now states the exclusion and why, and **new §3.7.4** carries the ablation table that justifies it. The chapter's own MCE table was renumbered **3.4 → 3.5** to make room — Table 3.3 keeps its number, which matters because `table_3_3.csv`, the brief and the interview deck all reference it. All three claims are on the guard's retired list; the ablation table is checked cell by cell, because its figures also appear in the paragraph beneath it and a whole-document substring check passes a corrupted cell.
 
+**NSRDB removed from the study (all three chapters).** It was never acquired and is now out of scope; SARAH is the sole satellite reference. Chapter 1 ¶35, Chapter 2 §2.3.3 (heading and the whole NSRDB paragraph), Chapter 3 §3.3.3 and the §3.10 data-availability list. Two live **Sengupta et al. (2018)** citations went with it, so Chapter 2 is now 24 `ZOTERO_ITEM` fields and Chapter 3 is 25, both still balanced at 25 and 26 begin/end pairs. Their bibliography entries were deleted by hand as well — **refresh the Zotero bibliography in Word to make that authoritative**, since the reference lists are Zotero-generated and a manual deletion is only cosmetic until it is regenerated. Backups: `*_BACKUP_pre_nsrdb.docx` beside each chapter.
+
 **Three claims that were untrue and are now disclaimed:**
-1. **SARAH-2 and NSRDB were never acquired.** Validation is entirely against withheld ERA5. `data/raw/` now also holds `osm/` and `worldpop/` for §3.9, but neither is a validation product and neither touches the ML stage.
+1. **No satellite product was acquired at the time this was written; SARAH now is (§13).** The results reported here are validated entirely against withheld ERA5. `data/raw/` now also holds `osm/` and `worldpop/` for §3.9, but neither is a validation product and neither touches the ML stage.
 2. **The delta-mapping baseline was never implemented** — now it is (B9).
 3. **RF/XGBoost feature importance was never extracted** — now it is (B8).
 
@@ -821,7 +823,6 @@ Under **git** since the second audit: 61 files tracked, two commits, `data/` exc
 
   Note the filename suffix differs across the join — `…UD1000101UD` for the CDR, `…UD10001I1UD` for the ICDR — so a naive glob silently picks up only one half.
 
-- **NSRDB — COMMITTED, not acquired.** Needs an NREL API key.
 
 **Needs your hand — one item, and it needs the Zotero desktop app**
 - **Dozier & Frew (1990) is not in the Zotero library.** Verified precisely: it appears once, as plain text at Chapter 3 paragraph 75 ("the Dozier and Frew (1990) sky-view integral"), and is in **none** of the 26 `ZOTERO_ITEM` citation fields. Chapter 3's bibliography is Zotero-generated (`ZOTERO_BIBL` field present), so **the reference will not appear in the reference list** as things stand. I cannot add it — the library is the desktop application's own database. Add this item, then re-cite the plain text as a live field:
@@ -831,8 +832,8 @@ Under **git** since the second audit: 61 files tracked, two commits, `data/` exc
 - **The published results dashboard has been withdrawn** and replaced with a retraction notice (see §10a / E1). Nothing further is needed unless you want the URL itself deleted, which must be done from the artifacts gallery.
 
 **Closed in the Round 5 pass**
-- **Chapter 1 needed no change.** Its SARAH-2/NSRDB passage (paragraph 35) describes those products' *limitation* — that they carry no future information — and never claims them as this study's validation. Checked rather than assumed.
-- **Chapter 2 §2.3.3 tense — fixed.** Paragraph 69 claimed SARAH-2 was "a suitable independent validation dataset for the downscaled products produced in this study"; paragraph 71 said "NSRDB **serves as** a secondary independent validation source". Both now state the validation is planned and not reported here, pointing to §3.3.3, so Chapters 1, 2 and 3 agree.
+- **Chapter 1 needed no change.** Its satellite-product passage (paragraph 35) describes their *limitation* — that they carry no future information — and never claims them as this study's validation. Checked rather than assumed.
+- **Chapter 2 §2.3.3 tense — fixed.** Paragraph 69 claimed SARAH-2 was "a suitable independent validation dataset for the downscaled products produced in this study"; paragraph 71 made the same claim for a second product. Both now state the validation is planned and not reported here, pointing to §3.3.3, so Chapters 1, 2 and 3 agree.
 - **Chapter 2 forward reference — added.** Paragraph 128's "Benchmarking studies **confirm** that deep learning models outperform classical baselines" is softened to "**report**", and the paragraph now closes by framing this as a hypothesis the study tests rather than assumes, states that it is not borne out here, and forward-references §3.8.4.
 - **The 0.68 ambiguity does not exist in the thesis.** Searched all three chapters: **0.68 appears nowhere**. The collision is between two *status-document* sections (§6.1's collapsed correlation and §7.5's std ratios), not between two thesis passages, so no clarifying clause is needed. Resolved as not applicable rather than left open.
 - **Per-cell QC flag counts — implemented, and they found a real defect.** See §7.12.
@@ -843,7 +844,7 @@ Under **git** since the second audit: 61 files tracked, two commits, `data/` exc
 
 ## 14. Standing methodological caveats
 
-1. **ERA5 is the only reference *in the work reported here*.** Training and validation both use it, over a data-sparse region where reanalysis is weakest. The temporal split is genuine, so this is a real out-of-sample test *of the reanalysis relationship* — but not an independent test against observations. SARAH-2 / NSRDB validation is committed as the next stage (§13); until it lands, every skill figure in §8 carries this qualifier.
+1. **ERA5 is the only reference *in the work reported here*.** Training and validation both use it, over a data-sparse region where reanalysis is weakest. The temporal split is genuine, so this is a real out-of-sample test *of the reanalysis relationship* — but not an independent test against observations. SARAH validation is committed as the next stage (§13), and the data is now held; until it lands, every skill figure in §8 carries this qualifier.
 2. **Stationarity is assumed.** Models fitted on 1985–2010 are applied to bias-corrected SSP5-8.5 fields to 2100. EDCM preserves the absolute change signal, but the learned predictor→irradiance mapping is assumed valid in an unseen climate.
 3. **Cloud is unresolved.** The dominant control on surface irradiance is parameterised inside the GCM and available only as a grid mean. Feature importance confirms cloud fraction dominates the fit.
 4. **Defensive NaN handling hides failures.** Two of the three severe silent bugs were `np.nan_to_num` converting a loud failure into a plausible field. Both were caught by inspecting fields, not scores. `safe_nan_to_num` now makes this loud.
