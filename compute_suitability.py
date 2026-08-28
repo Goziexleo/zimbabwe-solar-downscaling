@@ -162,14 +162,32 @@ def main():
         print("    %-12s %.3f  vs  %.2f   (%+.3f)" % (c, v, AHP_WEIGHTS[c], v - AHP_WEIGHTS[c]))
     print("  max deviation %.3f" % max(abs(v - AHP_WEIGHTS[c]) for c, v in zip(CRITERIA, w)))
 
-    ghi_source = "ghi_present_sarah" if "ghi_present_sarah" in ds else "ghi_present_era5"
-    print("\nirradiance layer: %s" % ghi_source)
+    # Present uses SARAH (7.17). CHANGE between present and future must not,
+    # because the projections come from an ERA5-trained chain and differencing
+    # SARAH against them would put the SARAH-ERA5 offset inside the change
+    # signal. So the future periods are scored on their own downscaled layers
+    # and change is taken against ghi_present_era5, never against SARAH.
+    periods = [("present", "ghi_present_sarah" if "ghi_present_sarah" in ds
+                else "ghi_present_era5")]
+    periods += [("present_era5_basis", "ghi_present_era5")]
+    periods += [(v.replace("ghi_", ""), v) for v in sorted(ds.data_vars)
+                if v.startswith("ghi_ssp")]
+    print("\nperiods: %d" % len(periods))
+    for tag, v in periods:
+        print("   %-28s <- %s" % (tag, v))
+    ghi_source = periods[0][1]
 
     # ---- exclusion mask (Section 3.9.2) ----
     inzw = ds.in_zimbabwe.values > AREAL_EXCLUSION
     ex_pa = ds.protected_fraction.values > AREAL_EXCLUSION
     ex_urb = ds.urban_fraction.values > AREAL_EXCLUSION
-    ex_water = ds.water_fraction.values > AREAL_EXCLUSION
+    # Section 3.9.2 treats open water, marshland and riparian zones as one
+    # category, so the ESA CCI water classes and the HydroSHEDS corridor are
+    # unioned before the areal test.
+    wet = ds.water_fraction.values.copy()
+    if "river_fraction" in ds:
+        wet = np.clip(wet + ds.river_fraction.values, 0, 1)
+    ex_water = wet > AREAL_EXCLUSION
     # Section 3.9.2 as written: cell-mean slope above 15 degrees. Kept literal
     # rather than retuned. At 0.1 degrees it excludes almost nothing, because
     # averaging over 121 km2 smooths every peak - the 95th percentile cell-mean
@@ -192,6 +210,12 @@ def main():
     alt = (ds.urban_fraction.values > 0.0).sum()
     print("     (urban at >0%% instead of >%.0f%% would exclude %d cells, not %d - "
           "the threshold matters)" % (100 * AREAL_EXCLUSION, alt, ex_urb.sum()))
+    if "river_fraction" in ds:
+        riv = ds.river_fraction.values
+        print("     (HydroSHEDS riparian corridor: %.3f%% of the mean cell, max "
+              "%.2f%% - at 0.1 deg a 200 m corridor is 1.8%% of a cell width, so "
+              "it cannot bind an areal-majority rule)"
+              % (100 * riv.mean(), 100 * riv.max()))
     steep = (ds.slope_frac_gt15.values > 0.2) & inzw
     print("     (cells with >20%% of their AREA above 15 deg: %d, of which %.0f%% "
           "east of 32E - the Eastern Highlands the slope exclusion does not reach)"
@@ -213,7 +237,17 @@ def main():
     schemes = build_schemes()
     out = xr.Dataset(coords={"lat": ds.lat, "lon": ds.lon})
     tiers = {}
-    print("\nweighting schemes:")
+
+    # Every period is standardised on the SAME min-max range as the present, so
+    # the tiers mean the same thing across periods. Rescaling each period by its
+    # own range would hide the change entirely: a uniformly brighter future
+    # would re-normalise back to the same scores.
+    ref = ds[ghi_source].values
+    lo, hi = np.nanmin(ref[keep]), np.nanmax(ref[keep])
+    print("\nGHI standardised on the present range %.1f..%.1f W m-2 for every period"
+          % (lo, hi))
+
+    print("\nweighting schemes (present):")
     for name, wts in schemes.items():
         assert abs(sum(wts.values()) - 1) < 1e-9, name
         si = sum(wts[c] * S[c] for c in CRITERIA)
@@ -225,6 +259,35 @@ def main():
         out["tier_" + key] = (("lat", "lon"), t)
         print("  %-24s SI %.3f mean on retained | very high %d, high %d"
               % (name, si[keep].mean(), (t == 0).sum(), (t == 1).sum()))
+
+    print("\nall periods under the primary AHP weights:")
+    w = schemes["AHP (primary)"]
+    rows = []
+    for tag, var in periods:
+        g = np.clip((ds[var].values - lo) / (hi - lo), 0, 1)
+        si = sum(w[c] * (g if c == "ghi" else S[c]) for c in CRITERIA)
+        si = np.where(excluded, 0.0, si)
+        t = classify(si, excluded)
+        out["si_" + tag] = (("lat", "lon"), si)
+        out["tier_" + tag] = (("lat", "lon"), t)
+        rows.append(dict(period=tag, mean_ghi=float(ds[var].values[keep].mean()),
+                         mean_si=float(si[keep].mean()),
+                         very_high=int((t == 0).sum()), high=int((t == 1).sum())))
+        print("  %-30s GHI %6.2f | SI %.4f | very high %4d | high %4d"
+              % (tag, rows[-1]["mean_ghi"], rows[-1]["mean_si"],
+                 rows[-1]["very_high"], rows[-1]["high"]))
+    pd.DataFrame(rows).to_csv(os.path.join(OUT_DIR, "suitability_by_period.csv"),
+                              index=False)
+
+    # change, taken ERA5-basis against ERA5-trained projections
+    base = out["si_present_era5_basis"].values
+    print("\nchange in SI against the ERA5-basis present (same measurement system):")
+    for tag, _ in periods:
+        if tag.startswith("ssp"):
+            d_si = out["si_" + tag].values - base
+            out["dsi_" + tag] = (("lat", "lon"), d_si)
+            print("  %-30s mean %+.4f | cells improving %5d of %d"
+                  % (tag, d_si[keep].mean(), int((d_si[keep] > 0).sum()), keep.sum()))
 
     prim = tiers["AHP (primary)"]
     print("\nCohen's kappa against the AHP classification (retained cells):")

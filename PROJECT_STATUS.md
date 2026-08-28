@@ -121,6 +121,7 @@ The retained domain is narrower than Chapter 3's nominal box (15.0–22.5°S, 25
 | `compute_feature_importance.py` | RF MDI + permutation, XGBoost gain + cover |
 | `compute_rolling_origin.py` | Rolling-origin evaluation across 4 expanding-window folds (C3) |
 | `compute_bootstrap_ci.py` | Paired year-block bootstrap: CIs on Table 3.3 and on model differences |
+| `make_suitability_maps.py` | §3.9 map figures 07–10, exclusions drawn off the score ramp |
 | `compare_sarah_era5.py` | SARAH against the ERA5-derived GHI over 1985–2024, on the target grid. Resumable: caches each month as it interpolates, after an OS update killed a 25-minute run that held everything in memory |
 | `build_suitability_layers.py` | §3.9 criterion layers and exclusion mask on the 0.1° grid |
 | `compute_suitability.py` | §3.9 AHP weighting, WLC, five-tier classification, four-scheme sensitivity |
@@ -879,7 +880,36 @@ Both scripts now run. `build_suitability_layers.py` writes 19 layers on the 71 x
 
 **Only 42 cells (1.8% of retained) are very high or high under all four schemes; 90.8% change tier under at least one.** Equal weighting agrees with the AHP classification *worse than chance*. §3.9.6 was written to measure this and did not anticipate the answer being this stark. **The defensible output is the 42-cell robust set, not the headline five-tier map** — which is exactly what §3.9.6's "robustly suitable" designation exists to produce, and it should be presented that way in Chapter 4 rather than as a caveat to a map.
 
-**Deviations still open.** §3.9.2 names the HydroSHEDS river network for riparian exclusion alongside ESA CCI water; HydroSHEDS is not yet held, so the water exclusion is ESA CCI only. `download_suitability_data.py --only hydrosheds` fetches HydroRIVERS v10 (Africa) when a network is available.
+**HydroSHEDS is now held and wired in, and it changes one cell.** HydroRIVERS v10 (Africa, 103 MB) gives 40,016 reaches in the box, 3,049 of flow order ≤ 5. A 200 m corridor — 100 m either side of those centrelines — covers **0.239% of the mean cell, at most 4.76%**, so under the areal-majority rule it excludes nothing on its own and moves the water total from 110 to 111. That is the honest outcome and it makes §3.9.2 true rather than aspirational: at 0.1° a 200 m corridor is 1.8% of a cell width, so riparian exclusion is a site-selection constraint, not a screening one. Same shape of finding as the slope exclusion, and for the same reason — the rule is sound at its native scale and cannot bind at 11 km.
+
+*The download needed a User-Agent header: `data.hydrosheds.org` answers HEAD but returns 403 to `urllib`'s default UA while serving the identical URL to curl. `fetch()` now identifies itself, which helps every dataset in that script.*
+
+**The maps.** `make_suitability_maps.py` writes four figures: `07_suitability_criteria` (seven layers plus the exclusion mask), `08_suitability_primary` (SI and the five tiers), `09_suitability_schemes` (four weightings and the robust set), `10_suitability_periods` (SI by period and ΔSI). Excluded land is drawn in flat grey rather than on the score ramp — putting exclusions on the same colour scale as poor sites is the commonest way a suitability map misleads.
+
+The pattern is geographically coherent: high suitability follows the central watershed where the Harare–Bulawayo road and grid corridors run, with the Eastern Highlands and the south-east scoring low. **Best cell SI 0.838 at 29.8°E, 18.9°S** — the Kadoma–Chegutu stretch of that corridor — and the top twelve cluster along the central-western axis between 26.2° and 30.1°E.
+
+### The future-period maps are weaker than they look, and should be labelled as such
+
+All six projections improve **2,386 of 2,386 retained cells**. Not most — every one, in every scenario. That is not a bug, and that is the problem: **only the GHI layer varies by period.** Slope, land cover, roads, grid, settlements and population are all frozen at present values, so the change reduces to
+
+    ΔSI = 0.358 × Δ(GHI score)
+
+and since projected irradiance rises almost everywhere, suitability rises everywhere. The future map carries no information the irradiance projection did not already contain, rescaled by the GHI weight.
+
+| Period | mean GHI | mean SI | very high | high |
+|---|---|---|---|---|
+| present (SARAH) | 242.83 | 0.5712 | 21 | 986 |
+| present (ERA5 basis) | 235.75 | 0.5136 | 2 | 370 |
+| SSP2-4.5 near | 240.48 | 0.5521 | 14 | 703 |
+| SSP2-4.5 long | 244.87 | 0.5878 | 37 | 1,140 |
+| SSP5-8.5 near | 241.37 | 0.5594 | 20 | 780 |
+| SSP5-8.5 long | 246.83 | 0.6038 | 65 | 1,274 |
+
+Two consequences for Chapter 4. **The rise in "very high" counts from 21 to 65 is threshold crossing, not relocation** — the ordering of cells barely changes, everything drifts upward together. And presenting these as "where Zimbabwe should site solar in 2100" would overclaim, because it assumes the 2100 grid, road network and population are those of 2020, in a country expected to add substantially to all three. **The defensible claim is how much the resource improves at today's viable sites, not where tomorrow's best sites will be** — the second question needs infrastructure and population scenarios this study does not have.
+
+Note also the present row: **SI 0.5712 on SARAH against 0.5136 on the ERA5 basis, with 21 very-high cells against 2.** The §7.17 layer decision shows up directly in the headline numbers, which is further confirmation it was consequential rather than cosmetic.
+
+All periods are standardised on the **present** min-max range rather than each on its own, deliberately: rescaling each period by its own range would hide the change entirely, since a uniformly brighter future would normalise back to identical scores.
 
 **One scoping fact worth stating in Chapter 4.** Only **57.2%** of the rectangular analysis box lies inside Zimbabwe; the rest is Zambia, Mozambique and Botswana. The effective domain is ~3,291 cells, not 5,751, which is why "outside Zimbabwe" is the largest single exclusion.
 

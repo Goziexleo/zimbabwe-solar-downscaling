@@ -75,6 +75,14 @@ LC_WATER = {160, 170, 180, 210}
 SLOPE_EXCLUDE_DEG = 15.0
 URBAN_BUFFER_KM = 1.0
 
+# Section 3.9.2 excludes "riparian zones wider than 200 m" using HydroSHEDS.
+# HydroRIVERS carries no channel width, so the corridor is defined from flow
+# order: ORD_FLOW runs 1 (largest) to 10 (smallest), and reaches of order 5 or
+# better carry the discharge for which a corridor of this width is plausible.
+# 200 m TOTAL means 100 m either side of the centreline.
+RIVER_ORD_FLOW_MAX = 5
+RIVER_HALF_WIDTH_M = 100.0
+
 
 def target_grid():
     d = xr.open_dataset(os.path.join(PROC, "ml_ready/ml_validation_dataset.nc"))
@@ -197,6 +205,40 @@ def landcover_layers(lat, lon):
     return score, urban, water
 
 
+def river_fraction(lat, lon, gx, gy):
+    """Fraction of each cell inside the riparian corridor of a major river.
+
+    Expected to be ~0 everywhere, and that is the point: a 200 m corridor is
+    1.8 per cent of an 11 km cell, so at 0.1 degrees this exclusion cannot bind
+    under an areal-majority rule. Measuring it is what lets Section 3.9.2 say
+    HydroSHEDS was used and say honestly what it contributed.
+    """
+    import geopandas as gpd
+    shp = glob.glob(os.path.join(RAW, "hydrosheds/**/*.shp"), recursive=True)
+    if not shp:
+        print("  no HydroRIVERS - riparian exclusion skipped")
+        return None
+    riv = gpd.read_file(shp[0], bbox=(24.5, -22.5, 33.5, -14.5))
+    big = riv[riv.ORD_FLOW <= RIVER_ORD_FLOW_MAX]
+    print("  HydroRIVERS: %d reaches in the box, %d of flow order <= %d"
+          % (len(riv), len(big), RIVER_ORD_FLOW_MAX))
+    if big.empty:
+        return np.zeros((len(lat), len(lon)))
+    corridor = big.to_crs(AEQD).geometry.buffer(RIVER_HALF_WIDTH_M).union_all()
+    _, _, step = _cell_edges(lat)
+    cell_m = step * 111320.0
+    out = np.zeros((len(lat), len(lon)))
+    from shapely.geometry import box as _box
+    for a_ in range(len(lat)):
+        for b_ in range(len(lon)):
+            cell = _box(gx[a_, b_] - cell_m / 2, gy[a_, b_] - cell_m / 2,
+                        gx[a_, b_] + cell_m / 2, gy[a_, b_] + cell_m / 2)
+            out[a_, b_] = cell.intersection(corridor).area / cell.area
+    print("  riparian corridor covers %.4f%% of the mean cell (max %.2f%%)"
+          % (100 * out.mean(), 100 * out.max()))
+    return out
+
+
 def population(lat, lon):
     """WorldPop head count summed into each 0.1 deg cell."""
     import rasterio
@@ -313,6 +355,11 @@ def main():
     sxy = _to_xy(settle)
     ds["dist_settlements"] = (("lat", "lon"), distance_km(
         np.column_stack([sxy.geometry.x, sxy.geometry.y]), gx, gy))
+
+    print("rivers ...")
+    rf = river_fraction(lat, lon, gx, gy)
+    if rf is not None:
+        ds["river_fraction"] = (("lat", "lon"), rf)
 
     print("protected areas and national boundary ...")
     wdpa = gpd.read_file(os.path.join(RAW, "protected areas/WDPA_ZWE_polygons.gpkg"))

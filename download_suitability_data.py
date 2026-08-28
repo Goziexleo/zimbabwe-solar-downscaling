@@ -63,6 +63,13 @@ LANDCOVER_PAGE = ("https://cds.climate.copernicus.eu/datasets/"
                   "satellite-land-cover?tab=download")
 
 
+# Some hosts (data.hydrosheds.org among them) reject urllib's default
+# User-Agent with a 403 while serving the same URL to curl. The files are
+# public; this only stops the request looking like an unidentified bot.
+UA = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X) "
+                    "MSc-solar-downscaling/1.0 (academic research)"}
+
+
 def human(n):
     return "%.1f MB" % (n / 1048576.0) if n else "unknown size"
 
@@ -72,7 +79,7 @@ def fetch(url, dest, label):
     os.makedirs(os.path.dirname(dest), exist_ok=True)
     have = os.path.getsize(dest) if os.path.exists(dest) else 0
 
-    head = urllib.request.Request(url, method="HEAD")
+    head = urllib.request.Request(url, method="HEAD", headers=UA)
     try:
         with urllib.request.urlopen(head, timeout=60) as r:
             total = int(r.headers.get("Content-Length") or 0)
@@ -88,7 +95,7 @@ def fetch(url, dest, label):
         os.remove(dest)
         have = 0
 
-    req = urllib.request.Request(url)
+    req = urllib.request.Request(url, headers=dict(UA))
     if have:
         req.add_header("Range", "bytes=%d-" % have)
         print("  resuming %s at %s of %s" % (label, human(have), human(total)))
