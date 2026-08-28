@@ -10,12 +10,31 @@ present-day irradiance layer, and there are two candidates - the ERA5-derived
 climatology the models reproduce, and SARAH. Picking one without measuring the
 gap would put an unexamined choice underneath every suitability map.
 
+It is RESUMABLE. Each month's interpolated field is cached to disk as it is
+computed, so an interruption costs one month rather than the whole run - the
+first attempt at this lost twenty-five minutes to an OS update because it held
+everything in memory and wrote nothing until the end. Re-running picks up from
+whatever is already cached. The interpolation itself is deliberately left as it
+is; this is about surviving interruption, not about going faster.
+
 Two grid facts matter. SARAH is cell-centred (25.025, 25.075, ...) while the
 target grid is node-centred (25.0, 25.1, ...), so NONE of the coordinates
-coincide and this interpolates rather than block-averages. And the order was
-placed without margin, so the target perimeter - 300 of 5,751 cells - lies
-0.025 degrees outside SARAH's cell-centre hull; those cells are reported
-separately rather than silently extrapolated.
+coincide and this interpolates rather than block-averages.
+
+And the order was placed without margin, so the target perimeter - 300 of 5,751
+cells - lies 0.025 degrees outside the RANGE OF SARAH CELL CENTRES. This is not
+missing data. The SARAH cell centred on 25.025 spans 25.00 to 25.05, so it
+physically covers the target node at 25.0; linear interpolation simply will not
+extrapolate the last half cell. Those nodes are therefore clamped to the nearest
+interior value, which for a cell-centred field is not an approximation but the
+correct answer: the node lies inside that cell. Half a degree of margin on the
+order would have avoided the question.
+
+One month is dropped rather than clamped. 1985-02 is 23.5 per cent NaN at native
+resolution and is built from about 21 daily averages, so its gaps are real
+retrieval gaps across the interior, not the edge artefact. Left in, it alone
+dragged apparent whole-record coverage from 94.8 to 72.5 per cent through an
+any-NaN test.
 
     python compare_sarah_era5.py
 """
@@ -35,6 +54,19 @@ ROOT = os.path.dirname(os.path.abspath(__file__))
 PROC = os.path.join(ROOT, "data/processed")
 OUT_NC = os.path.join(PROC, "evaluation/sarah_era5_comparison.nc")
 OUT_CSV = os.path.join(PROC, "evaluation/sarah_era5_monthly.csv")
+CACHE = os.path.join(PROC, "evaluation/_sarah_regrid_cache")
+# 23.5% NaN at native resolution, ~21 daily averages behind it
+DROP_MONTHS = {"1985-02"}
+
+
+def clamp_edges(a):
+    """Fill NaN from the nearest valid cell. See the note on the perimeter."""
+    from scipy.ndimage import distance_transform_edt
+    bad = np.isnan(a)
+    if not bad.any():
+        return a
+    _, (iy, ix) = distance_transform_edt(bad, return_indices=True)
+    return a[iy, ix]
 
 
 def era5_ghi_stack():
@@ -58,19 +90,45 @@ def era5_ghi_stack():
 
 
 def sarah_stack(lat, lon):
+    """One interpolated field per month, cached to disk as it goes."""
+    os.makedirs(CACHE, exist_ok=True)
     files = sorted(glob.glob(os.path.join(ROOT, "data/raw/sarah/SISmm*.nc")))
     stamp = lambda f: pd.Timestamp(re.search(r"SISmm(\d{8})", f).group(1))
-    d = xr.open_mfdataset(files, combine="nested", concat_dim="time",
-                          preprocess=lambda x: x[["SIS"]])
-    d = d.assign_coords(time=pd.DatetimeIndex([stamp(f) for f in files]))
-    print("  SARAH stack %s -> interpolating to the target grid" % (d.SIS.shape,))
-    return d.SIS.interp(lat=lat, lon=lon, method="linear").compute()
+    times, fields = [], []
+    cached = done = 0
+    for n, f in enumerate(files, 1):
+        ts = stamp(f)
+        if ts.strftime("%Y-%m") in DROP_MONTHS:
+            continue
+        cp = os.path.join(CACHE, "%s.npy" % ts.strftime("%Y-%m"))
+        if os.path.exists(cp):
+            fields.append(np.load(cp)); cached += 1
+        else:
+            with xr.open_dataset(f) as d:
+                v = d["SIS"].interp(lat=lat, lon=lon,
+                                    method="linear").values.squeeze()
+            np.save(cp, v.astype(np.float32))
+            fields.append(v); done += 1
+            if done % 20 == 0:
+                print("    interpolated %d new (%d/%d files)" % (done, n, len(files)),
+                      flush=True)
+        times.append(ts)
+    print("  SARAH: %d months (%d from cache, %d newly interpolated, %d dropped)"
+          % (len(fields), cached, done, len(DROP_MONTHS)), flush=True)
+    arr = np.array(fields)
+    n_edge = int(np.isnan(arr[0]).sum())
+    arr = np.array([clamp_edges(x) for x in arr])
+    print("  clamped %d perimeter cells per month (half-cell, ~2.8 km)"
+          % n_edge, flush=True)
+    return xr.DataArray(arr,
+                        coords={"time": pd.DatetimeIndex(times), "lat": lat, "lon": lon},
+                        dims=("time", "lat", "lon"))
 
 
 def main():
     era5 = era5_ghi_stack()
     lat, lon = era5.lat.values, era5.lon.values
-    print("ERA5-derived stack:", era5.shape)
+    print("ERA5-derived stack:", era5.shape, flush=True)
     sar = sarah_stack(lat, lon)
 
     # month-end (ERA5) against month-start (SARAH): align on calendar month
@@ -79,7 +137,7 @@ def main():
     sar = sar.assign_coords(ym=("time", pd.PeriodIndex(
         pd.DatetimeIndex(sar.time.values), freq="M").astype(str)))
     common = sorted(set(era5.ym.values) & set(sar.ym.values))
-    print("  months in common: %d (%s .. %s)" % (len(common), common[0], common[-1]))
+    print("  months in common: %d (%s .. %s)" % (len(common), common[0], common[-1]), flush=True)
     e = era5.isel(time=[list(era5.ym.values).index(m) for m in common]).values
     s = sar.isel(time=[list(sar.ym.values).index(m) for m in common]).values
 

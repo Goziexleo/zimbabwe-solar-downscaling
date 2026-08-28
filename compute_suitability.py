@@ -64,6 +64,17 @@ PAIRWISE = {
 RI = [0, 0, 0.58, 0.90, 1.12, 1.24, 1.32, 1.41, 1.45, 1.49]
 
 D_REF_KM = {"roads": 10.0, "grid": 10.0, "settlements": 5.0}
+
+# One rule for every areal exclusion: a 0.1 degree cell is excluded when MORE
+# THAN HALF its area falls in an excluded category. The first version of this
+# used > 0.5 for protected areas and water but > 0.0 for urban, which was an
+# arbitrary asymmetry rather than a decision. The threshold is defensible at
+# this resolution: a cell is about 121 km2 and a utility-scale plant needs
+# roughly 2 to 5 km2, so a minority of excluded land still leaves ample room and
+# belongs in the SCORE rather than in a disqualification. Section 3.9.2's
+# categories are all areal, so they all take the same test.
+AREAL_EXCLUSION = 0.5
+SLOPE_EXCLUDE_DEG = 15.0
 TIERS = [("very high", 0.75), ("high", 0.60), ("moderate", 0.45), ("low", 0.30)]
 
 SCHEMES = {
@@ -155,11 +166,19 @@ def main():
     print("\nirradiance layer: %s" % ghi_source)
 
     # ---- exclusion mask (Section 3.9.2) ----
-    inzw = ds.in_zimbabwe.values > 0.5
-    ex_pa = ds.protected_fraction.values > 0.5
-    ex_urb = ds.urban_fraction.values > 0.0
-    ex_slope = ds.slope.values > 15.0
-    ex_water = ds.water_fraction.values > 0.5
+    inzw = ds.in_zimbabwe.values > AREAL_EXCLUSION
+    ex_pa = ds.protected_fraction.values > AREAL_EXCLUSION
+    ex_urb = ds.urban_fraction.values > AREAL_EXCLUSION
+    ex_water = ds.water_fraction.values > AREAL_EXCLUSION
+    # Section 3.9.2 as written: cell-mean slope above 15 degrees. Kept literal
+    # rather than retuned. At 0.1 degrees it excludes almost nothing, because
+    # averaging over 121 km2 smooths every peak - the 95th percentile cell-mean
+    # slope inside Zimbabwe is 7.3 degrees. Changing the rule after seeing that
+    # it barely binds would be tuning the method to produce a wanted outcome.
+    # The Eastern Highlands are handled by the slope CRITERION at weight 0.20,
+    # not by the exclusion, and Section 3.9.2's claim about them is corrected
+    # rather than the threshold being moved.
+    ex_slope = ds.slope.values > SLOPE_EXCLUDE_DEG
     excluded = (~inzw) | ex_pa | ex_urb | ex_slope | ex_water
     if ghi_source in ds:
         excluded |= np.isnan(ds[ghi_source].values)
@@ -170,6 +189,13 @@ def main():
         print("  %-18s %5d  %5.1f%%" % (name, m.sum(), 100 * m.sum() / m.size))
     print("  %-18s %5d  %5.1f%%  <- union" % ("EXCLUDED", excluded.sum(),
                                               100 * excluded.sum() / excluded.size))
+    alt = (ds.urban_fraction.values > 0.0).sum()
+    print("     (urban at >0%% instead of >%.0f%% would exclude %d cells, not %d - "
+          "the threshold matters)" % (100 * AREAL_EXCLUSION, alt, ex_urb.sum()))
+    steep = (ds.slope_frac_gt15.values > 0.2) & inzw
+    print("     (cells with >20%% of their AREA above 15 deg: %d, of which %.0f%% "
+          "east of 32E - the Eastern Highlands the slope exclusion does not reach)"
+          % (steep.sum(), 100 * (np.meshgrid(ds.lon.values, ds.lat.values)[0][steep] > 32).mean()))
     keep = ~excluded
     print("  %-18s %5d  %5.1f%%" % ("retained", keep.sum(), 100 * keep.sum() / keep.size))
 

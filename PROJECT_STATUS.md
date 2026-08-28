@@ -121,6 +121,9 @@ The retained domain is narrower than Chapter 3's nominal box (15.0–22.5°S, 25
 | `compute_feature_importance.py` | RF MDI + permutation, XGBoost gain + cover |
 | `compute_rolling_origin.py` | Rolling-origin evaluation across 4 expanding-window folds (C3) |
 | `compute_bootstrap_ci.py` | Paired year-block bootstrap: CIs on Table 3.3 and on model differences |
+| `compare_sarah_era5.py` | SARAH against the ERA5-derived GHI over 1985–2024, on the target grid. Resumable: caches each month as it interpolates, after an OS update killed a 25-minute run that held everything in memory |
+| `build_suitability_layers.py` | §3.9 criterion layers and exclusion mask on the 0.1° grid |
+| `compute_suitability.py` | §3.9 AHP weighting, WLC, five-tier classification, four-scheme sensitivity |
 | `compare_sarah_clearsky.py` | Compares the PVLIB clear-sky ceiling against SARAH's `SISC` by calendar month. The near-constant 1.724 ratio is the evidence for §7.15 |
 | `compute_bca_centred_rmse.py` | **BCa intervals** on the paired differences. Required because the percentile interval is invalid for centred RMSE, whose bootstrap distribution is biased by construction. Reports percentile, basic and BCa side by side. |
 | `check_status_consistency.py` | Guards this document against stale numbers; run by `pytest` |
@@ -517,9 +520,41 @@ Across all twelve months the ratio is **1.724, sd 0.0326, range 1.670–1.780** 
 
 **Not yet done:** rebuilding the ceiling on a 24-hour basis. It would change no reported number, since it cancels, so it is cosmetic for the product and worth doing only when §3.5.4 is next revised. **SARAH's `SISC` is now the better reference** if it is rebuilt.
 
-### 7.16 First independent signal: ERA5 sits below SARAH
+### 7.16 ERA5 sits 3.0% below SARAH, and the gap has a seasonal cycle
 
-Preliminary and not a result. For January 2021, domain mean, the ERA5-derived GHI is **206.86 W m⁻²** against SARAH's **237.61** — about **13% low**. One month, one statistic, no spatial or temporal analysis behind it. It is recorded because it is the first quantity in this project measured against something that is not ERA5, and because §14.1 turns on exactly this comparison.
+The first quantity in this project measured against something that is not ERA5. Full record, 479 months over 1985–2024, all 5,751 cells (`compare_sarah_era5.py` → `sarah_era5_comparison.nc`).
+
+| | |
+|---|---|
+| ERA5-derived mean | 237.92 W m⁻² |
+| SARAH mean | 245.27 W m⁻² |
+| **bias (ERA5 − SARAH)** | **−7.35 W m⁻² (−3.0%)** |
+| RMSE | 13.37 |
+| spatial-mean correlation | 0.9800 |
+| bias range across cells | −20.88 to +14.40 W m⁻² |
+
+**An earlier version of this section reported 13% low, from January 2021 alone.** That month was unrepresentative; the whole-record figure is 3.0%. The lesson is the ordinary one about single-month statistics, and it is recorded rather than quietly overwritten.
+
+**The gap is seasonal, not a constant offset.** The ERA5/SARAH ratio runs 0.94–0.96 from January to July, rises through August and September, and **crosses above one in October and November** (1.011, 1.025). ERA5 understates the wet-season resource and slightly overstates the late dry season.
+
+**Two coverage points, both about grid geometry rather than data.** SARAH is cell-centred (25.025, …) and the target grid is node-centred (25.0, …), so the outer ring of 300 cells falls 0.025° beyond the range of SARAH cell centres and linear interpolation will not extrapolate. That is not missing data — the SARAH cell centred at 25.025 spans 25.00–25.05 and physically contains the target node — so those cells are **clamped to the nearest interior value**, which for a cell-centred field is the correct answer rather than an approximation. Half a degree of margin on the CM SAF order would have avoided the question. Separately, **1985-02 is dropped**: 23.5% NaN at native resolution, built from about 21 daily averages, with real interior gaps. Left in, that one month dragged apparent whole-record coverage from 94.8% to 72.5% through an any-NaN test.
+
+### 7.17 The present-day suitability layer must be SARAH, and the reason is not the bias
+
+§3.9 needs a present-day irradiance layer, and the choice looked presentational. The argument for ERA5 is that the projections come from an ERA5-trained chain, so present-to-future *change* must stay inside one measurement system or it differences two instruments and calls the difference climate. That argument is correct — **for change**.
+
+It does not carry to a present-day siting map, and the expected escape route turns out to be closed. **The offset is spatially near-uniform** — ratio sd 0.0142, range 0.919 to 1.067 — which suggested it would cancel under §3.9.3's min-max normalisation and leave the ranking untouched. **It does not.** Min-max rescales by the *range*, so it amplifies exactly the small spatial structure the ratio sd conceals:
+
+| | |
+|---|---|
+| Spearman ρ of the min-max GHI score | **0.860** |
+| mean absolute score difference | 0.170 |
+| cells crossing the 0.75 tier threshold | **1,485 (27.2%)** |
+| cells crossing 0.60 | 2,503 (45.9%) |
+
+Nearly half the domain changes tier on the irradiance criterion alone. **So the layer choice is a methodological decision, not a presentational one**, and defaulting to ERA5 without measuring it would have put an unexamined choice under every suitability map.
+
+**Resolution: SARAH for the present-day map** — an independent retrieval at 0.05°, finer than the target grid, over a region where reanalysis is weakest. **ERA5-derived for present-to-future change**, so the change signal stays within one measurement system. `build_suitability_layers.py` writes both and `compute_suitability.py` prefers SARAH.
 
 ### 7.6 Cross-validation selected worse hyperparameters
 A 150-cell subsampled CV search picked configurations for both tree models that underperformed the untuned defaults on the full 5,751-cell holdout. Defaults retained. The search's own scores gave no warning.
@@ -814,10 +849,46 @@ Under **git** since the second audit: 61 files tracked, two commits, `data/` exc
 
 ---
 
+## 12a. Section 3.9 suitability analysis — first end-to-end run
+
+Both scripts now run. `build_suitability_layers.py` writes 19 layers on the 71 x 81 grid; `compute_suitability.py` does the AHP weighting, the overlay, the five-tier classification and the four-scheme sensitivity. **AHP CR 0.0076**, reconstructed weights within **0.008** of Table 3.5 on every criterion. Irradiance layer: **SARAH** (§7.17).
+
+**Exclusions.** One rule for every areal category — a cell is excluded when more than half its area falls in it. The first version used `> 0.5` for protected areas and water but `> 0.0` for urban, which was an accident rather than a decision; the threshold is justifiable at this resolution because a cell is ~121 km² and a utility-scale plant needs 2–5 km², so a minority of excluded land belongs in the score rather than in a disqualification. It matters: **urban at `>0%` excludes 537 cells, at `>50%` it excludes 22.**
+
+| Category | Cells | % |
+|---|---|---|
+| outside Zimbabwe | 2,460 | 42.8 |
+| protected area | 895 | 15.6 |
+| water | 110 | 1.9 |
+| urban (incl. 1 km buffer) | 22 | 0.4 |
+| **slope > 15°** | **2** | **0.0** |
+| **retained** | **2,386** | **41.5** |
+
+**The 1 km urban buffer was specified in §3.9.2 and had never been implemented.** It is applied at the 300 m land-cover resolution, where 1 km is a radius of about 3.3 pixels and means something; applying it after aggregation to 0.1° would be meaningless, since a cell is 11 km across. Urban coverage rises from 0.201% to 0.802% of pixels.
+
+**The slope exclusion does not bind, and the threshold was deliberately not retuned.** At 0.1° a cell is ~121 km², so averaging 90 m slope smooths every face: the 95th percentile of cell-mean slope inside Zimbabwe is 7.3°, and 2 cells exceed 15°. §3.9.2 claimed the exclusion "disproportionately affects the Eastern Highlands" — it does not. Lowering the threshold after seeing it barely bites would be tuning the method toward a wanted outcome, so **the chapter's claim was corrected instead of the rule**. The relief is in the data rather than absent from it: 81 cells have more than 20% of their area above 15°, and 80% of those lie east of 32°E. The Eastern Highlands are penalised through the slope *criterion* at weight 0.20, not through the exclusion.
+
+**The classification is far more weight-sensitive than §3.9.6 anticipated.**
+
+| Scheme | mean SI | very high | high | Cohen's κ vs AHP |
+|---|---|---|---|---|
+| AHP (primary) | 0.571 | 21 | 986 | — |
+| irradiance-dominant | 0.593 | 47 | 1,264 | 0.697 |
+| infrastructure-dominant | 0.512 | 27 | 391 | 0.317 |
+| **equal** | 0.417 | 2 | 40 | **−0.111** |
+
+**Only 42 cells (1.8% of retained) are very high or high under all four schemes; 90.8% change tier under at least one.** Equal weighting agrees with the AHP classification *worse than chance*. §3.9.6 was written to measure this and did not anticipate the answer being this stark. **The defensible output is the 42-cell robust set, not the headline five-tier map** — which is exactly what §3.9.6's "robustly suitable" designation exists to produce, and it should be presented that way in Chapter 4 rather than as a caveat to a map.
+
+**Deviations still open.** §3.9.2 names the HydroSHEDS river network for riparian exclusion alongside ESA CCI water; HydroSHEDS is not yet held, so the water exclusion is ESA CCI only. `download_suitability_data.py --only hydrosheds` fetches HydroRIVERS v10 (Africa) when a network is available.
+
+**One scoping fact worth stating in Chapter 4.** Only **57.2%** of the rectangular analysis box lies inside Zimbabwe; the rest is Zambia, Mozambique and Botswana. The effective domain is ~3,291 cells, not 5,751, which is why "outside Zimbabwe" is the largest single exclusion.
+
+---
+
 ## 13. Outstanding
 
 **Not started**
-- **§3.9 Multi-Criteria Suitability Analysis** — the largest remaining piece. Data acquisition is now partly done (`download_suitability_data.py`); the analysis itself is not started.
+- **§3.9 Multi-Criteria Suitability Analysis** — data acquisition complete and **the analysis now runs end to end (§12a)**. What remains is the maps themselves, the future-period suitability (the present-day run is done), and writing it into Chapter 4.
 
   | Criterion | Source | State |
   |---|---|---|

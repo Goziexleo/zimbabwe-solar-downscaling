@@ -105,7 +105,15 @@ def sarah_present(lat, lon):
     target 0.025 degrees outside SARAH's cell-centre hull. Left as NaN rather
     than extrapolated so the suitability step has to decide what to do about it.
     """
-    import re
+    # compare_sarah_era5.py already interpolates the whole record onto this
+    # grid and saves the climatology as sarah_mean. Reuse it rather than
+    # repeating 480 interpolations for the same answer.
+    cmp_nc = os.path.join(PROC, "evaluation/sarah_era5_comparison.nc")
+    if os.path.exists(cmp_nc):
+        d = xr.open_dataset(cmp_nc)
+        if np.allclose(d.lat.values, lat) and np.allclose(d.lon.values, lon):
+            print("  SARAH present reused from sarah_era5_comparison.nc")
+            return d.sarah_mean.values
     files = sorted(glob.glob(os.path.join(RAW, "sarah/SISmm*.nc")))
     if not files:
         print("  no SARAH files - skipping the SARAH present layer")
@@ -147,8 +155,22 @@ def landcover_layers(lat, lon):
     for k, s in LC_SCORE.items():
         lut[k] = s
     score_px = lut[np.clip(v, 0, 255)]
-    urban_px = np.isin(v, list(LC_URBAN)).astype(np.float32)
     water_px = np.isin(v, list(LC_WATER)).astype(np.float32)
+
+    # Section 3.9.2 excludes urban pixels "plus a 1 km buffer". The buffer is
+    # applied here at the land-cover resolution, where it is meaningful: 300 m
+    # pixels, so 1 km is a radius of about 3.3 pixels. Doing it after
+    # aggregation to 0.1 degrees would be meaningless, since one cell is 11 km.
+    from scipy.ndimage import binary_dilation
+    urban_raw = np.isin(v, list(LC_URBAN))
+    px_m = 300.0
+    r = int(np.ceil(URBAN_BUFFER_KM * 1000.0 / px_m))
+    yy, xx = np.ogrid[-r:r + 1, -r:r + 1]
+    disk = (yy ** 2 + xx ** 2) <= r ** 2
+    urban_buf = binary_dilation(urban_raw, structure=disk)
+    print("   urban %0.3f%% of pixels, %0.3f%% after the %.0f km buffer"
+          % (100 * urban_raw.mean(), 100 * urban_buf.mean(), URBAN_BUFFER_KM))
+    urban_px = urban_buf.astype(np.float32)
 
     lat0, lat1, _ = _cell_edges(lat)
     lon0, lon1, _ = _cell_edges(lon)

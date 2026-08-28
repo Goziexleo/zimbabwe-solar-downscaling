@@ -52,6 +52,10 @@ WORLDPOP = ("https://data.worldpop.org/GIS/Population/"
 # GeoPackage rather than the smaller shapefile zip: one file carries every admin
 # level, and nothing gets truncated to the shapefile's 10-character field names.
 GADM = "https://geodata.ucdavis.edu/gadm/gadm4.1/gpkg/gadm41_ZWE.gpkg"
+# HydroRIVERS, the HydroSHEDS river network Section 3.9.2 names for riparian
+# exclusion. Africa extract; there is no country-level download.
+HYDRORIVERS = ("https://data.hydrosheds.org/file/HydroRIVERS/"
+               "HydroRIVERS_v10_af_shp.zip")
 
 # Both must be accepted once, on the dataset page, before the API will serve it.
 LANDCOVER_LICENCES = ["satellite-land-cover", "vito-proba-v"]
@@ -130,6 +134,15 @@ def get_gadm():
     return fetch(GADM, os.path.join(RAW, "gadm/gadm41_ZWE.gpkg"), "gadm41_ZWE.gpkg")
 
 
+def get_hydrorivers():
+    print("\nHydroSHEDS HydroRIVERS v10, Africa extract")
+    print("  Section 3.9.2 names this for excluding riparian zones wider than")
+    print("  200 m. Until it is held, the water exclusion uses the ESA CCI water")
+    print("  and flooded classes only, which is a documented deviation.")
+    return fetch(HYDRORIVERS, os.path.join(RAW, "hydrosheds/HydroRIVERS_v10_af_shp.zip"),
+                 "HydroRIVERS_v10_af_shp.zip")
+
+
 def get_landcover(year="2022", version="v2_1_1"):
     print("\nESA CCI Land Cover 300 m, %s (%s), subset to the domain" % (year, version))
     try:
@@ -182,7 +195,8 @@ def note_wdpa():
 
 
 JOBS = {"osm": get_osm, "worldpop": get_worldpop, "gadm": get_gadm,
-        "landcover": get_landcover, "wdpa": note_wdpa}
+        "hydrosheds": get_hydrorivers, "landcover": get_landcover,
+        "wdpa": note_wdpa}
 
 
 def main():
