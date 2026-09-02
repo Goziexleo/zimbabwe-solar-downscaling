@@ -916,6 +916,35 @@ All periods are standardised on the **present** min-max range rather than each o
 
 ---
 
+## 12b. Document audit
+
+A full cross-check of Chapters 1–4, PROJECT_STATUS, UPDATE_BRIEF and the brief against the canonical CSVs and against the code. Every headline value agrees across every document — XGBoost RMSE 9.24, RF 10.30, U-Net 10.11, CNN 10.14, skill 0.5155, R 0.9707, architecture variance 27.18%, 42 robust cells — and §3.9's full specification matches the implementation exactly: all seven Table 3.5 weights, both reference distances, all four tier boundaries, the 15° slope threshold, the 1 km urban buffer, and the five land-cover scores. What follows is what did not check out.
+
+**§3.9.3's decay function is ambiguous, and it moves the headline.** The section prints `Score = e^(−d/d_ref)` as an equation object, and separately states that the score falls below 0.14 beyond d_ref. These disagree: e⁻¹ = 0.368. The implementation follows the 0.14 statement, which needs a factor of two in the exponent. Under the formula as printed:
+
+| | `e^(−2d/d_ref)` (implemented) | `e^(−d/d_ref)` (as printed) |
+|---|---|---|
+| robust set | **42 cells (1.8%)** | **145 cells (6.1%)** |
+| very high | 21 | 54 |
+| grid proximity factor | 12.5× | 6.1× |
+| weight-sensitive | 90.8% | 87.8% |
+
+The qualitative findings survive either reading — infrastructure still dominates resource, equal weights still agree no better than chance — but **the counts do not**, and §4.8.1 now reports both rather than quoting 42 as definitive. *The gentler decay is arguably the more physical: penalising a site 10 km from transmission to a score of 0.135 is severe for utility-scale solar, where a 10 km spur is routine.* **This needs your decision, and the equation in §3.9.3 should then be made to agree with its own prose.**
+
+**Chapter 4 promised citations it does not contain.** Its closing note said the bracketed citations needed converting to Zotero fields. There are none: 0 citations, 0 `et al.`, 0 figure references, against 10 figures that exist. The note now says so plainly instead of implying the work is done.
+
+**An asserted mechanism, now backed.** §4.7 said the irradiance rise "is consistent with a projected reduction in cloud cover" without checking. It checks out — domain-mean cloud fraction falls from 38.87% (1985–2010) to 33.85% under SSP2-4.5 and 31.26% under SSP5-8.5 by 2076–2100, larger under the higher pathway and monotonic with lead time — and the numbers are now in the text rather than the assertion.
+
+**Three overclaims in Chapter 1, corrected.** The climatology was dated 1985–**2025**; the record ends 2024. "A validated high-resolution climatology" is now "a 0.1° climatology, validated against a withheld ERA5 record", since §7.2 establishes it resolves nothing below 0.25° and §4.9 establishes the validation is not independent. And §1.5's undertaking to deliver priority zones "with quantified uncertainty" is not met — the analysis delivers a weighting sensitivity analysis and a robust subset, and no uncertainty is propagated onto the index from §4.7, §4.6 or the infrastructure layers. Chapter 1 now says what is delivered; §4.9 records the shortfall.
+
+**One claim in Chapter 2 was refuted by the results.** §2.4 said higher downscaling fidelity "confirm[s] that the downscaling quality achieved in this study will propagate directly into the suitability outputs". §4.8 finds it largely does not: irradiance separates the robust set from the domain by 1.4%, grid distance by a factor of 12.5. The sentence now frames it as the empirical question it is and points to the answer.
+
+**A code comment that misdescribed its own function.** `decay()`'s docstring claimed the score is 0.135 at 2·d_ref; the implementation gives 0.135 at d_ref and 0.018 at 2·d_ref. Fixed, with the ambiguity documented at the call site.
+
+**Not defects, checked and cleared.** Chapter 3's "missing" formulas are OMML equation objects that `python-docx` cannot read, not gaps. The super-resolution framing in Chapters 1 and 2 describes the literature, not this study. And `clt` is genuinely the dominant predictor on all four importance measures (0.333 / 0.395 / 0.470 / 0.178), though the margin on XGBoost cover is slim.
+
+---
+
 ## 13. Outstanding
 
 **Not started**

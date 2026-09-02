@@ -130,9 +130,22 @@ def minmax(a, mask, invert=False):
     return np.clip(1 - s if invert else s, 0, 1)
 
 
+# Section 3.9.3 is ambiguous and the ambiguity is worth this much comment, because it
+# moves the headline result. The section prints the decay as Score = e^(-d/d_ref) but
+# also says the score falls below 0.14 beyond d_ref. Those disagree: e^-1 is 0.368, and
+# only e^(-2d/d_ref) puts d_ref at 0.135. This follows the 0.14 statement.
+#
+# It is not a free choice. Under the printed formula the robust set grows from 42 cells
+# to 145 and the highest tier from 21 to 54. The qualitative findings survive either way
+# - infrastructure still dominates resource, at a grid proximity factor of 6.1 rather
+# than 12.5, and the classification is still weight-sensitive in 87.8 per cent of cells
+# - but the counts are not robust to it, so Section 4.8.1 reports both.
+DECAY_EXPONENT_FACTOR = 2.0
+
+
 def decay(d_km, d_ref):
-    """Section 3.9.3's distance decay; at d = 2*d_ref the score is ~0.135."""
-    return np.exp(-d_km / d_ref * 2.0)
+    """e^(-2d/d_ref): the reading in which d_ref scores 0.135, per Section 3.9.3."""
+    return np.exp(-d_km / d_ref * DECAY_EXPONENT_FACTOR)
 
 
 def classify(si, excluded):
