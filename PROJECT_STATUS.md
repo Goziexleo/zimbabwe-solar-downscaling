@@ -121,7 +121,9 @@ The retained domain is narrower than Chapter 3's nominal box (15.0–22.5°S, 25
 | `compute_feature_importance.py` | RF MDI + permutation, XGBoost gain + cover |
 | `compute_rolling_origin.py` | Rolling-origin evaluation across 4 expanding-window folds (C3) |
 | `compute_bootstrap_ci.py` | Paired year-block bootstrap: CIs on Table 3.3 and on model differences |
+| `build_chapter5.py` | Generates Chapter 5 from the same CSVs as Chapter 4 |
 | `build_chapter4.py` | Generates Chapter 4 from the evaluation CSVs. Prose drifting from tables is this project's most frequent failure, so the chapter is generated rather than typed |
+| `optimise_unet.py` | Controlled U-Net sweep. Fits on 1985–2004, selects on 2005–2010, touches the withheld record once per variant. Source of §7.18 |
 | `make_suitability_maps.py` | §3.9 map figures 07–10, exclusions drawn off the score ramp |
 | `compare_sarah_era5.py` | SARAH against the ERA5-derived GHI over 1985–2024, on the target grid. Resumable: caches each month as it interpolates, after an OS update killed a 25-minute run that held everything in memory |
 | `build_suitability_layers.py` | §3.9 criterion layers and exclusion mask on the 0.1° grid |
@@ -261,7 +263,9 @@ Ullrich et al. recommend power spectra because ML emulators typically damp high 
 | CNN | 0.00259 | 1.04× | matches truth |
 | **U-Net** | **0.00021** | **0.08×** | **DAMPED** |
 
-**The U-Net damps CSI power beyond k=10 by a factor of twelve** — the Ullrich failure mode, tied to loss and architecture.
+**The U-Net damps CSI power beyond k=10 by a factor of twelve** — the Ullrich failure mode.
+
+**The cause is the dropout setting, not the loss or the architecture (§7.18).** An earlier version of this section attributed the damping to loss and architecture. A controlled sweep (`optimise_unet.py`) shows otherwise: removing `Dropout2d(0.3)`, which the deployed configuration applies eight times per level, lifts the spectral ratio from **0.085 to 0.771** while simultaneously improving held-out RMSE from 10.98 to 8.63 and spatial correlation from 0.894 to 0.970. Varying the gradient penalty instead moves the ratio hardly at all. Aggressive spatial dropout smooths the output field; that is the mechanism.
 
 **The two verdicts in that table are not equally robust, and the table alone does not show it.** `k=10` is one arbitrary cut. Sweeping it (`compute_power_spectra.py` → `effective_resolution_cut_sensitivity.csv`):
 
@@ -557,6 +561,27 @@ It does not carry to a present-day siting map, and the expected escape route tur
 Nearly half the domain changes tier on the irradiance criterion alone. **So the layer choice is a methodological decision, not a presentational one**, and defaulting to ERA5 without measuring it would have put an unexamined choice under every suitability map.
 
 **Resolution: SARAH for the present-day map** — an independent retrieval at 0.05°, finer than the target grid, over a region where reanalysis is weakest. **ERA5-derived for present-to-future change**, so the change signal stays within one measurement system. `build_suitability_layers.py` writes both and `compute_suitability.py` prefers SARAH.
+
+### 7.18 The U-Net's damping is a dropout artefact, and both neural models select on the test set
+
+Two findings from `optimise_unet.py`, a controlled sweep that fits on 1985–2004, selects on 2005–2010, and touches the withheld record once per variant.
+
+**Dropout, not loss or architecture, causes the damping.** The deployed configuration applies `Dropout2d(0.3)` eight times per encoder/decoder level. Removing it:
+
+| | deployed | dropout removed |
+|---|---|---|
+| held-out RMSE | 10.98 | **8.63** |
+| spatial correlation | 0.894 | **0.970** |
+| centred RMSE | 3.59 | **1.97** |
+| spectral ratio (k≥10) | 0.085 | **0.771** |
+
+Varying the gradient penalty barely moves the ratio, so the smoothness-prior hypothesis is refuted. Three other results from the same sweep: a per-cell climatology gives the best spatial correlation of any variant (0.993) and the worst RMSE (18.68), because it hands the network the pattern and costs it the level; reducing capacity to 1.1M parameters costs little; and every combination containing the per-cell climatology inherits its error.
+
+**`train_unet_downscaler.py` and `train_cnn_downscaler.py` both select their saved checkpoint on `ml_validation_dataset.nc`** — the withheld 2011–2024 record. The U-Net additionally early-stops and schedules its learning rate on it. This is §6.12's defect, found and fixed for XGBoost, still live in the other two. The deployed U-Net's log shows the validation curve bouncing between 0.109 and 0.140 with the checkpoint saved at the 0.1085 minimum: selecting a favourable fluctuation from ~28 draws.
+
+**Consequence.** Table 3.3's U-Net (10.11) and CNN (10.14) figures are optimistically biased and are *not* commensurable with XGBoost's 9.24, which is honestly selected. The deployment decision is unaffected — it turned on scenario discrimination, not RMSE — but the four-way comparison needs the caveat, and Chapter 4 §4.2 now carries it.
+
+**Not yet done: retraining both neural models with honest selection.** That is the actual fix. It would change Table 3.3, the Taylor statistics, the BCa intervals, the spectra and the uncertainty decomposition, so it is a deliberate decision rather than a tidy-up, and it is listed in §13.
 
 ### 7.6 Cross-validation selected worse hyperparameters
 A 150-cell subsampled CV search picked configurations for both tree models that underperformed the untuned defaults on the full 5,751-cell holdout. Defaults retained. The search's own scores gave no warning.
@@ -929,7 +954,7 @@ A full cross-check of Chapters 1–4, PROJECT_STATUS, UPDATE_BRIEF and the brief
 | grid proximity factor | 12.5× | 6.1× |
 | weight-sensitive | 90.8% | 87.8% |
 
-The qualitative findings survive either reading — infrastructure still dominates resource, equal weights still agree no better than chance — but **the counts do not**, and §4.8.1 now reports both rather than quoting 42 as definitive. *The gentler decay is arguably the more physical: penalising a site 10 km from transmission to a score of 0.135 is severe for utility-scale solar, where a 10 km spur is routine.* **This needs your decision, and the equation in §3.9.3 should then be made to agree with its own prose.**
+**RESOLVED in favour of the equation as printed.** §3.9.3's prose now states 0.37 at d_ref and below 0.14 at twice it, `DECAY_EXPONENT_FACTOR` is 1.0, and every downstream number has been regenerated. The grounds: a site 10 km from an existing line is routinely connectable for utility-scale development and should not score as though it were remote. **The robust set is therefore 145 cells, not 42**, and Chapters 4 and 5 use that throughout.
 
 **Chapter 4 promised citations it does not contain.** Its closing note said the bracketed citations needed converting to Zotero fields. There are none: 0 citations, 0 `et al.`, 0 figure references, against 10 figures that exist. The note now says so plainly instead of implying the work is done.
 
@@ -964,6 +989,8 @@ The qualitative findings survive either reading — infrastructure still dominat
   **Two caveats on the OSM power layer.** GDAL's OSM driver does not promote `power` to a column — it lands in `other_tags` as an hstore string, so the grid layer needs either a string filter or a custom `osmconf.ini` that promotes `power` and `voltage`. And the country extract carries **cross-border** infrastructure: the first `power=line` found is tagged `operator=Zesco`, which is Zambia's utility. The grid layer must be clipped to the domain and operator-checked, or proximity is computed to a grid that cannot be connected to.
 
   **WorldPop is clipped to the national outline, not the domain box** — it spans 25.24–33.06°E, 22.42–15.61°S, falling short of the 25–33°E / 15–22°S grid by 0.24° west and 0.61° north, where the box lies in Zambia and Mozambique. This is correct behaviour for a Zimbabwe-only product, and it means **a national-boundary mask (GADM) is required** so out-of-country cells become clean exclusions rather than nodata holes in the weighted linear combination.
+- **Chapter 5 — FIRST DRAFT WRITTEN**, `CR_Madukwe_Chapter5_DRAFT.docx`, ~2,400 words, generated by `build_chapter5.py` from the same CSVs as Chapter 4 so the conclusions cannot quote figures that have drifted from the results. Answers all four RQs, and **RQ2 gets a largely negative answer** — the product resolves essentially nothing below its input grid — which is stated as the study's most important single finding rather than softened. Needs citations before submission.
+
 - **Chapter 4 — FIRST DRAFT WRITTEN**, `CR_Madukwe_Chapter4_DRAFT.docx`, ~4,300 words, 10 tables, generated by `build_chapter4.py` from the evaluation CSVs so no figure in the prose can drift from the analysis. **Edit the generator, not the .docx.** Two manual steps remain in Word: the bracketed citations are plain text and need converting to Zotero fields, and figures 01–10 need inserting with captions.
 
   §4.8.1 leads with the robust set rather than the five-tier map, and its central finding is that **the 42 robust cells are not the sunniest places in Zimbabwe** — mean irradiance 246.12 against 242.83 W m⁻², a difference of 1.4% — but the best-connected: 2.12 km from transmission against 26.54 km, a factor of **12.5**. Irradiance over Zimbabwe varies too narrowly to discriminate between sites after standardisation, while grid distance varies over two orders of magnitude and decides the outcome under every weighting. The planning implication is that **the binding constraint is grid access, not sunlight**.

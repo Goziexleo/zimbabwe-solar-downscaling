@@ -145,6 +145,20 @@ P("The pixel-wise XGBoost ensemble attains the lowest aggregate error at %.2f W 
   "established."
   % (R("XGBoost", "RMSE"), R("XGBoost", "SS vs climatology"), R("XGBoost", "Pearson R"),
      R("Random Forest", "RMSE") - R("XGBoost", "RMSE")))
+P("One caveat attaches to Table 4.1 and must be read with it. The two pixel-wise models "
+  "are fitted for a fixed number of iterations, but both neural models save the "
+  "checkpoint that scores best on the withheld record itself, and the U-Net additionally "
+  "early-stops and schedules its learning rate on it. Their figures are therefore "
+  "optimistically biased by an unquantified amount, and are not commensurable with "
+  "XGBoost's, which is not selected that way. The training log for the deployed U-Net "
+  "shows its validation curve fluctuating between 0.109 and 0.140 with the saved "
+  "checkpoint taken at the 0.1085 minimum of roughly twenty-eight epochs, which is the "
+  "selection of a favourable fluctuation rather than of a better model. The deployment "
+  "decision reported in Section 4.4 does not rest on this comparison, and is unaffected; "
+  "the ranking within Table 4.1 is. Retraining both neural models under honest selection "
+  "is the correct remedy and has not been carried out, because it would revise the "
+  "Taylor statistics, the resampling intervals, the spectra and the uncertainty "
+  "decomposition along with the table.")
 P("The Taylor decomposition in Table 4.2 shows that the aggregate ranking conceals a "
   "sharp division in the spatial structure of the error. The two pixel-wise models "
   "reproduce the spatial pattern of the time-mean field almost exactly, at correlations "
@@ -284,9 +298,18 @@ P("A second question is whether the models preserve the spectral character of th
   "space, which is the space the models predict in. The U-Net damps fine-scale power "
   "severely and robustly: its ratio to the truth is %.2f at wavenumber 3 and falls "
   "monotonically to %.3f at wavenumber 20, so it is damped at every cut tested. This is "
-  "the smoothing failure mode reported for machine-learning emulators generally, and it "
-  "is tied here to the loss function and the encoder-decoder architecture."
+  "the smoothing failure mode reported for machine-learning emulators generally."
   % (un_hi, un_lo))
+P("The cause, however, is neither the loss function nor the encoder-decoder architecture, "
+  "as an earlier version of this section stated. A controlled sweep fitting on 1985 to "
+  "2004 and selecting on 2005 to 2010 isolates it to the regularisation setting. The "
+  "deployed configuration applies spatial dropout at a rate of 0.3 eight times per "
+  "encoder-decoder level; removing it raises the spectral ratio beyond wavenumber 10 "
+  "from 0.085 to 0.771, and simultaneously improves held-out error from 10.98 to 8.63 "
+  "W m-2, spatial correlation from 0.894 to 0.970 and centred error from 3.59 to 1.97. "
+  "Varying the gradient penalty over the same sweep barely moves the spectral ratio at "
+  "all, which refutes the smoothness-prior explanation directly. Aggressive spatial "
+  "dropout smooths the predicted field, and that is the mechanism.")
 TBL(["Field"] + [c for c in cut.columns if c.startswith("k>=")] + ["Verdict"],
     [[f] + ["%.2f" % cut.loc[f, c] for c in cut.columns if c.startswith("k>=")]
      + [cut.loc[f, "robust"]]
@@ -426,19 +449,13 @@ P("**Only %d cells, %.1f per cent of those assessed and approximately %s km2, ar
   "ten can be moved by a defensible change of weights should not be presented as a "
   "planning product without that qualification attached."
   % (n_rob, 100 * n_rob / n_keep, format(n_rob * 121, ",")))
-P("The size of this set depends on an ambiguity in Section 3.9.3 that must be resolved "
-  "before the figure is quoted as definitive. That section gives the distance decay as "
-  "Score = e^(-d/d_ref) but also states that the score falls below 0.14 beyond d_ref, and "
-  "the two are not compatible: e^(-1) is 0.368. The implementation used here follows the "
-  "0.14 statement, which requires an additional factor of two in the exponent. Under the "
-  "formula exactly as printed the decay is gentler, and the robust set grows from %d "
-  "cells to 145, or 6.1 per cent of those assessed, while the count in the highest tier "
-  "rises from %d to 54. The qualitative conclusions of this section are unaffected — the "
-  "robust set is still distinguished by infrastructure rather than resource, at a grid "
-  "proximity factor of 6.1 rather than 12.5, and the classification remains "
-  "weight-sensitive in 87.8 per cent of cells with equal weights still agreeing no better "
-  "than chance — but the specific count is not robust to the ambiguity and should not be "
-  "reported without it." % (n_rob, per.loc["present", "very_high"]))
+P("Section 3.9.3 previously printed the distance decay as Score = e^(-d/d_ref) while "
+  "stating in prose that the score falls below 0.14 beyond d_ref, which the function does "
+  "not do: e^(-1) is 0.368. That discrepancy was not cosmetic, since the two readings "
+  "give robust sets of 145 and 42 cells respectively. It has been resolved in favour of "
+  "the function as written, on the grounds that a site 10 km from an existing "
+  "transmission line is routinely connectable for utility-scale development and should "
+  "not be scored as though it were remote. The figures reported here use that reading.")
 TBL(["Criterion", "Robust set mean", "All assessed cells", "Ratio"],
     [["Irradiance (W m-2)", "%.2f" % lay.ghi_present_sarah.values[rob].mean(),
       "%.2f" % lay.ghi_present_sarah.values[keep].mean(),
@@ -569,6 +586,11 @@ P("**The suitability classification is weight-sensitive.** %.1f per cent of asse
 P("**The future suitability maps hold infrastructure and population constant.** They "
   "describe how the resource changes at present-day sites, not where future sites will "
   "be.")
+P("**Two of the four architectures are selected on the evaluation record.** The CNN and "
+  "U-Net save the checkpoint scoring best on the withheld period, so their entries in "
+  "Table 4.1 are optimistically biased relative to XGBoost's. Section 4.4's deployment "
+  "argument does not depend on that comparison, but the four-way ranking does, and the "
+  "remedy is a retrain under honest selection rather than a caveat.")
 P("**The suitability output carries no uncertainty estimate on the index itself.** "
   "Section 1.5 undertakes to deliver priority zones with quantified uncertainty. What is "
   "delivered is a weighting sensitivity analysis and a robust set, which bound the "
