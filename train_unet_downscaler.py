@@ -1,5 +1,6 @@
 import os
 import numpy as np
+import pandas as pd
 import xarray as xr
 import torch
 import torch.nn.functional as F
@@ -45,7 +46,7 @@ target_var = "clear_sky_index"  # lives on the fine (fine_lat, fine_lon) target 
 # was supplied only as a command-line environment override, so a plain rerun
 # silently reproduced a different model from the one reported in Table 3.3.
 BATCH_SIZE = int(os.environ.get("UNET_BATCH_SIZE", "16"))
-EPOCHS = 100
+EPOCHS = int(os.environ.get("EPOCHS", "100"))
 EARLY_STOP_PATIENCE = int(os.environ.get("UNET_EARLY_STOP_PATIENCE", "20"))
 LEARNING_RATE = float(os.environ.get("UNET_LEARNING_RATE", "2e-4"))
 WEIGHT_DECAY = float(os.environ.get("UNET_WEIGHT_DECAY", "1e-4"))
@@ -210,19 +211,42 @@ if anomaly_std == 0.0:
 
 print(f"Coarse input grid: {len(coarse_lats)} x {len(coarse_lons)} | Fine target grid: {fine_shape}")
 
+# --- Honest model selection (see Section 6.13) -------------------------------
+# This script previously early-stopped, scheduled its learning rate, and saved
+# its checkpoint on ds_val, the withheld 2011-2024 record. All three are
+# selection on the evaluation set - Section 6.12's defect, found and fixed for
+# XGBoost, left live here. The deployed run's log shows the curve fluctuating
+# between 0.109 and 0.140 with the checkpoint taken at the 0.1085 minimum of
+# roughly 28 epochs: a favourable fluctuation, not a better model.
+#
+# Phase A fits on 1985-2004 and scores on 2005-2010 to choose the epoch count;
+# Phase B refits from scratch on the full training period for that many epochs,
+# so all 312 months are used and the comparison with RF and XGBoost stays fair.
+INNER_SPLIT_YEAR = int(os.environ.get("INNER_SPLIT_YEAR", "2005"))
+_t = pd.DatetimeIndex(ds_train.time.values)
+_fit_mask = _t.year < INNER_SPLIT_YEAR
+ds_fit = ds_train.isel(time=np.where(_fit_mask)[0])
+ds_sel = ds_train.isel(time=np.where(~_fit_mask)[0])
+print(f"Inner split: fit {_fit_mask.sum()} months (<{INNER_SPLIT_YEAR}), "
+      f"select {(~_fit_mask).sum()}. Evaluation record ({ds_val.sizes['time']} months) unused.")
+
 train_dataset = DownscalingDataset(ds_train, train_means, train_stds, climatology_mean, anomaly_std,
                                     ds_topo, augment=True)
-val_dataset = DownscalingDataset(ds_val, train_means, train_stds, climatology_mean, anomaly_std,
-                                  ds_topo, augment=False)
+fit_dataset = DownscalingDataset(ds_fit, train_means, train_stds, climatology_mean, anomaly_std,
+                                 ds_topo, augment=True)
+sel_dataset = DownscalingDataset(ds_sel, train_means, train_stds, climatology_mean, anomaly_std,
+                                 ds_topo, augment=False)
 
 print("Classifying training months into ENSO phases (NOAA CPC ONI)...")
 phases = classify_enso_phase(ds_train.time.values)
 sampler = ENSOStratifiedBatchSampler(phases, BATCH_SIZE)
+fit_sampler = ENSOStratifiedBatchSampler(classify_enso_phase(ds_fit.time.values), BATCH_SIZE)
 print(f"  El Nino months: {len(sampler.el_nino_idx)} | La Nina months: {len(sampler.la_nina_idx)} "
       f"| batches/epoch: {len(sampler)} (>= {sampler.n_el} El Nino + {sampler.n_la} La Nina per batch)")
 
 train_loader = DataLoader(train_dataset, batch_sampler=sampler)
-val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False)
+fit_loader = DataLoader(fit_dataset, batch_sampler=fit_sampler)
+sel_loader = DataLoader(sel_dataset, batch_size=BATCH_SIZE, shuffle=False)
 
 # --- 5. Model, optimiser, composite loss (dual MSE + spatial gradient penalty,
 #     Section 3.6.5's dual-loss rationale applied consistently to the U-Net) ---
@@ -246,57 +270,76 @@ def composite_loss(y_pred, y_true, lambda_gp=0.001):
     return mse + lambda_gp * gp
 
 
-best_val_loss = float('inf')
-patience_counter = 0
+def _build():
+    m = ClimateUNet(coarse_channels=coarse_channels, fine_channels=fine_channels,
+                    out_channels=1, fine_shape=fine_shape).to(device)
+    o = optim.Adam(m.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
+    return m, o, optim.lr_scheduler.ReduceLROnPlateau(o, mode='min', factor=0.5, patience=10)
 
-print(f"\nTraining ClimateU-Net (max {EPOCHS} epochs, early-stopping patience {EARLY_STOP_PATIENCE})...")
-for epoch in range(EPOCHS):
-    model.train()
-    train_loss = 0.0
-    for xc_batch, xf_batch, y_batch in train_loader:
-        xc_batch, xf_batch, y_batch = xc_batch.to(device), xf_batch.to(device), y_batch.to(device)
-        optimizer.zero_grad()
-        y_pred = model(xc_batch, xf_batch)
-        loss = composite_loss(y_pred, y_batch)
-        loss.backward()
-        optimizer.step()
-        train_loss += loss.item() * xc_batch.size(0)
-    train_loss /= len(train_dataset)
 
-    model.eval()
-    val_loss = 0.0
+def _run_epoch(m, o, loader):
+    m.train(); tot = 0.0; n = 0
+    for xc, xf, yb in loader:
+        xc, xf, yb = xc.to(device), xf.to(device), yb.to(device)
+        o.zero_grad()
+        loss = composite_loss(m(xc, xf), yb)
+        loss.backward(); o.step()
+        tot += loss.item() * xc.size(0); n += xc.size(0)
+    return tot / max(n, 1)
+
+
+def _score(m, loader):
+    m.eval(); tot = 0.0; n = 0
     with torch.no_grad():
-        for xc_batch, xf_batch, y_batch in val_loader:
-            xc_batch, xf_batch, y_batch = xc_batch.to(device), xf_batch.to(device), y_batch.to(device)
-            y_pred = model(xc_batch, xf_batch)
-            val_loss += F.mse_loss(y_pred, y_batch).item() * xc_batch.size(0)
-    val_loss /= len(val_dataset)
+        for xc, xf, yb in loader:
+            xc, xf, yb = xc.to(device), xf.to(device), yb.to(device)
+            tot += F.mse_loss(m(xc, xf), yb).item() * xc.size(0); n += xc.size(0)
+    return tot / max(n, 1)
 
-    scheduler.step(val_loss)
-    print(f"Epoch {epoch + 1}/{EPOCHS} | Train Loss: {train_loss:.4f} | Val MSE: {val_loss:.4f}")
 
-    if val_loss < best_val_loss:
-        best_val_loss = val_loss
-        patience_counter = 0
-        torch.save({
-            'schema_version': SCHEMA_VERSION,
-            'state_dict': model.state_dict(),
-            'coarse_vars': COARSE_VARS,
-            'fine_static_vars': FINE_STATIC_VARS,
-            'fine_dynamic_vars': FINE_DYNAMIC_VARS,
-            'feature_means': train_means,
-            'feature_stds': train_stds,
-            'climatology_mean': climatology_mean,
-            'anomaly_std': anomaly_std,
-            'fine_shape': fine_shape,
-            'coarse_channels': coarse_channels,
-            'fine_channels': fine_channels,
-        }, model_path)
+print(f"\nPhase A: fitting on {len(fit_dataset)} months, selecting on {len(sel_dataset)}...")
+model, optimizer, scheduler = _build()
+best_sel, best_epoch, stale = float("inf"), EPOCHS, 0
+for epoch in range(EPOCHS):
+    tr = _run_epoch(model, optimizer, fit_loader)
+    sel = _score(model, sel_loader)
+    scheduler.step(sel)
+    if sel < best_sel:
+        best_sel, best_epoch, stale = sel, epoch + 1, 0
     else:
-        patience_counter += 1
-        if patience_counter >= EARLY_STOP_PATIENCE:
-            print(f"\nEarly stopping triggered at epoch {epoch + 1} "
-                  f"(no improvement in validation MSE for {EARLY_STOP_PATIENCE} epochs).")
-            break
+        stale += 1
+    if (epoch + 1) % 10 == 0 or epoch == 0:
+        print(f"  epoch {epoch + 1}/{EPOCHS} | fit {tr:.4f} | select {sel:.4f}")
+    if stale >= EARLY_STOP_PATIENCE:
+        print(f"  inner selection stopped at epoch {epoch + 1}")
+        break
+print(f"Phase A: best inner-select MSE {best_sel:.4f} at epoch {best_epoch}.")
 
-print(f"\nSuccess! ClimateU-Net saved to: {model_path} (best validation MSE: {best_val_loss:.4f})")
+print(f"\nPhase B: refitting on all {len(train_dataset)} training months for {best_epoch} epochs...")
+model, optimizer, scheduler = _build()
+for epoch in range(best_epoch):
+    tr = _run_epoch(model, optimizer, train_loader)
+    scheduler.step(tr)
+    if (epoch + 1) % 10 == 0 or epoch == 0 or epoch + 1 == best_epoch:
+        print(f"  epoch {epoch + 1}/{best_epoch} | train {tr:.4f}")
+
+torch.save({
+    'schema_version': SCHEMA_VERSION,
+    'state_dict': model.state_dict(),
+    'coarse_vars': COARSE_VARS,
+    'fine_static_vars': FINE_STATIC_VARS,
+    'fine_dynamic_vars': FINE_DYNAMIC_VARS,
+    'feature_means': train_means,
+    'feature_stds': train_stds,
+    'climatology_mean': climatology_mean,
+    'anomaly_std': anomaly_std,
+    'fine_shape': fine_shape,
+    'coarse_channels': coarse_channels,
+    'fine_channels': fine_channels,
+    'selected_epoch': best_epoch,
+    'inner_select_mse': best_sel,
+    'selection': 'inner split %d, evaluation record untouched' % INNER_SPLIT_YEAR,
+}, model_path)
+
+print(f"\nClimateU-Net saved to: {model_path} (epoch {best_epoch} chosen on the inner "
+      f"split, inner MSE {best_sel:.4f}; the evaluation record was never used)")

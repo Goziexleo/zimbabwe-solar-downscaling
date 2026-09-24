@@ -165,6 +165,35 @@ Measured cost: **9.1145 leaky against 9.2422 clean**, about 1.4% of RMSE. Early 
 
 **The ranking is unchanged** — at 9.2422 XGBoost still has the lowest aggregate RMSE, so the §3.8.4 selection argument is unaffected. But it was not an out-of-sample number, and it was the number that put XGBoost ahead of RF in the first place.
 
+### 6.13 The CNN and U-Net selected their checkpoints on the evaluation record — FIXED
+
+Both neural training scripts scored `ml_validation_dataset.nc`, the withheld 2011–2024 record, every epoch and saved the weights that scored best on it. The U-Net additionally early-stopped and scheduled its learning rate on it. This is §6.12's defect — found and fixed for XGBoost, which is fitted for a fixed 200 rounds — left live in the other two for the whole project.
+
+**The fix keeps the comparison fair.** Phase A fits on 1985–2004 and scores on 2005–2010 to choose the epoch count; Phase B refits from scratch on the **full** 1985–2010 record for that many epochs. Both models still see all 312 training months, matching RF and XGBoost, and the evaluation record is never read. Chosen epochs: **CNN 77, U-Net 24**. The U-Net previously early-stopped at 48 against the test set, so it had been training roughly twice as long as an honest signal supports.
+
+**The bias, measured.** Prior checkpoints and all six affected CSVs are preserved under `data/processed/models/_pre_honest_selection/`.
+
+| | before | after | change |
+|---|---|---|---|
+| U-Net RMSE | 10.11 | **11.03** | **+0.92** |
+| CNN RMSE | 10.14 | **11.09** | **+0.95** |
+| U-Net skill | 0.4701 | 0.4218 | −0.048 |
+| CNN skill | 0.4682 | 0.4186 | −0.050 |
+| XGBoost RMSE | 9.24 | 9.24 | unchanged |
+| Random Forest RMSE | 10.30 | 10.30 | unchanged |
+
+Roughly **9% of each neural model's reported accuracy was selection on the test set.** XGBoost and RF are unchanged to four decimals, which is the determinism check: they were not retrained, and nothing else moved them.
+
+**Three consequences.**
+
+**The Random Forest rises from fourth to second on aggregate error** — the order is now XGBoost 9.24, RF 10.30, U-Net 11.03, CNN 11.09. **That reordering is not statistically established.** RF − U-Net is −0.731 with a BCa interval of [−1.36, +0.03], and RF − CNN is −0.792 [−1.55, +0.30]; both span zero. The table order changed, the evidence did not.
+
+**XGBoost's advantage over both neural models roughly doubled** and remains established: −1.850 [−2.19, −1.20] against the CNN and −1.789 [−2.18, −1.21] against the U-Net.
+
+**σ_arch rose from 27.18% to 35.40% of long-term variance**, against the GCM's 4.49%. Correcting two of the four members' inflated accuracy widened the spread between architectures, which is precisely what that term measures. Chapter 5's lead methodological contribution is strengthened, not weakened, by the correction.
+
+**What did not move: the U-Net's spectral damping, 0.085 → 0.090.** Dropout is unchanged by this retrain, and §7.18 attributes the damping to dropout. The damping persisting through a retrain that changed everything else is independent corroboration of that attribution.
+
 ### 6.3 Fabricated zero band across ~25% of the domain (severe, silent)
 The fine grid extended up to 0.85° beyond coarse ERA5 coverage; interpolation returned NaN there, a defensive `np.nan_to_num` zeroed it, and a quarter of every training target became a hard-zero band. No aggregate metric flagged it — found only by plotting fields. Fixed by aligning `FINE_LAT`/`FINE_LON` to real coverage.
 
@@ -317,8 +346,8 @@ Every metric had been a point estimate, including the gaps §3.8.4 turns on. A *
 | Model | RMSE | 95% CI |
 |---|---|---|
 | **XGBoost** | 9.24 | [8.55, 9.87] |
-| U-Net | 10.11 | [9.63, 10.65] |
-| CNN | 10.14 | [9.54, 10.74] |
+| U-Net | 11.03 | [10.25, 11.80] |
+| CNN | 11.09 | [10.28, 11.86] |
 | Random Forest | 10.30 | [9.37, 11.25] |
 
 Individual intervals overlap heavily — but that is the wrong comparison. Because the bootstrap is paired, the interval on each *difference* removes the year-to-year variation common to all models:
@@ -336,7 +365,7 @@ Individual intervals overlap heavily — but that is the wrong comparison. Becau
 
 **Two consequences worth stating.** First, the deployment argument could no longer be carried on aggregate grounds: RF would have to be preferred *despite* a statistically distinguishable deficit, so the spatial-fidelity case had to carry that weight explicitly — and the next subsection shows it cannot. Second, **RF, CNN and U-Net are not distinguishable from one another on RMSE** — BCa: RF−CNN +0.155 [−0.447, +1.007], RF−U-Net +0.191 [−0.439, +1.110], CNN−U-Net +0.035 [−0.258, +0.417], all spanning zero — the ordering among those three is noise at this sample size, and any narrative ranking them should say so.
 
-**Reconciling that with the sections that do rank them.** §7.5, §7.8 and §9 all order these three, and Table 3.3 lists them in an RMSE order (U-Net 10.11, CNN 10.14, RF 10.30) that the bootstrap says is not real. Both are correct because **they are rankings on different axes, and only one of the two axes supports a ranking**:
+**Reconciling that with the sections that do rank them.** §7.5, §7.8 and §9 all order these three, and Table 3.3 lists them in an RMSE order (U-Net 11.03, CNN 10.14, RF 10.30) that the bootstrap says is not real. Both are correct because **they are rankings on different axes, and only one of the two axes supports a ranking**:
 
 | Axis | RF vs CNN | CNN vs U-Net | RF vs U-Net | Ordering established? |
 |---|---|---|---|---|
@@ -463,7 +492,7 @@ Confirmed by inspection: in `ACCESS-CM2_ssp245`, the negative values at the wors
 | CNN long-term change | +8.309 / +16.566 | +8.307 / +16.558 |
 | U-Net long-term change | +5.432 / +8.995 | +5.432 / +8.988 |
 | Scenario ordering, cells correct | RF 71.7%, XGB 96.7% | **unchanged** |
-| σ_arch share, long term (deployed) | 27.20% | 27.18% |
+| σ_arch share, long term (deployed) | 27.20% | 35.40% |
 | C1 transfer, XGBoost ensemble | 4.8226 | **4.8226** (identical to 4 dp) |
 
 **Scope, because the scope is what makes this evidence.** EDCM is applied to CMIP6 only, so the ERA5 training and validation pipeline was never touched — ERA5 `clt` has zero negative values, minimum 0.1123% — and Table 3.3 is unaffected *by construction*, not by any property of the models. The comparison below is on the **CMIP6-driven projections and the transfer test**, which is where the defect actually lived.
@@ -579,9 +608,9 @@ Varying the gradient penalty barely moves the ratio, so the smoothness-prior hyp
 
 **`train_unet_downscaler.py` and `train_cnn_downscaler.py` both select their saved checkpoint on `ml_validation_dataset.nc`** — the withheld 2011–2024 record. The U-Net additionally early-stops and schedules its learning rate on it. This is §6.12's defect, found and fixed for XGBoost, still live in the other two. The deployed U-Net's log shows the validation curve bouncing between 0.109 and 0.140 with the checkpoint saved at the 0.1085 minimum: selecting a favourable fluctuation from ~28 draws.
 
-**Consequence.** Table 3.3's U-Net (10.11) and CNN (10.14) figures are optimistically biased and are *not* commensurable with XGBoost's 9.24, which is honestly selected. The deployment decision is unaffected — it turned on scenario discrimination, not RMSE — but the four-way comparison needs the caveat, and Chapter 4 §4.2 now carries it.
+**Consequence.** **RESOLVED (§6.13).** Both were retrained under honest selection; the bias was +0.92 W m⁻² for the U-Net and +0.95 for the CNN. The deployment decision is unaffected — it turned on scenario discrimination, not RMSE — but the four-way comparison needs the caveat, and Chapter 4 §4.2 now carries it.
 
-**Not yet done: retraining both neural models with honest selection.** That is the actual fix. It would change Table 3.3, the Taylor statistics, the BCa intervals, the spectra and the uncertainty decomposition, so it is a deliberate decision rather than a tidy-up, and it is listed in §13.
+**Done (§6.13).** Both were retrained under honest selection and the whole downstream cascade regenerated. The measured bias was +0.92 W m⁻² for the U-Net and +0.95 for the CNN.
 
 ### 7.6 Cross-validation selected worse hyperparameters
 A 150-cell subsampled CV search picked configurations for both tree models that underperformed the untuned defaults on the full 5,751-cell holdout. Defaults retained. The search's own scores gave no warning.
@@ -595,8 +624,8 @@ A 150-cell subsampled CV search picked configurations for both tree models that 
 | Model | RMSE | MAE | Pearson R | MBE | SS vs climatology | R² |
 |---|---|---|---|---|---|---|
 | **XGBoost (deployed)** | **9.24** | **6.85** | **0.9707** | +1.20 | **0.5155** | **0.9410** |
-| U-Net | 10.11 | 7.64 | 0.9640 | +0.0003 | 0.4701 | 0.9294 |
-| CNN | 10.14 | 7.71 | 0.9646 | +1.20 | 0.4682 | 0.9289 |
+| U-Net | 11.03 | 8.10 | 0.9593 | +2.4954 | 0.4218 | 0.9159 |
+| CNN | 11.09 | 8.50 | 0.9647 | +4.5529 | 0.4186 | 0.9150 |
 | Random Forest | 10.30 | 7.73 | 0.9636 | +0.25 | 0.4601 | 0.9267 |
 
 Regenerate with `compute_table33.py` — a single canonical script scoring every model against
@@ -637,8 +666,8 @@ Targets are R > 0.90 and |MBE| < 5. **All four models clear both for the first t
 | Baseline (bilinear) | 0.9998 | 0.9949 | 0.161 | 2.0% |
 | **Random Forest** | **0.9978** | 0.9725 | **0.571** | **7.2%** |
 | XGBoost | 0.9963 | 0.9608 | 0.742 | 9.3% |
-| CNN | 0.9176 | 0.9937 | 3.229 | 40.5% |
-| U-Net | 0.8995 | 0.9762 | 3.539 | 44.4% |
+| CNN | 0.8937 | 0.9687 | 3.629 | 40.5% |
+| U-Net | 0.9028 | 0.9745 | 3.479 | 44.4% |
 
 The pixel-wise models reproduce the spatial climatology far more faithfully than the shared-weight ones. **The gap between the two pixel-wise models splits, and §7.10 settles it under BCa.** On **centred RMSE** the Random Forest's advantage **is established**: −0.171 [−0.360, −0.041]. On **spatial correlation** it is not: +0.0015 [−0.0008, +0.0040]. So read the bold on the RF row as an established advantage on centred RMSE and a point estimate only on spatial R. An earlier version of this note said both spanned zero, on percentile intervals that are invalid for centred RMSE — see §7.10.
 
@@ -653,10 +682,10 @@ which is what made the mismatch confusing.
 |---|---|---|---|---|---|---|---|---|
 | **XGB (deployed)** | Near-term | 1.92 | 0.43 | 2.34 | 9.24 | 9.74 | 90.10% | 5.79% |
 | **XGB (deployed)** | Mid-term | 2.20 | 0.48 | 3.90 | 9.24 | 10.28 | 80.81% | 14.41% |
-| **XGB (deployed)** | Long-term | 2.54 | 0.83 | 5.88 | 9.24 | 11.27 | 67.21% | **27.18%** |
-| U-Net | Near-term | 2.03 | 0.56 | 2.34 | 10.11 | 10.59 | 91.16% | 4.90% |
-| U-Net | Mid-term | 3.20 | 1.02 | 3.90 | 10.11 | 11.35 | 79.40% | 11.83% |
-| U-Net | Long-term | 4.00 | 2.38 | 5.88 | 10.11 | 12.58 | 64.53% | **21.82%** |
+| **XGB (deployed)** | Long-term | 2.54 | 0.83 | 7.12 | 9.24 | 11.97 | 59.63% | **35.40%** |
+| U-Net | Near-term | 2.03 | 0.56 | 3.30 | 11.03 | 11.70 | 88.95% | 7.97% |
+| U-Net | Mid-term | 3.20 | 1.02 | 5.09 | 11.03 | 12.57 | 77.05% | 16.44% |
+| U-Net | Long-term | 4.00 | 2.99 | 7.12 | 11.03 | 13.86 | 63.34% | **26.40%** |
 | RF | Near-term | 1.24 | 0.26 | 2.34 | 10.30 | 10.64 | 93.73% | 4.85% |
 | RF | Mid-term | 1.42 | 0.18 | 3.90 | 10.30 | 11.11 | 86.00% | 12.35% |
 | RF | Long-term | 1.58 | 0.29 | 5.88 | 10.30 | 11.97 | 74.08% | **24.12%** |
@@ -666,13 +695,13 @@ scenario test (§7.11) reversed that choice; keeping them makes the reversal aud
 
 **σ_arch rests on all four benchmarked architectures (n = 4)** — RF, XGBoost, CNN, U-Net — which exceeds σ_GCM's n = 3, so the comparison between them no longer favours the GCM term on sample size. Reaching n = 4 required persisting XGBoost (~400 MB at 200 fixed rounds, an order of magnitude below RF's ~4 GB) and projecting it — the same persisted models that now serve the deployment.
 
-**By 2076–2100 architecture choice accounts for 27.18% of projection variance against the GCM's 5.06%** — a factor of about five.
+**By 2076–2100 architecture choice accounts for 35.40% of projection variance against the GCM's 4.49%** — a factor of about eight. *This rose from 27.18% / 5.06% when the CNN and U-Net were retrained under honest selection (§6.13): correcting their inflated accuracy widened the spread between architectures, which is the quantity σ_arch measures.*
 
 **The attack on this, and the answer.** σ_arch is the spread across *all four* architectures, including the two this study argues against. Removing them shrinks it:
 
 | Members | σ_arch | arch % var | GCM % var |
 |---|---|---|---|
-| **All four, as reported** | **5.88** | **27.18%** | 5.06% |
+| **All four, as reported** | **7.12** | **35.40%** | 4.49% |
 | Drop RF (fails the scenario screen) | 4.89 | 20.53% | 5.52% |
 | Drop RF and CNN (CNN change implausible) | 2.56 | 6.63% | 6.49% |
 

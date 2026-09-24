@@ -81,11 +81,37 @@ class StandardizedClimateDataset(Dataset):
         return x, y
 
 
+# --- Honest model selection (see Section 6.13) -------------------------------
+# This script previously saved the checkpoint that scored best on ds_val, the
+# withheld 2011-2024 record. That is selection on the evaluation set: the same
+# defect Section 6.12 found and fixed for XGBoost, which is fitted for a fixed
+# number of rounds. It makes the reported figure the minimum of ~100 noisy draws
+# rather than an estimate of generalisation.
+#
+# The fix keeps the evaluation record untouched and still uses all 312 training
+# months, so the comparison with RF and XGBoost stays fair:
+#   Phase A  fit on 1985-2004, score on 2005-2010, record the best epoch.
+#   Phase B  refit from scratch on the FULL training period for that many epochs.
+# ds_val is opened only to confirm it is never read during training.
+import pandas as _pd
+
+INNER_SPLIT_YEAR = int(os.environ.get("INNER_SPLIT_YEAR", "2005"))
+_t = _pd.DatetimeIndex(ds_train.time.values)
+_fit = _t.year < INNER_SPLIT_YEAR
+
+ds_fit = ds_train.isel(time=np.where(_fit)[0])
+ds_sel = ds_train.isel(time=np.where(~_fit)[0])
+print(f"Inner split: fit {_fit.sum()} months (<{INNER_SPLIT_YEAR}), "
+      f"select {(~_fit).sum()} months (>={INNER_SPLIT_YEAR}). "
+      f"The {ds_val.sizes['time']}-month evaluation record is not used in training.")
+
 train_dataset = StandardizedClimateDataset(ds_train, feature_vars, target_var, train_means, train_stds)
-val_dataset = StandardizedClimateDataset(ds_val, feature_vars, target_var, train_means, train_stds)
+fit_dataset = StandardizedClimateDataset(ds_fit, feature_vars, target_var, train_means, train_stds)
+sel_dataset = StandardizedClimateDataset(ds_sel, feature_vars, target_var, train_means, train_stds)
 
 train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
-val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False)
+fit_loader = DataLoader(fit_dataset, batch_size=BATCH_SIZE, shuffle=True)
+sel_loader = DataLoader(sel_dataset, batch_size=BATCH_SIZE, shuffle=False)
 
 
 # --- CNN Architecture (Section 3.6.5) imported from cnn_model.py so training
@@ -110,45 +136,69 @@ def composite_loss(y_pred, y_true, lambda_gp=LAMBDA_GP):
     return mse + lambda_gp * gp
 
 
-print("\nTraining Convolutional Neural Network (Section 3.6.5) over 100 epochs...")
-epochs = 100
-best_val_loss = float('inf')
-for epoch in range(epochs):
-    model.train()
-    train_loss = 0.0
-    for x_batch, y_batch in train_loader:
-        x_batch, y_batch = x_batch.to(device), y_batch.to(device)
-        optimizer.zero_grad()
-        y_pred = model(x_batch)
-        loss = composite_loss(y_pred, y_batch)
-        loss.backward()
-        optimizer.step()
-        train_loss += loss.item() * x_batch.size(0)
+EPOCHS = int(os.environ.get("EPOCHS", "100"))
 
-    scheduler.step()
-    epoch_loss = train_loss / len(train_dataset)
 
-    model.eval()
-    val_loss = 0.0
+def _build():
+    m = SuperResolutionCNN(in_channels=len(feature_vars), fine_shape=fine_shape).to(device)
+    o = optim.Adam(m.parameters(), lr=LEARNING_RATE)
+    return m, o, optim.lr_scheduler.CosineAnnealingLR(o, T_max=EPOCHS)
+
+
+def _run_epoch(m, o, loader):
+    m.train(); tot = 0.0
+    for xb, yb in loader:
+        xb, yb = xb.to(device), yb.to(device)
+        o.zero_grad()
+        loss = composite_loss(m(xb), yb)
+        loss.backward(); o.step()
+        tot += loss.item() * xb.size(0)
+    return tot / len(loader.dataset)
+
+
+def _score(m, loader):
+    m.eval(); tot = 0.0
     with torch.no_grad():
-        for x_batch, y_batch in val_loader:
-            x_batch, y_batch = x_batch.to(device), y_batch.to(device)
-            y_pred = model(x_batch)
-            val_loss += F.mse_loss(y_pred, y_batch).item() * x_batch.size(0)
-    val_loss /= len(val_dataset)
+        for xb, yb in loader:
+            xb, yb = xb.to(device), yb.to(device)
+            tot += F.mse_loss(m(xb), yb).item() * xb.size(0)
+    return tot / len(loader.dataset)
 
-    if (epoch + 1) % 10 == 0 or epoch == 0:
-        print(f"Epoch [{epoch + 1}/{epochs}], Train Loss: {epoch_loss:.6f}, Val MSE: {val_loss:.6f}")
 
-    if val_loss < best_val_loss:
-        best_val_loss = val_loss
-        torch.save({
-            'schema_version': 1,
-            'state_dict': model.state_dict(),
-            'feature_vars': feature_vars,
-            'feature_means': train_means,
-            'feature_stds': train_stds,
-            'fine_shape': fine_shape,
-        }, model_path)
+# --- Phase A: choose the epoch count on the inner split ---
+print(f"\nPhase A: fitting on {len(fit_dataset)} months, selecting on {len(sel_dataset)}...")
+model, optimizer, scheduler = _build()
+best_sel, best_epoch = float("inf"), EPOCHS
+for epoch in range(EPOCHS):
+    tr = _run_epoch(model, optimizer, fit_loader)
+    scheduler.step()
+    sel = _score(model, sel_loader)
+    if sel < best_sel:
+        best_sel, best_epoch = sel, epoch + 1
+    if (epoch + 1) % 20 == 0 or epoch == 0:
+        print(f"  epoch {epoch + 1}/{EPOCHS} | fit {tr:.6f} | select {sel:.6f}")
+print(f"Phase A: best inner-select MSE {best_sel:.6f} at epoch {best_epoch}.")
 
-print(f"\nCNN Model successfully saved to: {model_path} (best validation MSE: {best_val_loss:.6f})")
+# --- Phase B: refit on the full training period for that many epochs ---
+print(f"\nPhase B: refitting on all {len(train_dataset)} training months for {best_epoch} epochs...")
+model, optimizer, scheduler = _build()
+for epoch in range(best_epoch):
+    tr = _run_epoch(model, optimizer, train_loader)
+    scheduler.step()
+    if (epoch + 1) % 20 == 0 or epoch == 0 or epoch + 1 == best_epoch:
+        print(f"  epoch {epoch + 1}/{best_epoch} | train {tr:.6f}")
+
+torch.save({
+    'schema_version': 1,
+    'state_dict': model.state_dict(),
+    'feature_vars': feature_vars,
+    'feature_means': train_means,
+    'feature_stds': train_stds,
+    'fine_shape': fine_shape,
+    'selected_epoch': best_epoch,
+    'inner_select_mse': best_sel,
+    'selection': 'inner split %d, evaluation record untouched' % INNER_SPLIT_YEAR,
+}, model_path)
+
+print(f"\nCNN saved to: {model_path} (epoch {best_epoch} chosen on the inner split, "
+      f"inner MSE {best_sel:.6f}; the evaluation record was never used)")
