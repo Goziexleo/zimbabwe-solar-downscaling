@@ -12,7 +12,8 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 from docx import Document
-from docx.shared import Pt
+from docx.shared import Pt, Inches
+from docx.enum.text import WD_ALIGN_PARAGRAPH
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 EVAL = os.path.join(ROOT, "data/processed/evaluation")
@@ -52,6 +53,23 @@ st.paragraph_format.space_after = Pt(8); st.paragraph_format.line_spacing = 1.5
 def H(t, lvl=2): doc.add_heading(t, level=lvl)
 
 
+FIGDIR = os.path.join(ROOT, "figures")
+_fig_n = [0]
+
+
+def FIG(png, caption, width_in=6.4):
+    path = os.path.join(FIGDIR, png)
+    if not os.path.exists(path):
+        print("  WARNING: missing figure %s" % png); return
+    _fig_n[0] += 1
+    doc.add_picture(path, width=Inches(width_in))
+    doc.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
+    c = doc.add_paragraph()
+    r = c.add_run("Figure 5.%d. %s" % (_fig_n[0], caption))
+    r.font.size = Pt(10); r.italic = True
+    c.alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+
 def P(t):
     import re as _re
     para = doc.add_paragraph()
@@ -79,7 +97,7 @@ H("5.2 Answers to the Research Questions")
 H("5.2.1 RQ1: downscaling accuracy and the comparison between architectures", 3)
 P("Four architectures were trained on identical inputs and evaluated on a withheld "
   "fourteen-year record. All four exceed the accuracy thresholds set in Section 3.7.1. "
-  "The deployed pixel-wise XGBoost ensemble reaches %.2f W m-2 against an ERA5-derived "
+  "The deployed pixel-wise XGBoost ensemble (Chen and Guestrin, 2016) reaches %.2f W m-2 against an ERA5-derived "
   "target, a skill score of %.4f relative to a training-period climatology, and a "
   "correlation of %.4f. The spread between best and worst is %.2f W m-2."
   % (t33.loc["XGBoost", "RMSE"], t33.loc["XGBoost", "SS vs climatology"],
@@ -124,7 +142,7 @@ P("This is a property of the design rather than a failure of fitting. The predic
   "architecture, loss function or training schedule can manufacture it. What the study "
   "delivers is a bias-and-variability correction evaluated on a finer mesh, with genuine "
   "temporal skill, and it should be described in those terms rather than as spatial "
-  "super-resolution. The physiographic correspondence the question anticipated — fine "
+  "super-resolution in the sense of Vandal et al. (2017). The physiographic correspondence the question anticipated — fine "
   "structure aligning with Zimbabwe's relief zones — is not present to be reported, "
   "because relief-scale structure is not in the input.")
 P("The one route to a different answer is a genuinely high-resolution target. The CM SAF "
@@ -154,7 +172,8 @@ P("The deployment decision followed from a test that no accuracy metric could pe
   "two of five tested axes, inverts the scenario signal it would be required to project: "
   "its separation between pathways shrinks with lead time rather than growing, and only "
   "71.7 per cent of cells order the two pathways correctly. The mechanism is tree "
-  "extrapolation, and the failure is categorical rather than a matter of degree. This is "
+  "extrapolation (Breiman, 2001), and the failure is categorical rather than a matter "
+  "of degree. This is "
   "why the improved U-Net configuration identified after the fact does not reopen the "
   "decision on accuracy alone: it has not been put through that screen.")
 
@@ -182,6 +201,10 @@ P("Suitability rises under every scenario and horizon, but that result is weaker
   "the irradiance change scaled by its weight, and the growth in the highest tier is "
   "cells crossing fixed thresholds rather than the best locations moving.")
 
+FIG("09_suitability_schemes.png", "The four weighting schemes and the robust set. "
+    "The robust locations, rather than any single classification, are this analysis's "
+    "answer to RQ4.")
+
 H("5.3 Contributions")
 P("**A quantified architecture-uncertainty term for solar downscaling.** The study's "
   "firmest methodological contribution is the finding that the choice of downscaling "
@@ -190,7 +213,7 @@ P("**A quantified architecture-uncertainty term for solar downscaling.** The stu
   "four members were retrained under honest selection, which is the expected direction: "
   "removing inflated accuracy from two architectures widens the spread between them, and "
   "that spread is what the term measures. Downscaling studies conventionally "
-  "report GCM and scenario spread while fitting a single architecture, which silently "
+  "report GCM and scenario spread while fitting a single architecture (Vandal et al., 2017; Lin et al., 2023), while comparative studies such as Hernanz et al. (2023) and Rampal et al. (2024) rank architectures without propagating the choice into a projection uncertainty, which silently "
   "sets the largest of the three terms to zero."
   % u.loc["long_term_2076_2100", "pct_var_arch"])
 P("**A demonstration that historical validation cannot substitute for a projection test.** "
@@ -249,7 +272,8 @@ P("**Read the projected increase as favourable but second-order.** An increase o
 H("5.6 Recommendations for Further Research")
 P("**Retrain against SARAH.** This is the highest-value next step and the only route to "
   "a product that genuinely resolves sub-grid structure. The record is held at 0.05 "
-  "degrees for 1985 to 2024 over the study domain. It would convert the negative answer "
+  "degrees for 1985 to 2024 over the study domain, following the approach Buster et al. "
+  "(2024) take for high-resolution solar resource data. It would convert the negative answer "
   "to RQ2 into a testable positive one and would simultaneously supply the independent "
   "validation the study currently lacks.")
 P("**Extend honest selection to the hyperparameters as well as the epoch count.** The "
@@ -301,9 +325,10 @@ doc.add_page_break()
 doc.add_heading("Note on this draft", level=2)
 P("Generated by build_chapter5.py from the same evaluation CSVs as Chapter 4, so that no "
   "figure quoted in the conclusions can drift from the results chapter. Edit the "
-  "generator rather than this document. As with Chapter 4, the chapter contains no "
-  "citations: the conclusions rest on this study's own results, but Sections 5.3 and 5.6 "
-  "should be positioned against the literature of Chapter 2 before submission.")
+  "generator rather than this document. Citations are plain author-year text and must be "
+  "converted to live Zotero fields; all of those used here are already in the Chapter 2 "
+  "and Chapter 3 bibliographies. The four additions listed at the end of Chapter 4 apply "
+  "to that chapter, not this one.")
 
 os.makedirs(os.path.dirname(OUT), exist_ok=True)
 doc.save(OUT)
