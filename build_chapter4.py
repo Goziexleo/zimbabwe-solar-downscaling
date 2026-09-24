@@ -140,25 +140,29 @@ TBL(["Model", "RMSE (W m-2)", "MAE", "Pearson R", "MBE", "Skill vs climatology",
     "training-period climatology, whose RMSE on this period is 19.08 W m-2.")
 P("The pixel-wise XGBoost ensemble attains the lowest aggregate error at %.2f W m-2, "
   "a skill score of %.4f against climatology, and a Pearson correlation of %.4f. The "
-  "spread across architectures is modest in absolute terms - %.2f W m-2 separates best "
-  "from worst - and Section 4.3 addresses which part of that spread is statistically "
-  "established."
+  "spread across architectures is %.2f W m-2 between best and worst, and Section 4.3 "
+  "addresses which part of that spread is statistically established."
   % (R("XGBoost", "RMSE"), R("XGBoost", "SS vs climatology"), R("XGBoost", "Pearson R"),
-     R("Random Forest", "RMSE") - R("XGBoost", "RMSE")))
-P("One caveat attaches to Table 4.1 and must be read with it. The two pixel-wise models "
-  "are fitted for a fixed number of iterations, but both neural models save the "
-  "checkpoint that scores best on the withheld record itself, and the U-Net additionally "
-  "early-stops and schedules its learning rate on it. Their figures are therefore "
-  "optimistically biased by an unquantified amount, and are not commensurable with "
-  "XGBoost's, which is not selected that way. The training log for the deployed U-Net "
-  "shows its validation curve fluctuating between 0.109 and 0.140 with the saved "
-  "checkpoint taken at the 0.1085 minimum of roughly twenty-eight epochs, which is the "
-  "selection of a favourable fluctuation rather than of a better model. The deployment "
-  "decision reported in Section 4.4 does not rest on this comparison, and is unaffected; "
-  "the ranking within Table 4.1 is. Retraining both neural models under honest selection "
-  "is the correct remedy and has not been carried out, because it would revise the "
-  "Taylor statistics, the resampling intervals, the spectra and the uncertainty "
-  "decomposition along with the table.")
+     t33["RMSE"].max() - t33["RMSE"].min()))
+P("The figures in Table 4.1 are comparable across all four models, which required a "
+  "correction. Earlier versions of both neural training procedures saved the checkpoint "
+  "scoring best on the withheld record itself, and the U-Net additionally early-stopped "
+  "and scheduled its learning rate on it; the pixel-wise models never did, being fitted "
+  "for a fixed number of iterations. That is selection on the evaluation set, and it "
+  "inflates the resulting figure because the reported score is the minimum of many noisy "
+  "draws rather than an estimate of generalisation. Both were retrained: the epoch count "
+  "is now chosen on an inner split of the training period, 1985 to 2004 for fitting and "
+  "2005 to 2010 for selection, after which each model is refitted from scratch on the "
+  "full training record for that number of epochs, so all four architectures see the "
+  "same 312 months and none sees the evaluation period.")
+P("The correction is quantified rather than asserted. The U-Net's error rose from 10.11 "
+  "to %.2f W m-2 and the CNN's from 10.14 to %.2f, while the two pixel-wise models are "
+  "unchanged to four decimal places, as they must be, having not been refitted. "
+  "Approximately nine per cent of each neural model's previously reported accuracy was "
+  "therefore selection on the evaluation record. One consequence is visible in the "
+  "ordering: the Random Forest now returns the second-lowest aggregate error rather than "
+  "the highest. Section 4.3 shows that this reordering is not statistically established."
+  % (R("U-Net", "RMSE"), R("CNN", "RMSE")))
 P("The Taylor decomposition in Table 4.2 shows that the aggregate ranking conceals a "
   "sharp division in the spatial structure of the error. The two pixel-wise models "
   "reproduce the spatial pattern of the time-mean field almost exactly, at correlations "
@@ -229,6 +233,14 @@ P("This matters because Section 3.8.4 originally deployed the Random Forest on a
   "nonetheless deployed has nothing to do with historical fidelity, and is given in "
   "Section 4.4.")
 xc = pair("XGBoost", "CNN", "RMSE"); xu = pair("XGBoost", "U-Net", "RMSE")
+P("The Random Forest's second place on aggregate error is not established against the "
+  "neural models, and should not be reported as a ranking. Its difference from the U-Net "
+  "is %+.3f W m-2 with an interval of %+.3f to %+.3f, and from the CNN %+.3f with %+.3f "
+  "to %+.3f; both intervals contain zero. The order in Table 4.1 changed when the neural "
+  "models were retrained, but the evidence separating those three did not."
+  % (pair("Random Forest", "U-Net", "RMSE")[0], pair("Random Forest", "U-Net", "RMSE")[1],
+     pair("Random Forest", "U-Net", "RMSE")[2], pair("Random Forest", "CNN", "RMSE")[0],
+     pair("Random Forest", "CNN", "RMSE")[1], pair("Random Forest", "CNN", "RMSE")[2]))
 P("Against the convolutional models the aggregate comparison is unambiguous: XGBoost is "
   "lower by %.3f W m-2 against the CNN and %.3f against the U-Net, both intervals "
   "excluding zero." % (abs(xc[0]), abs(xu[0])))
@@ -586,11 +598,14 @@ P("**The suitability classification is weight-sensitive.** %.1f per cent of asse
 P("**The future suitability maps hold infrastructure and population constant.** They "
   "describe how the resource changes at present-day sites, not where future sites will "
   "be.")
-P("**Two of the four architectures are selected on the evaluation record.** The CNN and "
-  "U-Net save the checkpoint scoring best on the withheld period, so their entries in "
-  "Table 4.1 are optimistically biased relative to XGBoost's. Section 4.4's deployment "
-  "argument does not depend on that comparison, but the four-way ranking does, and the "
-  "remedy is a retrain under honest selection rather than a caveat.")
+P("**Model selection on the evaluation record — identified and corrected.** The CNN and "
+  "U-Net previously saved the checkpoint scoring best on the withheld period. Both have "
+  "been retrained with the epoch count chosen on an inner split of the training data, "
+  "which raised their errors by 0.92 and 0.95 W m-2 respectively. The figures reported "
+  "here are the corrected ones. The limitation is recorded because the earlier figures "
+  "appear in superseded versions of this work and because the episode bears on how the "
+  "architecture comparison should be read: it compares particular configurations, "
+  "selected in a particular way, rather than architectures in the abstract.")
 P("**The suitability output carries no uncertainty estimate on the index itself.** "
   "Section 1.5 undertakes to deliver priority zones with quantified uncertainty. What is "
   "delivered is a weighting sensitivity analysis and a robust set, which bound the "

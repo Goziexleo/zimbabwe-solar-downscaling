@@ -83,21 +83,25 @@ P("Four architectures were trained on identical inputs and evaluated on a withhe
   "target, a skill score of %.4f relative to a training-period climatology, and a "
   "correlation of %.4f. The spread between best and worst is %.2f W m-2."
   % (t33.loc["XGBoost", "RMSE"], t33.loc["XGBoost", "SS vs climatology"],
-     t33.loc["XGBoost", "Pearson R"],
-     t33.loc["Random Forest", "RMSE"] - t33.loc["XGBoost", "RMSE"]))
+     t33.loc["XGBoost", "Pearson R"], t33["RMSE"].max() - t33["RMSE"].min()))
 P("The comparison between architectures is answered with more care than the question "
   "invites. Resampling establishes that XGBoost is better than the Random Forest on "
   "aggregate error, that the Random Forest is better on mean bias and on the spatial "
   "structure of its error, and that the two cannot be separated on spatial correlation. "
-  "The answer is a split decision, not a ranking. Two further qualifications belong with "
-  "it. The convolutional models select their saved weights on the evaluation record "
-  "itself, so their entries are optimistically biased and not commensurable with the "
-  "others. And a controlled sweep conducted after the deployment decision shows the "
-  "U-Net is capable of 8.63 W m-2 under honest selection once its dropout setting is "
-  "removed, which is below the deployed model. That does not overturn the deployment, "
-  "for the reason given under RQ3, but it does mean the architecture comparison in this "
-  "study is a comparison of particular configurations rather than of architectures in "
-  "general.")
+  "The answer is a split decision, not a ranking. The Random Forest returns the second "
+  "lowest aggregate error, but its separation from the two neural models is not "
+  "established: both differences carry intervals containing zero. Only XGBoost is "
+  "established as better than all three others on that axis.")
+P("Two qualifications belong with that answer, and both concern how the comparison was "
+  "produced rather than what it found. The convolutional models originally selected "
+  "their saved weights on the evaluation record, which inflated their accuracy by "
+  "roughly nine per cent; they were retrained with the epoch count chosen on an inner "
+  "split of the training period, and the figures above are the corrected ones. "
+  "Separately, a controlled sweep shows the U-Net reaches 8.63 W m-2 under honest "
+  "selection once its dropout setting is removed, which is below the deployed model. "
+  "Neither fact overturns the deployment, for the reason given under RQ3, but together "
+  "they mean this study compares particular configurations, selected in a particular "
+  "way, rather than architectures in the abstract.")
 P("Against traditional baselines the answer is unambiguous only for the admissible one. "
   "All four models beat a per-cell, per-calendar-month climatology. Scores against "
   "interpolation of the coarse irradiance field are not skill, because that field is a "
@@ -182,7 +186,10 @@ H("5.3 Contributions")
 P("**A quantified architecture-uncertainty term for solar downscaling.** The study's "
   "firmest methodological contribution is the finding that the choice of downscaling "
   "architecture accounts for %.1f per cent of long-term projection variance, several "
-  "times the contribution of the global climate model. Downscaling studies conventionally "
+  "times the contribution of the global climate model. The estimate rose when two of the "
+  "four members were retrained under honest selection, which is the expected direction: "
+  "removing inflated accuracy from two architectures widens the spread between them, and "
+  "that spread is what the term measures. Downscaling studies conventionally "
   "report GCM and scenario spread while fitting a single architecture, which silently "
   "sets the largest of the three terms to zero."
   % u.loc["long_term_2076_2100", "pct_var_arch"])
@@ -245,11 +252,13 @@ P("**Retrain against SARAH.** This is the highest-value next step and the only r
   "degrees for 1985 to 2024 over the study domain. It would convert the negative answer "
   "to RQ2 into a testable positive one and would simultaneously supply the independent "
   "validation the study currently lacks.")
-P("**Retrain the neural models under honest selection.** The CNN and U-Net select their "
-  "checkpoints on the evaluation record. Correcting this would revise Table 4.1, the "
-  "Taylor statistics, the resampling intervals, the spectra and the uncertainty "
-  "decomposition, which is why it was not folded into the present study, but the "
-  "comparison between architectures is not sound until it is done.")
+P("**Extend honest selection to the hyperparameters as well as the epoch count.** The "
+  "checkpoint-selection defect in the neural models has been corrected, and the epoch "
+  "count is now chosen on an inner split. The remaining hyperparameters — learning rate, "
+  "gradient-penalty weight, dropout, architecture width — were fixed by a grid search "
+  "reported in Section 3.6.7, and the sweep described above shows at least one of them, "
+  "dropout, to be badly chosen. A search conducted entirely within the training period, "
+  "over all of them jointly, is the natural completion of that correction.")
 P("**Revisit the U-Net configuration.** A controlled sweep shows that removing the "
   "spatial dropout setting improves held-out error to 8.63 W m-2, spatial correlation to "
   "0.970 and the spectral ratio from 0.085 to 0.771 — that is, it removes the smoothing "
