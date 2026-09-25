@@ -999,6 +999,38 @@ A full cross-check of Chapters 1–4, PROJECT_STATUS, UPDATE_BRIEF and the brief
 
 ---
 
+## 12c. Both document guards could skip silently, and one did
+
+Running the three guards under the wrong interpreter (`/opt/anaconda3/bin/python`
+rather than the `climate_stack` environment) produced this:
+
+```
+SKIPPED - chapter not found at:
+  .../CR_Madukwe_Chapter3_Final.docx
+```
+
+The chapter was there. What was missing was `python-docx`. `load()` returned the
+same `None, None, None` for an absent dependency as for an absent file, and
+`main()` printed the file-not-found message for both and **exited 0**. A guard
+that reports a clean bill of health for a document it never opened is worse than
+no guard, because the exit status is what a person or a hook actually reads.
+
+`check_brief_consistency.py` had the same defect in a quieter form: without
+`python-pptx`, `deck_prose()` returned `""`, so every deck assertion passed
+vacuously and the summary still printed *"Every checked table cell matches the
+canonical evaluation CSVs."* Nothing announced that the fourth guarded document
+had not been read.
+
+Both are fixed. The two causes are now distinguished and named, a missing
+dependency exits **1** while a genuinely absent document still exits 0, and the
+brief guard prints an explicit warning naming the interpreter when the deck was
+not checked. Verified both ways: under `climate_stack` all three guards pass and
+exit 0; under base, the Chapter 3 guard now reports the real cause and exits 1.
+
+**Everything reported in Section 12b and since was produced under
+`climate_stack`, where `docx`, `pptx`, `pandas` and `numpy` are all present, so
+no previously reported pass was one of these vacuous ones.**
+
 ## 13. Outstanding
 
 **Not started**

@@ -38,6 +38,11 @@ STATUS = os.path.join(ROOT, "PROJECT_STATUS.md")
 UPDATE = os.path.join(ROOT, "UPDATE_BRIEF.md")
 DECK = os.path.join(ROOT, "brief/CR_Madukwe_Interview_Deck.pptx")
 
+# Set when the deck could not be read. Returning an empty string makes
+# every deck assertion pass vacuously, so the skip has to be announced -
+# otherwise the guard reports a clean deck it never opened.
+DECK_SKIP = None
+
 
 def deck_prose():
     """Every text frame and speaker note in the interview deck, as one string.
@@ -50,11 +55,15 @@ def deck_prose():
     Returns "" when the deck or python-pptx is absent, so the guard still runs
     on a machine that only has the markdown.
     """
+    global DECK_SKIP
     try:
         from pptx import Presentation
     except ImportError:
+        DECK_SKIP = ("python-pptx is not installed in this interpreter (%s), "
+                     "so the deck was NOT checked" % sys.executable)
         return ""
     if not os.path.exists(DECK):
+        DECK_SKIP = "the deck is not present at %s, so it was NOT checked" % DECK
         return ""
     parts = []
     for slide in Presentation(DECK).slides:
@@ -404,8 +413,12 @@ def main():
     else:
         print("Markdown matches what the builder produces from the HTML.")
 
+    if DECK_SKIP:
+        print("\nWARNING: %s." % DECK_SKIP)
+        print("The deck assertions above passed vacuously.")
+
     print()
-    return 1 if (missing or resurrected or fmt) else 0
+    return 1 if (missing or resurrected or fmt or DECK_SKIP) else 0
 
 
 if __name__ == "__main__":

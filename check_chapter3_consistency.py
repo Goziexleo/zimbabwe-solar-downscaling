@@ -40,6 +40,14 @@ DEFAULT = os.path.expanduser(
     "CR_Madukwe_Chapter3_Final.docx")
 CHAPTER = os.environ.get("CHAPTER3_PATH", DEFAULT)
 
+# Why the guard skipped, set by load(). A guard that skips silently is worse
+# than no guard: it prints a clean bill of health for a document it never
+# opened. Distinguishing the two causes matters because they have opposite
+# meanings - an absent chapter is a legitimate skip, a missing python-docx is
+# a broken environment that must not exit 0.
+SKIP_REASON = None
+MISSING_DEP = False
+
 
 def load():
     """(prose, xml, tables) or a triple of None if unavailable.
@@ -51,11 +59,19 @@ def load():
     the brief guard had, and the fix is the same - anchor the cell, not the
     number.
     """
+    global SKIP_REASON, MISSING_DEP
     try:
         import docx
     except ImportError:
+        MISSING_DEP = True
+        SKIP_REASON = ("python-docx is not installed in this interpreter (%s).\n"
+                       "  That is an environment fault, not a missing chapter: "
+                       "run the guard in the\n  project environment."
+                       % sys.executable)
         return None, None, None
     if not os.path.exists(CHAPTER):
+        SKIP_REASON = ("chapter not found at:\n  %s\n"
+                       "  Set CHAPTER3_PATH to check a copy elsewhere." % CHAPTER)
         return None, None, None
     d = docx.Document(CHAPTER)
     parts = [p.text for p in d.paragraphs]
@@ -265,9 +281,10 @@ def main():
     print("=" * 84)
 
     if missing is None:
-        print("\nSKIPPED — chapter not found at:\n  %s" % CHAPTER)
-        print("Set CHAPTER3_PATH to check a copy elsewhere.")
-        return 0
+        print("\nSKIPPED — %s" % SKIP_REASON)
+        # A missing dependency means nothing was verified. Exit non-zero so it
+        # cannot be mistaken for a pass.
+        return 1 if MISSING_DEP else 0
 
     if missing:
         print("\nCANONICAL VALUES ABSENT (%d):" % len(missing))
