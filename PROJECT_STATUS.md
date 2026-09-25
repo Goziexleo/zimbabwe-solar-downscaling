@@ -907,7 +907,7 @@ Under **git** since the second audit: 61 files tracked, two commits, `data/` exc
 
 ## 12a. Section 3.9 suitability analysis — first end-to-end run
 
-Both scripts now run. `build_suitability_layers.py` writes 19 layers on the 71 x 81 grid; `compute_suitability.py` does the AHP weighting, the overlay, the five-tier classification and the four-scheme sensitivity. **AHP CR 0.0076**, reconstructed weights within **0.008** of Table 3.5 on every criterion. Irradiance layer: **SARAH** (§7.17).
+Both scripts now run. `build_suitability_layers.py` writes 19 layers on the 71 x 81 grid; `compute_suitability.py` does the AHP weighting, the overlay, the five-tier classification and the four-scheme sensitivity. The weights are Table 3.5's throughout; the reconstructed Saaty matrix reproduces them to within **0.008** on every criterion but is a diagnostic only, and **its consistency ratio is not a reportable result** (§12d). Irradiance layer: **SARAH** (§7.17).
 
 **Exclusions.** One rule for every areal category — a cell is excluded when more than half its area falls in it. The first version used `> 0.5` for protected areas and water but `> 0.0` for urban, which was an accident rather than a decision; the threshold is justifiable at this resolution because a cell is ~121 km² and a utility-scale plant needs 2–5 km², so a minority of excluded land belongs in the score rather than in a disqualification. It matters: **urban at `>0%` excludes 537 cells, at `>50%` it excludes 22.**
 
@@ -1030,6 +1030,54 @@ exit 0; under base, the Chapter 3 guard now reports the real cause and exits 1.
 **Everything reported in Section 12b and since was produced under
 `climate_stack`, where `docx`, `pptx`, `pandas` and `numpy` are all present, so
 no previously reported pass was one of these vacuous ones.**
+
+## 12d. The AHP consistency ratio was a fabricated validation statistic
+
+Chapter 4 Section 4.8 stated:
+
+> The consistency ratio of the pairwise comparison matrix is 0.0076, below the
+> 0.10 acceptability threshold.
+
+That number came from `compute_suitability.PAIRWISE`, a Saaty matrix **fitted to
+reproduce Table 3.5's weights**. Its consistency ratio measures how well the fit
+succeeded, not whether the researcher's judgements were coherent. Publishing it
+as the thesis's CR is the same circularity as training on a transform of the
+target: the quantity offered as validation was derived from the answer it claims
+to validate. The tell was in the number itself - 0.0076 is an order of magnitude
+below what a real elicitation produces, typically 0.03 to 0.08.
+
+Chapter 3 paragraph 180 was careful: it says a CR "is computed and verified to be
+below 0.10" without quoting a value. Chapter 4 invented the value. **Chapter 4 no
+longer quotes any CR**; it states that none is quotable, says why, and points to
+Section 4.8.1, where the weighting sensitivity analysis answers the question a CR
+is meant to answer - and answers it far less flatteringly: **87.8% of assessed
+cells change suitability tier under a defensible reweighting.** A CR of 0.008
+printed beside that figure would have been the more reassuring of the two and the
+less true.
+
+**Nothing downstream moved, and this was checked rather than assumed.** Every
+scheme weights from `AHP_WEIGHTS` (Table 3.5); `ahp()`'s vector is printed and
+discarded. Re-running `compute_suitability.py` leaves both suitability CSVs
+byte-identical, and a token-level diff of the rebuilt Chapter 4 shows the only
+numbers removed are `0.0076` and its `0.10` threshold.
+
+**Guarded.** `PAIRWISE_IS_ELICITED = False` gates the diagnostic, which now
+prints "NOT REPORTABLE" rather than "acceptable", and
+`test_reconstructed_ahp_cr_is_never_published` fails if either chapter generator
+hardcodes the value or quotes a consistency ratio. Injection-tested: restoring
+the old sentence fails the test on both the value and the phrase.
+
+**Left for you, because it is your account of your own process.** Chapter 3
+paragraph 180 says the matrix was "completed by the researcher in consultation
+with the thesis supervisors" and that its CR was verified below 0.10. That matrix
+is not in the project archive, so the sentence is currently unevidenced. Two
+honest routes: recover the original judgements, drop them into `PAIRWISE` and set
+`PAIRWISE_IS_ELICITED = True`, at which point the printed CR becomes real and
+quotable - or soften paragraph 180 to state that weights were assigned on the
+stated policy rationale without a formal consistency check. **Do not leave it as
+it stands.**
+
+---
 
 ## 13. Outstanding
 

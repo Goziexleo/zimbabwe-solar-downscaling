@@ -24,6 +24,19 @@ that the matrix was reverse-engineered from a target weight vector rather than
 elicited, and it should be described that way rather than offered as evidence of
 careful judgement.
 
+RESOLVED. Chapter 4 Section 4.8 previously stated "the consistency ratio of the
+pairwise comparison matrix is 0.0076, below the 0.10 acceptability threshold",
+which took this reconstruction's CR and published it as the thesis's own. That
+sentence is gone. Chapter 4 now says no CR is quotable, says why, and points at
+Section 4.8.1 - where the weighting sensitivity analysis answers the question a
+CR is meant to answer, and answers it unfavourably: 87.8 per cent of assessed
+cells change tier under a defensible reweighting. A consistency ratio of 0.008
+sitting beside that number would have been the more flattering of the two and
+the less informative.
+
+Nothing downstream moved. Every scheme weights from AHP_WEIGHTS (Table 3.5);
+ahp()'s vector is printed and discarded.
+
     python compute_suitability.py
 """
 
@@ -48,7 +61,17 @@ CRITERIA = ["ghi", "slope", "landcover", "roads", "grid", "settlements", "popula
 # Table 3.5
 AHP_WEIGHTS = dict(zip(CRITERIA, [0.35, 0.20, 0.15, 0.10, 0.10, 0.05, 0.05]))
 
-# Reconstructed Saaty judgements, upper triangle, in CRITERIA order.
+# RECONSTRUCTED Saaty judgements, upper triangle, in CRITERIA order.
+#
+# This is NOT the elicitation record. It was fitted to reproduce Table 3.5's
+# weights, so any consistency ratio computed from it measures the fit, not the
+# researcher's judgement, and MUST NOT be reported as the thesis's CR. Chapter 4
+# once quoted the 0.0076 below as "the consistency ratio of the pairwise
+# comparison matrix"; it no longer does, and a test enforces that.
+#
+# If the original matrix is recovered, replace the judgements below with it and
+# set PAIRWISE_IS_ELICITED = True. The printed CR then becomes the real one and
+# is quotable.
 PAIRWISE = {
     ("ghi", "slope"): 2, ("ghi", "landcover"): 2, ("ghi", "roads"): 4,
     ("ghi", "grid"): 4, ("ghi", "settlements"): 7, ("ghi", "population"): 7,
@@ -60,6 +83,11 @@ PAIRWISE = {
     ("grid", "settlements"): 2, ("grid", "population"): 2,
     ("settlements", "population"): 1,
 }
+# True only if PAIRWISE holds the judgements actually elicited from the
+# researcher and supervisors, rather than the reconstruction. Gates whether the
+# consistency ratio may be reported as a result.
+PAIRWISE_IS_ELICITED = False
+
 # Saaty's random index, n = 1..10
 RI = [0, 0, 0.58, 0.90, 1.12, 1.24, 1.32, 1.41, 1.45, 1.49]
 
@@ -86,7 +114,14 @@ SCHEMES = {
 
 
 def ahp():
-    """Priority vector and consistency ratio from PAIRWISE."""
+    """Priority vector and consistency ratio from PAIRWISE.
+
+    Both are diagnostics. The analysis weights every scheme from AHP_WEIGHTS
+    (Table 3.5) and never from the vector returned here, so the reconstruction
+    cannot move a single downstream number - it only demonstrates that the
+    published weights are attainable from a consistent set of integer Saaty
+    judgements. Read the CR under PAIRWISE_IS_ELICITED.
+    """
     n = len(CRITERIA)
     A = np.ones((n, n))
     for (a, b), v in PAIRWISE.items():
@@ -164,8 +199,15 @@ def kappa(a, b, valid):
 def main():
     ds = xr.open_dataset(LAYERS)
     w, cr, lam = ahp()
-    print("AHP consistency: lambda_max %.4f, CR %.4f %s"
-          % (lam, cr, "(< 0.10, acceptable)" if cr < 0.10 else "(FAILS 0.10)"))
+    if PAIRWISE_IS_ELICITED:
+        print("AHP consistency (ELICITED matrix): lambda_max %.4f, CR %.4f %s"
+              % (lam, cr, "(< 0.10, acceptable)" if cr < 0.10 else "(FAILS 0.10)"))
+    else:
+        print("AHP diagnostic - RECONSTRUCTED matrix, NOT the elicitation record.")
+        print("  lambda_max %.4f, CR %.4f -- NOT REPORTABLE as the thesis's"
+              " consistency ratio:" % (lam, cr))
+        print("  this matrix was fitted to Table 3.5, so its CR measures the fit.")
+        print("  A CR this far below 0.10 is itself the tell.")
     print("  reconstructed vs Table 3.5:")
     for c, v in zip(CRITERIA, w):
         print("    %-12s %.3f  vs  %.2f   (%+.3f)" % (c, v, AHP_WEIGHTS[c], v - AHP_WEIGHTS[c]))

@@ -467,10 +467,16 @@ FIG("04_uncertainty.png", "Four-component variance decomposition of the projecti
 
 H("4.8 Solar Energy Suitability")
 P("The suitability analysis of Section 3.9 combines the irradiance layer with six "
-  "biophysical and infrastructural criteria under weights derived by the Analytic "
-  "Hierarchy Process (Saaty, 1980), after a binary exclusion "
-  "mask. The consistency ratio of the pairwise comparison matrix is 0.0076, below the "
-  "0.10 acceptability threshold. Of the 5,751 cells in the analysis box, 2,460 fall "
+  "biophysical and infrastructural criteria under the Analytic Hierarchy Process weights "
+  "of Table 3.5 (Saaty, 1980), after a binary exclusion "
+  "mask. No consistency ratio is quoted here. Section 3.9.4 records that the pairwise "
+  "comparison matrix was completed by the researcher in consultation with the "
+  "supervisors, but that matrix is not held in the project archive, and a ratio "
+  "recomputed from a matrix reconstructed to reproduce Table 3.5's weights would measure "
+  "the reconstruction rather than the elicitation. The question a consistency ratio is "
+  "meant to answer \u2014 whether the ranking can be relied upon given the weights \u2014 is "
+  "addressed directly, and far less favourably, in Section 4.8.1. "
+  "Of the 5,751 cells in the analysis box, 2,460 fall "
   "outside Zimbabwe, 895 lie predominantly within protected areas, and smaller numbers "
   "are excluded as urban, water or steep, leaving %d cells assessed. Of those, %d score below the 0.30 threshold and fall "
   "in the lowest tier despite not being excluded." % (n_keep, n_low))

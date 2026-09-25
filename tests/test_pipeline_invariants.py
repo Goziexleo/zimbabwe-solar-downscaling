@@ -292,3 +292,45 @@ def test_status_document_has_no_stale_numbers():
         problems += [f"superseded value present at line {ln}: '{val}' — {why}"
                      for val, why, ln, _ in resurrected]
     assert not problems, "PROJECT_STATUS.md is out of date:\n  " + "\n  ".join(problems)
+
+
+def test_reconstructed_ahp_cr_is_never_published():
+    """No document may quote the reconstructed matrix's consistency ratio.
+
+    compute_suitability.PAIRWISE was fitted to reproduce Table 3.5's weights,
+    so its CR measures the fit and not the researcher's judgement. Chapter 4
+    nonetheless stated "the consistency ratio of the pairwise comparison matrix
+    is 0.0076, below the 0.10 acceptability threshold" - a validation statistic
+    for a matrix built backwards from its own answer, which is the same
+    circularity as training on a transform of the target.
+
+    Chapter 3 never quoted a value, only that one was computed. Chapter 4
+    invented the number, so this guards the generator rather than the chapter:
+    the .docx is a build product, and a hardcoded CR in the generator is what
+    would put it back.
+    """
+    import compute_suitability as cs
+
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    problems = []
+
+    if not cs.PAIRWISE_IS_ELICITED:
+        _, cr, _ = cs.ahp()
+        cr_txt = "%.4f" % cr
+        for name in ("build_chapter4.py", "build_chapter5.py"):
+            path = os.path.join(root, name)
+            if not os.path.exists(path):
+                continue
+            src = open(path, encoding="utf-8").read()
+            if cr_txt in src or cr_txt.rstrip("0") in src:
+                problems.append(f"{name} hardcodes the reconstructed CR {cr_txt}")
+            low = src.lower()
+            for phrase in ("consistency ratio of the pairwise",
+                           "consistency ratio is 0.",
+                           "consistency ratio of 0."):
+                if phrase in low:
+                    problems.append(f"{name} quotes a consistency ratio: '{phrase}'")
+
+    assert not problems, (
+        "The reconstructed AHP consistency ratio is not a result:\n  "
+        + "\n  ".join(problems))
