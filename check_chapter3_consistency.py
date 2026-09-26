@@ -17,7 +17,8 @@ Three checks, deliberately different in kind:
              number, it is a wrong claim about the design, and it sat in §3.4.4
              through every numeric correction.
 
-  FIELDS     Zotero field integrity. Chapter 3 carries 26 live citation fields,
+  FIELDS     Zotero field integrity. Chapter 3 carries 25 live citation fields
+             (the docstring said 26 until the count was actually taken),
              and the edits in this project are run-level surgery. A mismatched
              begin/end pair or an orphaned field silently breaks the
              bibliography, and nothing else would notice.
@@ -133,6 +134,15 @@ RETIRED = [
     ("9.11", "XGBoost RMSE while early-stopped on the validation set; now 9.24"),
     ("+1.26", "XGBoost mean bias before the early-stopping fix; now +1.20"),
     ("0.721", "XGBoost centred RMSE mis-transcribed; the Taylor value is 0.742"),
+    # the AHP elicitation that was never held (Section 12d)
+    ("pairwise comparison matrix completed by the researcher",
+     "no pairwise matrix was elicited or retained; 3.9.4 now says so and reports no CR"),
+    ("consistency ratio of the pairwise comparison matrix is computed and verified",
+     "unevidenced - the matrix is not in the archive; 3.9.4 reports no consistency ratio"),
+    ("confirming that the weight assignments are internally consistent",
+     "no consistency ratio supports this; Section 3.9.6's sensitivity analysis is the test"),
+    ("Criterion Weighting Using AHP",
+     "the heading claimed a procedure 3.9.4 states was not performed; now 'Criterion Weighting'"),
     # deployment claims
     ("the pixel-wise Random Forest is deployed", "XGBoost is deployed"),
     ("deployed for the projection stage is the pixel-wise Random Forest", "XGBoost is deployed"),

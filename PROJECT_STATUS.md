@@ -1067,15 +1067,40 @@ prints "NOT REPORTABLE" rather than "acceptable", and
 hardcodes the value or quotes a consistency ratio. Injection-tested: restoring
 the old sentence fails the test on both the value and the phrase.
 
-**Left for you, because it is your account of your own process.** Chapter 3
-paragraph 180 says the matrix was "completed by the researcher in consultation
-with the thesis supervisors" and that its CR was verified below 0.10. That matrix
-is not in the project archive, so the sentence is currently unevidenced. Two
-honest routes: recover the original judgements, drop them into `PAIRWISE` and set
-`PAIRWISE_IS_ELICITED = True`, at which point the printed CR becomes real and
-quotable - or soften paragraph 180 to state that weights were assigned on the
-stated policy rationale without a formal consistency check. **Do not leave it as
-it stands.**
+**Chapter 3 paragraph 180 - RESOLVED by softening, on the author's instruction**
+("soften ¶180, I don't have the matrix"). It previously claimed the matrix was
+"completed by the researcher in consultation with the thesis supervisors" and its
+CR "computed and verified to be below the AHP acceptability threshold of 0.10,
+confirming that the weight assignments are internally consistent". Both halves
+were unevidenced once the matrix could not be produced. Section 3.9.4 now states
+that the weights are assigned by the researcher, reflect the National Renewable
+Energy Policy priorities, follow the AHP's ordinal logic, and that **no formal
+pairwise comparison matrix was elicited or retained and no consistency ratio is
+therefore reported** - then points at Section 3.9.6, whose four-scheme
+robustness test is the claim the chapter can actually support.
+
+**The heading went with it.** Section 3.9.4 was titled "Criterion Weighting Using
+AHP", which would have advertised, one line above the new paragraph, the
+procedure that paragraph says was not performed. It is now "Criterion Weighting".
+Section numbering is untouched and Chapter 3 carries no TOC field, so nothing
+needs refreshing in Word.
+
+**Still says AHP elsewhere, and this is a judgement call left open.** The Table
+3.5 caption, that table's "Initial AHP Weight" column, and paragraphs 190 and 196
+("primary AHP weights", "primary AHP classification") still use AHP as the *name*
+of the primary weighting scheme, as does Chapter 4 Section 4.8. That is defensible
+now that Section 3.9.4 states plainly what was and was not done - the label names
+a weight vector, not a claimed procedure - but an examiner may still ask why the
+name is kept. Renaming it throughout is a one-pass change if wanted.
+
+**Guarded.** Four literal anchors in `check_chapter3_consistency.RETIRED` cover
+the elicitation claim, the verified-CR claim, the internal-consistency conclusion
+and the old heading. Injection-tested on a copy: restoring the original wording
+fires all four and exits 1.
+
+Zotero integrity held through both edits - 25 `ZOTERO_ITEM` fields, 1
+`ZOTERO_BIBL`, 156 `fldChar`, 222 paragraphs, 5 tables, unchanged before and
+after. Backup: `CR_Madukwe_Chapter3_Final_BACKUP_pre_ahp_soften.docx`.
 
 ---
 
