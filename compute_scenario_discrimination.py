@@ -27,6 +27,7 @@ import xarray as xr
 ROOT = os.path.dirname(os.path.abspath(__file__))
 PROC = os.path.join(ROOT, "data/processed")
 OUT = os.path.join(PROC, "evaluation/scenario_discrimination.csv")
+OUT_AGREE = os.path.join(PROC, "evaluation/architecture_agreement.csv")
 
 # The bare directory is the U-Net's: it was the deployed model when the
 # aggregation script was written and never took a suffix.
@@ -47,6 +48,31 @@ HORIZONS = [
 def field(model_dir, ssp, tag):
     path = os.path.join(PROC, model_dir, "mme_suitability_%s_%s.nc" % (ssp, tag))
     return xr.open_dataset(path).ghi_mean.values
+
+
+def architecture_agreement():
+    """Pairwise correlation of the projected CHANGE field across architectures.
+
+    Section 4.7 leans on this: agreement on the present is not agreement on the
+    future. It was asserted as "no pair correlates above 0.71" and "the deployed
+    model agrees with the others at 0.11 to 0.48", both typed by hand and both
+    stale after the honest retrain - the real figures are 0.58 and 0.12 to 0.28,
+    which make the point more strongly than the numbers that were printed.
+    """
+    import itertools
+
+    present = xr.open_dataset(
+        os.path.join(PROC, "suitability/criterion_layers.nc")).ghi_present_era5.values
+    change = {}
+    for model, d in MME.items():
+        g = field(d, "ssp585", "long_term_2076_2100")
+        change[model] = (g - present).ravel()
+
+    rows = []
+    for a, b in itertools.combinations(change, 2):
+        rows.append({"model_a": a, "model_b": b,
+                     "r_projected_change": float(np.corrcoef(change[a], change[b])[0, 1])})
+    return pd.DataFrame(rows)
 
 
 def main():
@@ -79,7 +105,18 @@ def main():
               % (r["model"], r["sep_near_term"], r["sep_mid_term"], r["sep_long_term"],
                  "yes" if r["grows"] else "NO", "yes" if r["monotonic"] else "no",
                  r["pct_ordered_long_term"]))
+    agree = architecture_agreement()
+    agree.to_csv(OUT_AGREE, index=False)
+    dep = agree[(agree.model_a == "XGBoost") | (agree.model_b == "XGBoost")]
+    print("\narchitecture agreement on the projected change field")
+    for _, r in agree.iterrows():
+        print("  %-16s vs %-16s r = %+.3f" % (r.model_a, r.model_b, r.r_projected_change))
+    print("  max over all pairs        %.2f" % agree.r_projected_change.max())
+    print("  deployed vs the others    %.2f to %.2f"
+          % (dep.r_projected_change.min(), dep.r_projected_change.max()))
+
     print("\nSaved %s" % OUT)
+    print("Saved %s" % OUT_AGREE)
 
 
 if __name__ == "__main__":

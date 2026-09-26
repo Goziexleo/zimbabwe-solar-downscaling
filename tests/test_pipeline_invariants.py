@@ -499,3 +499,56 @@ def test_scenario_discrimination_is_read_from_disk():
                 if v in src:
                     problems.append(f"{name} hardcodes the current {m} {h}-term value {v}")
     assert not problems, "\n  ".join(["Table 4.5 must be read from the CSV:"] + problems)
+
+
+def test_withdrawn_dropout_attribution_stays_withdrawn():
+    """The U-Net's damping must not be re-attributed to dropout.
+
+    Chapters 4 and 5 stated that removing spatial dropout "raises the spectral
+    ratio beyond wavenumber 10 from 0.085 to 0.771" and concluded that dropout
+    causes the damping. Three things were wrong: 0.085 was a pre-retrain
+    deployed-model figure paired with a sweep figure; the sweep's own baseline
+    carries the same dropout rate and shows a ratio of 1.24, an excess rather
+    than a deficit, so it never reproduced the defect; and removing dropout
+    leaves the ratio no closer to unity (0.23 against 0.24).
+
+    This asserts the data still says so, and that the withdrawn phrasing has not
+    returned. If a future sweep produces a baseline that does reproduce the
+    damping, this test fails and the attribution can be revisited on evidence.
+    """
+    import pandas as pd
+    import tokenize
+
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    uo = pd.read_csv(os.path.join(root, "data/processed/evaluation",
+                                  "unet_optimisation.csv")).set_index("variant")
+
+    base_r = uo.loc["baseline", "test_spec_ratio"]
+    drop_r = uo.loc["drop_0", "test_spec_ratio"]
+    assert base_r > 1.0, (
+        f"the sweep baseline now shows damping (ratio {base_r:.3f}); it did not before, "
+        "so the dropout attribution can be re-examined")
+    assert abs(1 - drop_r) >= abs(1 - base_r) - 0.05, (
+        "removing dropout now moves the spectral ratio materially closer to unity; "
+        "§4.5's withdrawal should be revisited")
+
+    def code_only(path):
+        out = []
+        with open(path, "rb") as fh:
+            for tok in tokenize.tokenize(fh.readline):
+                if tok.type != tokenize.COMMENT:
+                    out.append(tok.string)
+        return "\n".join(out)
+
+    problems = []
+    for name in ("build_chapter4.py", "build_chapter5.py"):
+        src = code_only(os.path.join(root, name))
+        if "0.085" in src:
+            problems.append(f"{name} carries the superseded 0.085 spectral ratio")
+        for phrase in ("dropout smooths the predicted field",
+                       "refutes the smoothness-prior",
+                       "isolates it to the regularisation setting",
+                       "removes the smoothing failure"):
+            if phrase in src:
+                problems.append(f"{name} restates the withdrawn attribution: {phrase!r}")
+    assert not problems, "\n  ".join(["The dropout attribution is withdrawn:"] + problems)

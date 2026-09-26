@@ -26,6 +26,7 @@ unc = pd.read_csv(os.path.join(EVAL, "uncertainty_decomposition_summary.csv"))
 info = pd.read_csv(os.path.join(EVAL, "information_content.csv")).set_index("field")
 per = pd.read_csv(os.path.join(EVAL, "suitability_by_period.csv")).set_index("period")
 scr = pd.read_csv(os.path.join(EVAL, "scenario_discrimination.csv")).set_index("model")
+uo = pd.read_csv(os.path.join(EVAL, "unet_optimisation.csv")).set_index("variant")
 sar = pd.read_csv(os.path.join(EVAL, "sarah_era5_monthly.csv"))
 lay = xr.open_dataset(os.path.join(SUIT, "criterion_layers.nc"))
 sui = xr.open_dataset(os.path.join(SUIT, "suitability_index.nc"))
@@ -116,11 +117,12 @@ P("Two qualifications belong with that answer, and both concern how the comparis
   "their saved weights on the evaluation record, which inflated their accuracy by "
   "roughly nine per cent; they were retrained with the epoch count chosen on an inner "
   "split of the training period, and the figures above are the corrected ones. "
-  "Separately, a controlled sweep shows the U-Net reaches 8.63 W m-2 under honest "
+  "Separately, a controlled sweep shows the U-Net reaches %.2f W m-2 under honest "
   "selection once its dropout setting is removed, which is below the deployed model. "
   "Neither fact overturns the deployment, for the reason given under RQ3, but together "
   "they mean this study compares particular configurations, selected in a particular "
-  "way, rather than architectures in the abstract.")
+  "way, rather than architectures in the abstract."
+  % uo.loc["drop_0", "test_rmse"])
 P("Against traditional baselines the answer is unambiguous only for the admissible one. "
   "All four models beat a per-cell, per-calendar-month climatology. Scores against "
   "interpolation of the coarse irradiance field are not skill, because that field is a "
@@ -283,14 +285,21 @@ P("**Extend honest selection to the hyperparameters as well as the epoch count.*
   "count is now chosen on an inner split. The remaining hyperparameters — learning rate, "
   "gradient-penalty weight, dropout, architecture width — were fixed by a grid search "
   "reported in Section 3.6.7, and the sweep described above shows at least one of them, "
-  "dropout, to be badly chosen. A search conducted entirely within the training period, "
+  "dropout, to be costly on held-out accuracy. A search conducted entirely within the "
+  "training period, "
   "over all of them jointly, is the natural completion of that correction.")
-P("**Revisit the U-Net configuration.** A controlled sweep shows that removing the "
-  "spatial dropout setting improves held-out error to 8.63 W m-2, spatial correlation to "
-  "0.970 and the spectral ratio from 0.085 to 0.771 — that is, it removes the smoothing "
-  "failure the architecture was thought to exhibit inherently. Any such configuration "
-  "must pass the scenario-discrimination screen before it can be considered for "
-  "deployment.")
+P("**Revisit the U-Net configuration, and settle what causes its damping.** A controlled "
+  "sweep shows that removing the spatial dropout setting improves held-out error to %.2f "
+  "W m-2 and spatial correlation to %.3f, so the setting is costly on accuracy. It does "
+  "not show what causes the spectral damping: the sweep's baseline carries the same "
+  "dropout rate as the deployed model and shows an excess of fine-scale power (%.2f) "
+  "rather than the deployed model's deficit, so it never reproduced the failure it was "
+  "built to explain. Section 4.5 sets this out and withdraws the earlier attribution. "
+  "Establishing the mechanism needs a sweep whose baseline reproduces the deployed "
+  "model's spectra, and any improved configuration must pass the scenario-discrimination "
+  "screen before it can be considered for deployment."
+  % (uo.loc["drop_0", "test_rmse"], uo.loc["drop_0", "test_spatial_r"],
+     uo.loc["baseline", "test_spec_ratio"]))
 P("**Extend the suitability analysis with infrastructure and demographic scenarios.** "
   "The present analysis can say how the resource changes at fixed sites. Answering where "
   "future sites should be requires projections of the transmission network and population "

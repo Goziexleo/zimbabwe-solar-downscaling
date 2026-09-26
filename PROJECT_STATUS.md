@@ -192,7 +192,7 @@ Roughly **9% of each neural model's reported accuracy was selection on the test 
 
 **σ_arch rose from 27.18% to 35.40% of long-term variance**, against the GCM's 4.49%. Correcting two of the four members' inflated accuracy widened the spread between architectures, which is precisely what that term measures. Chapter 5's lead methodological contribution is strengthened, not weakened, by the correction.
 
-**What did not move: the U-Net's spectral damping, 0.085 → 0.090.** Dropout is unchanged by this retrain, and §7.18 attributes the damping to dropout. The damping persisting through a retrain that changed everything else is independent corroboration of that attribution.
+**What did not move: the U-Net's spectral damping, 0.085 → 0.090** (the deployed model, at k≥11). Dropout is unchanged by this retrain, and §7.18 attributes the damping to dropout. The damping persisting through a retrain that changed everything else is independent corroboration of that attribution.
 
 ### 6.3 Fabricated zero band across ~25% of the domain (severe, silent)
 The fine grid extended up to 0.85° beyond coarse ERA5 coverage; interpolation returned NaN there, a defensive `np.nan_to_num` zeroed it, and a quarter of every training target became a hard-zero band. No aggregate metric flagged it — found only by plotting fields. Fixed by aligning `FINE_LAT`/`FINE_LON` to real coverage.
@@ -595,16 +595,20 @@ Nearly half the domain changes tier on the irradiance criterion alone. **So the 
 
 Two findings from `optimise_unet.py`, a controlled sweep that fits on 1985–2004, selects on 2005–2010, and touches the withheld record once per variant.
 
-**Dropout, not loss or architecture, causes the damping.** The deployed configuration applies `Dropout2d(0.3)` eight times per encoder/decoder level. Removing it:
+**Dropout costs accuracy. It has NOT been shown to cause the damping — that attribution is WITHDRAWN (§12h).** The deployed configuration applies `Dropout2d(0.3)` eight times per encoder/decoder level. Removing it, within the sweep:
 
-| | deployed | dropout removed |
+| | sweep baseline (dropout 0.3) | dropout removed |
 |---|---|---|
 | held-out RMSE | 10.98 | **8.63** |
 | spatial correlation | 0.894 | **0.970** |
 | centred RMSE | 3.59 | **1.97** |
-| spectral ratio (k≥10) | 0.085 | **0.771** |
+| spectral ratio (k≥10) | 1.24 | **0.771** |
 
-Varying the gradient penalty barely moves the ratio, so the smoothness-prior hypothesis is refuted. Three other results from the same sweep: a per-cell climatology gives the best spatial correlation of any variant (0.993) and the worst RMSE (18.68), because it hands the network the pattern and costs it the level; reducing capacity to 1.1M parameters costs little; and every combination containing the per-cell climatology inherits its error.
+**The left column is the sweep's baseline, not the deployed model**, which is 11.03 / 0.9028 / 3.479 and has a spectral ratio of 0.090 at k≥11. The table previously labelled that column "deployed" and put **0.085** in its spectral row — a pre-retrain deployed-model figure sitting beside three sweep figures.
+
+**Why the attribution fails.** The sweep's baseline carries the same dropout rate as the deployed model and shows a spectral ratio of **1.24 — an excess of fine-scale power, not a deficit**. It never reproduced the damping it was built to explain, so it cannot isolate its cause. Removing dropout moves the ratio to 0.771, which is no closer to unity: 0.23 against 0.24 in absolute deviation.
+
+**And the supporting claim was backwards.** "Varying the gradient penalty barely moves the ratio, so the smoothness-prior hypothesis is refuted" fails on both halves: the penalty variants span 1.01 to 1.24, and removing the penalty gives **1.006 — the closest to unity of any variant tested**, which points toward a smoothness prior rather than away from it. Three other results from the same sweep: a per-cell climatology gives the best spatial correlation of any variant (0.993) and the worst RMSE (18.68), because it hands the network the pattern and costs it the level; reducing capacity to 1.1M parameters costs little; and every combination containing the per-cell climatology inherits its error.
 
 **`train_unet_downscaler.py` and `train_cnn_downscaler.py` both select their saved checkpoint on `ml_validation_dataset.nc`** — the withheld 2011–2024 record. The U-Net additionally early-stops and schedules its learning rate on it. This is §6.12's defect, found and fixed for XGBoost, still live in the other two. The deployed U-Net's log shows the validation curve bouncing between 0.109 and 0.140 with the checkpoint saved at the 0.1085 minimum: selecting a favourable fluctuation from ~28 draws.
 
@@ -1294,6 +1298,66 @@ today's values as literals in either generator, and asserts the two verdicts §4
 leans on - that the Random Forest fails the screen and XGBoost passes it - so a
 regenerated CSV that quietly reversed either would fail rather than silently
 rewrite the chapter's argument. Injection-tested.
+
+---
+
+## 12h. Prose audit: a mechanism the data does not support
+
+Same method again - scan both generators for numeric literals inside `P()` that
+are not filled at build time, then check each surviving claim against the data.
+Most hits were section numbers. Four were real, and the last is not a stale
+number but a wrong inference.
+
+**Section 4.7 contradicted itself one paragraph apart.** The paragraph computing
+the variance decomposition printed architecture at **35.4 per cent** from the
+CSV; the very next paragraph said *"architecture contributes 27 per cent"* and
+repeated it. 27.18% was the pre-retrain figure. Both are computed now.
+
+**Its two supporting correlations were stale as well**, and no CSV held them: *"no
+pair of architectures correlates above 0.71"* is really **0.58**, and *"the
+deployed model agrees with the others at 0.11 to 0.48"* is **0.12 to 0.28**. Both
+now come from `architecture_agreement.csv`, written by
+`compute_scenario_discrimination.py`. The corrected figures make Section 4.7's
+point more strongly than the printed ones did.
+
+**The dropout attribution is withdrawn.** Chapters 4 and 5 and Section 7.18 all
+stated that removing spatial dropout *"raises the spectral ratio beyond wavenumber
+10 from 0.085 to 0.771"*, and concluded that dropout causes the U-Net's damping.
+Checking it against `unet_optimisation.csv`:
+
+- **0.085 was a pre-retrain deployed-model figure** (now 0.090) sitting beside
+  0.771, which is a **sweep** figure. Two different models, one comparison.
+- **The sweep's own baseline has a spectral ratio of 1.24** - an *excess* of
+  fine-scale power. It carries the same `Dropout2d(0.3)` as the deployed model
+  and shows no damping at all, so it never reproduced the failure it was built to
+  explain. A sweep whose baseline lacks the defect cannot isolate its cause.
+- **Removing dropout moves the ratio to 0.771, which is no closer to unity**:
+  0.23 against 0.24 in absolute deviation. Essentially unchanged.
+- **The supporting claim was backwards.** *"Varying the gradient penalty barely
+  moves the ratio, so the smoothness-prior hypothesis is refuted"* fails twice:
+  the penalty variants span 1.01 to 1.24, and removing the penalty gives **1.006,
+  the closest to unity of any variant tested** - evidence *for* a smoothness
+  prior, not against it.
+
+**What survives is the accuracy result**, which is solid and unchanged: removing
+dropout improves held-out RMSE from 10.98 to 8.63, spatial correlation from 0.894
+to 0.970, and centred error from 3.59 to 1.97. Dropout is costly. What it does to
+the spectra is now an open question, and both chapters say so.
+
+**This is a change to a scientific claim, not a typo, and it needs the author's
+review.** Section 4.5 now reports the withdrawal and the inconvenient
+gradient-penalty result explicitly rather than dropping the paragraph; Section 5.6
+asks for a sweep whose baseline reproduces the deployed model's spectra. Nothing
+downstream depends on the attribution - the deployment decision turned on scenario
+discrimination - so no result moves.
+
+*Cleared in the same pass, checked rather than assumed:* the 19.08 climatology
+(skill is RMSE-based, so 9.242/(1−0.5155) = 19.08 - my first check assumed an
+MSE-based skill and was wrong, not the chapter), mean bias below 5 W m⁻² for all
+four (max 4.553), 479 usable SARAH fields, the 3 per cent SARAH offset (3.23%),
+168 evaluation months and 312 training months, the 214–258 W m⁻² assessed span
+(214.1–257.1), two cells excluded by slope, and the +0.92/+0.95 honest-selection
+cost.
 
 ---
 

@@ -36,6 +36,9 @@ info = pd.read_csv(os.path.join(EVAL, "information_content.csv")).set_index("fie
 per = pd.read_csv(os.path.join(EVAL, "suitability_by_period.csv")).set_index("period")
 sch = pd.read_csv(os.path.join(EVAL, "suitability_schemes.csv")).set_index("scheme")
 scr = pd.read_csv(os.path.join(EVAL, "scenario_discrimination.csv")).set_index("model")
+agr = pd.read_csv(os.path.join(EVAL, "architecture_agreement.csv"))
+uo = pd.read_csv(os.path.join(EVAL, "unet_optimisation.csv")).set_index("variant")
+_dep = agr[(agr.model_a == "XGBoost") | (agr.model_b == "XGBoost")]
 K = lambda scheme: sch.loc[scheme, "kappa_vs_primary"]
 sar = pd.read_csv(os.path.join(EVAL, "sarah_era5_monthly.csv"))
 lay = xr.open_dataset(os.path.join(SUIT, "criterion_layers.nc"))
@@ -362,16 +365,38 @@ P("A second question is whether the models preserve the spectral character of th
   "monotonically to %.3f at wavenumber 20, so it is damped at every cut tested. This is "
   "the smoothing failure mode reported for machine-learning emulators generally (Rampal et al., 2024)."
   % (un_hi, un_lo))
-P("The cause, however, is neither the loss function nor the encoder-decoder architecture, "
-  "as an earlier version of this section stated. A controlled sweep fitting on 1985 to "
-  "2004 and selecting on 2005 to 2010 isolates it to the regularisation setting. The "
-  "deployed configuration applies spatial dropout at a rate of 0.3 eight times per "
-  "encoder-decoder level; removing it raises the spectral ratio beyond wavenumber 10 "
-  "from 0.085 to 0.771, and simultaneously improves held-out error from 10.98 to 8.63 "
-  "W m-2, spatial correlation from 0.894 to 0.970 and centred error from 3.59 to 1.97. "
-  "Varying the gradient penalty over the same sweep barely moves the spectral ratio at "
-  "all, which refutes the smoothness-prior explanation directly. Aggressive spatial "
-  "dropout smooths the predicted field, and that is the mechanism.")
+P("The cause was investigated with a controlled sweep fitting on 1985 to 2004 and "
+  "selecting on 2005 to 2010, varying one setting at a time. The clearest result concerns "
+  "accuracy rather than spectra: removing the spatial dropout that the deployed "
+  "configuration applies at a rate of %.1f improves held-out error from %.2f to %.2f "
+  "W m-2, spatial correlation from %.3f to %.3f, and centred error from %.2f to %.2f. "
+  "Dropout at this rate costs the U-Net a substantial amount of accuracy."
+  % (uo.loc["baseline", "cfg_dropout"], uo.loc["baseline", "test_rmse"],
+     uo.loc["drop_0", "test_rmse"], uo.loc["baseline", "test_spatial_r"],
+     uo.loc["drop_0", "test_spatial_r"], uo.loc["baseline", "test_centred_rmse"],
+     uo.loc["drop_0", "test_centred_rmse"]))
+P("The sweep does not, however, identify the cause of the damping reported above, and an "
+  "earlier version of this section claimed that it did. The difficulty is that the "
+  "sweep's own baseline does not reproduce the damping it was built to explain. That "
+  "baseline carries the same dropout rate as the deployed model, yet its spectral ratio "
+  "at wavenumber %d is %.2f — an excess of fine-scale power, not a deficit — against the "
+  "deployed model's %.3f at wavenumber 11. Removing dropout moves the sweep's ratio to "
+  "%.2f, which is no closer to unity than the baseline was: %.2f against %.2f in absolute "
+  "deviation. A sweep whose baseline does not exhibit the failure cannot isolate its "
+  "cause, and the attribution to dropout is therefore withdrawn."
+  % (10, uo.loc["baseline", "test_spec_ratio"], cut.loc["U-Net", "k>=11"],
+     uo.loc["drop_0", "test_spec_ratio"], abs(1 - uo.loc["drop_0", "test_spec_ratio"]),
+     abs(1 - uo.loc["baseline", "test_spec_ratio"])))
+P("One result from the same sweep points the other way and is reported because it is "
+  "inconvenient: removing the gradient penalty gives a spectral ratio of %.3f, the closest "
+  "to unity of any variant tested, while the penalty variants span %.2f to %.2f. An "
+  "earlier version of this section stated that the gradient penalty barely moves the "
+  "ratio and that a smoothness prior was therefore refuted. Neither half of that holds. "
+  "What can be said is that the deployed U-Net damps fine scales, that its damping is "
+  "robust to the wavenumber cut, and that the mechanism remains open."
+  % (uo.loc["gp_none", "test_spec_ratio"],
+     uo.loc[["baseline", "gp_none", "gp_match", "gp_match_strong"], "test_spec_ratio"].min(),
+     uo.loc[["baseline", "gp_none", "gp_match", "gp_match_strong"], "test_spec_ratio"].max()))
 TBL(["Field"] + [c for c in cut.columns if c.startswith("k>=")] + ["Verdict"],
     [[f] + ["%.2f" % cut.loc[f, c] for c in cut.columns if c.startswith("k>=")]
      + [cut.loc[f, "robust"]]
@@ -464,16 +489,20 @@ P("The uncertainty budget carries the more consequential result. At every horizo
   % (u.loc["near_term_2026_2050", "pct_var_ds"], u.loc["long_term_2076_2100", "pct_var_ds"],
      u.loc["near_term_2026_2050", "pct_var_gcm"], u.loc["long_term_2076_2100", "pct_var_gcm"],
      u.loc["near_term_2026_2050", "pct_var_arch"], u.loc["long_term_2076_2100", "pct_var_arch"]))
-P("The correct reading of that number is not that architecture contributes 27 per cent "
+P("The correct reading of that number is not that architecture contributes %.0f per cent "
   "and this study has identified the right architecture. It is that a study using a "
   "single architecture would have reported zero architecture uncertainty and been wrong "
-  "by 27 per cent of the long-term variance, whichever architecture it had chosen. "
+  "by %.0f per cent of the long-term variance, whichever architecture it had chosen. "
   "Excluding the weaker models to shrink the estimate would be circular, since it would "
   "use an unvalidated judgement about future behaviour to reduce an estimate of "
   "uncertainty about the future. The four-member spread is retained for that reason. A "
-  "supporting result points the same way: no pair of architectures correlates above 0.71 "
+  "supporting result points the same way: no pair of architectures correlates above %.2f "
   "on the spatial pattern of projected change, and the deployed model agrees with the "
-  "others at 0.11 to 0.48. Agreement on the present is not agreement on the future.")
+  "others at %.2f to %.2f. Agreement on the present is not agreement on the future."
+  % (u.loc["long_term_2076_2100", "pct_var_arch"],
+     u.loc["long_term_2076_2100", "pct_var_arch"],
+     agr.r_projected_change.max(),
+     _dep.r_projected_change.min(), _dep.r_projected_change.max()))
 
 FIG("03_feature_importance.png", "Predictor importance across the four measures. "
     "The topographic covariates score exactly zero for the pixel-wise models, which is "
