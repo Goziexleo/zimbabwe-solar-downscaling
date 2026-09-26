@@ -143,6 +143,12 @@ RETIRED = [
      "no consistency ratio supports this; Section 3.9.6's sensitivity analysis is the test"),
     ("Criterion Weighting Using AHP",
      "the heading claimed a procedure 3.9.4 states was not performed; now 'Criterion Weighting'"),
+    # the AHP label, renamed throughout once the procedure was withdrawn
+    ("initial AHP weights", "Table 3.5's caption now says 'initial criterion weights'"),
+    ("initial AHP weight", "3.9.1 now says 'its initial weight'"),
+    ("Initial AHP Weight", "Table 3.5's column header is now 'Initial Weight'"),
+    ("primary AHP weights", "3.9.6 now says 'the primary weights of Table 3.5'"),
+    ("primary AHP classification", "3.9.6 now says 'the primary classification'"),
     # deployment claims
     ("the pixel-wise Random Forest is deployed", "XGBoost is deployed"),
     ("deployed for the projection stage is the pixel-wise Random Forest", "XGBoost is deployed"),

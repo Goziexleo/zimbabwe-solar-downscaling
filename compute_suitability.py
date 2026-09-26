@@ -1,5 +1,12 @@
-"""Section 3.9: AHP weights, weighted linear combination, and the sensitivity
+"""Section 3.9: criterion weights, weighted linear combination, and the sensitivity
 analysis, from the layers build_suitability_layers.py writes.
+
+On naming. The primary scheme is called "primary", not "AHP". Section 3.9.4 no
+longer claims a pairwise elicitation was performed, so labelling the weight
+vector AHP would advertise machinery the thesis does not have. PRIMARY_WEIGHTS
+holds Table 3.5's values and the NetCDF carries si_primary / tier_primary. The
+only place AHP is still named is the reconstruction diagnostic below, which is
+genuinely about a Saaty matrix.
 
 On the AHP matrix, which is the one part of this that cannot be computed.
 Section 3.9.4 says the weights come from "a pairwise comparison matrix completed
@@ -34,7 +41,7 @@ cells change tier under a defensible reweighting. A consistency ratio of 0.008
 sitting beside that number would have been the more flattering of the two and
 the less informative.
 
-Nothing downstream moved. Every scheme weights from AHP_WEIGHTS (Table 3.5);
+Nothing downstream moved. Every scheme weights from PRIMARY_WEIGHTS (Table 3.5);
 ahp()'s vector is printed and discarded.
 
     python compute_suitability.py
@@ -59,7 +66,7 @@ OUT_DIR = os.path.join(PROC, "evaluation")
 CRITERIA = ["ghi", "slope", "landcover", "roads", "grid", "settlements", "population"]
 
 # Table 3.5
-AHP_WEIGHTS = dict(zip(CRITERIA, [0.35, 0.20, 0.15, 0.10, 0.10, 0.05, 0.05]))
+PRIMARY_WEIGHTS = dict(zip(CRITERIA, [0.35, 0.20, 0.15, 0.10, 0.10, 0.05, 0.05]))
 
 # RECONSTRUCTED Saaty judgements, upper triangle, in CRITERIA order.
 #
@@ -106,7 +113,7 @@ SLOPE_EXCLUDE_DEG = 15.0
 TIERS = [("very high", 0.75), ("high", 0.60), ("moderate", 0.45), ("low", 0.30)]
 
 SCHEMES = {
-    "AHP (primary)": AHP_WEIGHTS,
+    "primary": PRIMARY_WEIGHTS,
     "irradiance-dominant": None,     # GHI 0.50, rest scaled
     "infrastructure-dominant": None,  # roads+grid 0.40, GHI 0.25
     "equal": {c: 1.0 / 7 for c in CRITERIA},
@@ -116,7 +123,7 @@ SCHEMES = {
 def ahp():
     """Priority vector and consistency ratio from PAIRWISE.
 
-    Both are diagnostics. The analysis weights every scheme from AHP_WEIGHTS
+    Both are diagnostics. The analysis weights every scheme from PRIMARY_WEIGHTS
     (Table 3.5) and never from the vector returned here, so the reconstruction
     cannot move a single downstream number - it only demonstrates that the
     published weights are attainable from a consistent set of integer Saaty
@@ -136,7 +143,7 @@ def ahp():
 
 def build_schemes():
     s = dict(SCHEMES)
-    w = dict(AHP_WEIGHTS)
+    w = dict(PRIMARY_WEIGHTS)
     rest = 1 - w["ghi"]
     irr = {c: (0.50 if c == "ghi" else w[c] * (0.50 / rest) * (rest / rest))
            for c in CRITERIA}
@@ -210,8 +217,8 @@ def main():
         print("  A CR this far below 0.10 is itself the tell.")
     print("  reconstructed vs Table 3.5:")
     for c, v in zip(CRITERIA, w):
-        print("    %-12s %.3f  vs  %.2f   (%+.3f)" % (c, v, AHP_WEIGHTS[c], v - AHP_WEIGHTS[c]))
-    print("  max deviation %.3f" % max(abs(v - AHP_WEIGHTS[c]) for c, v in zip(CRITERIA, w)))
+        print("    %-12s %.3f  vs  %.2f   (%+.3f)" % (c, v, PRIMARY_WEIGHTS[c], v - PRIMARY_WEIGHTS[c]))
+    print("  max deviation %.3f" % max(abs(v - PRIMARY_WEIGHTS[c]) for c, v in zip(CRITERIA, w)))
 
     # Present uses SARAH (7.17). CHANGE between present and future must not,
     # because the projections come from an ERA5-trained chain and differencing
@@ -299,20 +306,22 @@ def main():
           % (lo, hi))
 
     print("\nweighting schemes (present):")
+    sis = {}
     for name, wts in schemes.items():
         assert abs(sum(wts.values()) - 1) < 1e-9, name
         si = sum(wts[c] * S[c] for c in CRITERIA)
         si = np.where(excluded, 0.0, si)
         t = classify(si, excluded)
         tiers[name] = t
+        sis[name] = si
         key = name.split()[0].replace("(", "")
         out["si_" + key] = (("lat", "lon"), si)
         out["tier_" + key] = (("lat", "lon"), t)
         print("  %-24s SI %.3f mean on retained | very high %d, high %d"
               % (name, si[keep].mean(), (t == 0).sum(), (t == 1).sum()))
 
-    print("\nall periods under the primary AHP weights:")
-    w = schemes["AHP (primary)"]
+    print("\nall periods under the primary weights:")
+    w = schemes["primary"]
     rows = []
     for tag, var in periods:
         g = np.clip((ds[var].values - lo) / (hi - lo), 0, 1)
@@ -340,11 +349,23 @@ def main():
             print("  %-30s mean %+.4f | cells improving %5d of %d"
                   % (tag, d_si[keep].mean(), int((d_si[keep] > 0).sum()), keep.sum()))
 
-    prim = tiers["AHP (primary)"]
-    print("\nCohen's kappa against the AHP classification (retained cells):")
+    # Persisted, not just printed. Chapter 4 quoted kappa 0.697 / 0.317 / -0.111
+    # as hardcoded literals because these numbers were nowhere on disk, and they
+    # went stale the moment the decay function was resolved - the generator that
+    # exists so no figure can drift from the analysis was the thing that drifted.
+    prim = tiers["primary"]
+    print("\nCohen's kappa against the primary classification (retained cells):")
+    scheme_rows = []
     for name, t in tiers.items():
-        if name != "AHP (primary)":
-            print("  %-24s %.4f" % (name, kappa(prim, t, keep)))
+        k = None if name == "primary" else kappa(prim, t, keep)
+        scheme_rows.append(dict(
+            scheme=name,
+            mean_si=float(np.nanmean(np.where(keep, sis[name], np.nan))),
+            very_high=int(((t == 0) & keep).sum()),
+            high=int(((t == 1) & keep).sum()),
+            kappa_vs_primary=k))
+        if k is not None:
+            print("  %-24s %.4f" % (name, k))
 
     robust = np.all([(t <= 1) for t in tiers.values()], axis=0) & keep
     shifts = np.any([(t != prim) for t in tiers.values()], axis=0) & keep
@@ -361,6 +382,13 @@ def main():
     out.to_netcdf(OUT_NC)
     pd.DataFrame([dict(scheme=k, **v) for k, v in schemes.items()]).to_csv(
         os.path.join(OUT_DIR, "suitability_weights.csv"), index=False)
+    pd.DataFrame(scheme_rows).to_csv(
+        os.path.join(OUT_DIR, "suitability_schemes.csv"), index=False)
+    pd.DataFrame([dict(assessed=int(keep.sum()),
+                       robust=int(robust.sum()),
+                       weight_sensitive=int(shifts.sum()),
+                       irradiance_layer=ghi_source)]).to_csv(
+        os.path.join(OUT_DIR, "suitability_robustness.csv"), index=False)
     print("\nSaved %s" % OUT_NC)
 
 

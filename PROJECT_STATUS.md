@@ -127,7 +127,7 @@ The retained domain is narrower than Chapter 3's nominal box (15.0–22.5°S, 25
 | `make_suitability_maps.py` | §3.9 map figures 07–10, exclusions drawn off the score ramp |
 | `compare_sarah_era5.py` | SARAH against the ERA5-derived GHI over 1985–2024, on the target grid. Resumable: caches each month as it interpolates, after an OS update killed a 25-minute run that held everything in memory |
 | `build_suitability_layers.py` | §3.9 criterion layers and exclusion mask on the 0.1° grid |
-| `compute_suitability.py` | §3.9 AHP weighting, WLC, five-tier classification, four-scheme sensitivity |
+| `compute_suitability.py` | §3.9 criterion weighting, WLC, five-tier classification, four-scheme sensitivity |
 | `compare_sarah_clearsky.py` | Compares the PVLIB clear-sky ceiling against SARAH's `SISC` by calendar month. The near-constant 1.724 ratio is the evidence for §7.15 |
 | `compute_bca_centred_rmse.py` | **BCa intervals** on the paired differences. Required because the percentile interval is invalid for centred RMSE, whose bootstrap distribution is biased by construction. Reports percentile, basic and BCa side by side. |
 | `check_status_consistency.py` | Guards this document against stale numbers; run by `pytest` |
@@ -926,12 +926,28 @@ Both scripts now run. `build_suitability_layers.py` writes 19 layers on the 71 x
 
 **The classification is far more weight-sensitive than §3.9.6 anticipated.**
 
-| Scheme | mean SI | very high | high | Cohen's κ vs AHP |
+**SUPERSEDED — first-run values, kept as the record of that run.** Every figure in
+this table predates the §3.9.3 decay resolution (§12b), which changed the road,
+grid and settlement scores and therefore every scheme's classification. The
+current values are below.
+
+| Scheme | mean SI | very high | high | Cohen's κ vs primary |
 |---|---|---|---|---|
 | AHP (primary) | 0.571 | 21 | 986 | — |
 | irradiance-dominant | 0.593 | 47 | 1,264 | 0.697 |
 | infrastructure-dominant | 0.512 | 27 | 391 | 0.317 |
 | **equal** | 0.417 | 2 | 40 | **−0.111** |
+
+**CURRENT**, read from `suitability_schemes.csv`, which exists because these
+numbers used to live only in a print statement and three of them went stale
+inside Chapter 4 (§12e):
+
+| Scheme | mean SI | very high | high | Cohen's κ vs primary |
+|---|---|---|---|---|
+| primary | 0.602 | 54 | 1,282 | — |
+| irradiance-dominant | 0.617 | 111 | 1,380 | 0.725 |
+| infrastructure-dominant | 0.569 | 93 | 783 | 0.476 |
+| **equal** | 0.467 | 3 | 144 | **-0.091** |
 
 **Only 42 cells (1.8% of retained) are very high or high under all four schemes; 90.8% change tier under at least one.** Equal weighting agrees with the AHP classification *worse than chance*. §3.9.6 was written to measure this and did not anticipate the answer being this stark. **The defensible output is the 42-cell robust set, not the headline five-tier map** — which is exactly what §3.9.6's "robustly suitable" designation exists to produce, and it should be presented that way in Chapter 4 rather than as a caveat to a map.
 
@@ -1056,7 +1072,7 @@ printed beside that figure would have been the more reassuring of the two and th
 less true.
 
 **Nothing downstream moved, and this was checked rather than assumed.** Every
-scheme weights from `AHP_WEIGHTS` (Table 3.5); `ahp()`'s vector is printed and
+scheme weights from `PRIMARY_WEIGHTS` (Table 3.5); `ahp()`'s vector is printed and
 discarded. Re-running `compute_suitability.py` leaves both suitability CSVs
 byte-identical, and a token-level diff of the rebuilt Chapter 4 shows the only
 numbers removed are `0.0076` and its `0.10` threshold.
@@ -1085,13 +1101,12 @@ procedure that paragraph says was not performed. It is now "Criterion Weighting"
 Section numbering is untouched and Chapter 3 carries no TOC field, so nothing
 needs refreshing in Word.
 
-**Still says AHP elsewhere, and this is a judgement call left open.** The Table
-3.5 caption, that table's "Initial AHP Weight" column, and paragraphs 190 and 196
-("primary AHP weights", "primary AHP classification") still use AHP as the *name*
-of the primary weighting scheme, as does Chapter 4 Section 4.8. That is defensible
-now that Section 3.9.4 states plainly what was and was not done - the label names
-a weight vector, not a claimed procedure - but an examiner may still ask why the
-name is kept. Renaming it throughout is a one-pass change if wanted.
+**The label was kept briefly and then dropped.** Table 3.5's caption, that table's
+"Initial AHP Weight" column, paragraphs 190 and 196 and Chapter 4 Section 4.8 all
+went on using AHP as the *name* of the primary scheme. That was arguably
+defensible once Section 3.9.4 stated plainly what was and was not done, but it
+invited the obvious question, so it is **now renamed throughout (Section 12e)** -
+and the rename turned up three stale Cohen's kappa values in Chapter 4.
 
 **Guarded.** Four literal anchors in `check_chapter3_consistency.RETIRED` cover
 the elicitation claim, the verified-CR claim, the internal-consistency conclusion
@@ -1101,6 +1116,75 @@ fires all four and exits 1.
 Zotero integrity held through both edits - 25 `ZOTERO_ITEM` fields, 1
 `ZOTERO_BIBL`, 156 `fldChar`, 222 paragraphs, 5 tables, unchanged before and
 after. Backup: `CR_Madukwe_Chapter3_Final_BACKUP_pre_ahp_soften.docx`.
+
+---
+
+## 12e. The AHP label is gone, and removing it exposed three stale kappa values
+
+**Renamed throughout, on the author's instruction** ("rename it throughout").
+With §3.9.4 no longer claiming a pairwise elicitation, "AHP" named machinery the
+thesis does not have. The primary scheme is now just **primary**:
+
+| Where | Was | Now |
+|---|---|---|
+| `compute_suitability.py` | `AHP_WEIGHTS`, scheme key `AHP (primary)` | `PRIMARY_WEIGHTS`, key `primary` |
+| `suitability_index.nc` | `si_AHP`, `tier_AHP` | `si_primary`, `tier_primary` |
+| `suitability_weights.csv` | row `AHP (primary)` | row `primary` |
+| Chapter 3 ¶164, ¶166, Table 3.5 column | "initial AHP weight(s)" | "initial weight(s)" |
+| Chapter 3 ¶190, ¶196 | "primary AHP weights/classification" | "primary weights of Table 3.5" / "primary classification" |
+| Chapter 4 §4.8 | "Analytic Hierarchy Process weights (Saaty, 1980)" | "the primary weighting scheme of Table 3.5" |
+| Brief, deck | "AHP weights", "AHP pairwise comparison matrix" | researcher-assigned weights, no CR claimed |
+
+Chapter 3 keeps **one** mention, spelled out at §3.9.4: the weights follow the
+AHP's ordinal logic. That is honest provenance rather than a claimed procedure,
+and it is the only place the concept is invoked.
+
+**Saaty (1980) drops off the must-add list.** Chapter 4 no longer cites it, so the
+list at the end of that chapter is now **three** items, not four: Cohen (1960),
+Efron (1987), Dozier & Frew (1990). Saaty is needed only if the author chooses to
+cite it at §3.9.4, and Chapter 4 says so explicitly rather than leaving it to be
+discovered.
+
+**What the rename exposed.** Re-running `compute_suitability.py` printed Cohen's
+kappa as **0.725 / 0.476 / −0.091**. Chapter 4 said **0.697 / 0.317 / −0.111** —
+hardcoded literals, because kappa was never written to disk. They were correct for
+the first run and went stale at the §3.9.3 decay resolution, which changed the
+road, grid and settlement scores and so every scheme's tiers. The generator whose
+stated purpose is that "no figure in the prose can drift from the analysis" was
+itself carrying three drifted numbers, and it went unnoticed through the document
+audit because nothing on disk contradicted it.
+
+Fixed at the root rather than by correcting the literals:
+`compute_suitability.py` now writes **`suitability_schemes.csv`** (mean SI, very
+high, high, kappa per scheme) and **`suitability_robustness.csv`** (assessed,
+robust, weight-sensitive, irradiance layer), and `build_chapter4.py` reads kappa
+from the first. `test_scheme_kappa_is_read_from_disk_not_hardcoded` fails if
+either the superseded or the current values appear as literals in the generator —
+the latter because a correct literal today is a stale literal after the next
+regeneration.
+
+**And the same defect was in the figure, where it reached the reader most
+directly.** Figure 09's own plotted title read "90.8% of retained cells change
+tier" with a panel labelled "under ALL four schemes (42 cells)" - both baked into
+`make_suitability_maps.py` - while the generated caption printed beneath it in
+Chapter 4 said 87.8% and 145. That figure appears in **both Chapter 4 and Chapter
+5**. It was caught by looking at the rendered PNG after the rename, not by any
+check: every guard in this project reads text, and nothing reads a figure. The
+titles now come from `suitability_robustness.csv`, and the same test rejects any
+robustness number baked into that script.
+
+*The first version of that test failed on its own explanatory comment, which
+names the stale figures in order to record why they are read from disk. It now
+strips comments before scanning: a guard that cannot tell code from prose
+punishes documentation.*
+
+The same three stale values had reached the interview brief, where the surrounding
+answer also still told the author to concede that the sensitivity analysis "has
+not been run". It has. Both are corrected, and the brief now advises volunteering
+the withdrawn consistency ratio rather than waiting to be asked for it.
+
+Everything else held: `suitability_by_period.csv` is byte-identical across the
+rename, and the only change in `suitability_weights.csv` is the row label.
 
 ---
 

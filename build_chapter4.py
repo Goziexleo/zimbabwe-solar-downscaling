@@ -34,6 +34,8 @@ unc = pd.read_csv(os.path.join(EVAL, "uncertainty_decomposition_summary.csv"))
 cut = pd.read_csv(os.path.join(EVAL, "effective_resolution_cut_sensitivity.csv")).set_index("field")
 info = pd.read_csv(os.path.join(EVAL, "information_content.csv")).set_index("field")
 per = pd.read_csv(os.path.join(EVAL, "suitability_by_period.csv")).set_index("period")
+sch = pd.read_csv(os.path.join(EVAL, "suitability_schemes.csv")).set_index("scheme")
+K = lambda scheme: sch.loc[scheme, "kappa_vs_primary"]
 sar = pd.read_csv(os.path.join(EVAL, "sarah_era5_monthly.csv"))
 lay = xr.open_dataset(os.path.join(SUIT, "criterion_layers.nc"))
 sui = xr.open_dataset(os.path.join(SUIT, "suitability_index.nc"))
@@ -60,7 +62,7 @@ _excluded = ((lay.in_zimbabwe.values <= 0.5) | (lay.protected_fraction.values > 
              | (lay.slope.values > 15.0)
              | np.isnan(lay.ghi_present_sarah.values))
 keep = ~_excluded
-n_low = int(((sui.tier_AHP.values == 4) & keep).sum())
+n_low = int(((sui.tier_primary.values == 4) & keep).sum())
 lat, lon = sui.lat.values, sui.lon.values
 LON, LAT = np.meshgrid(lon, lat)
 n_rob, n_keep = int(rob.sum()), int(keep.sum())
@@ -467,8 +469,8 @@ FIG("04_uncertainty.png", "Four-component variance decomposition of the projecti
 
 H("4.8 Solar Energy Suitability")
 P("The suitability analysis of Section 3.9 combines the irradiance layer with six "
-  "biophysical and infrastructural criteria under the Analytic Hierarchy Process weights "
-  "of Table 3.5 (Saaty, 1980), after a binary exclusion "
+  "biophysical and infrastructural criteria under the primary weighting scheme of "
+  "Table 3.5, after a binary exclusion "
   "mask. No consistency ratio is quoted here. Section 3.9.4 records that the pairwise "
   "comparison matrix was completed by the researcher in consultation with the "
   "supervisors, but that matrix is not held in the project archive, and a ratio "
@@ -502,13 +504,14 @@ P("The headline result of this analysis is not the five-tier suitability map. It
   "much smaller set of locations that remain highly suitable however the criteria are "
   "weighted.")
 P("Section 3.9.6 repeated the weighted overlay under four weighting schemes: the primary "
-  "AHP weights, an irradiance-dominant scheme, an infrastructure-dominant scheme, and "
+  "weights of Table 3.5, an irradiance-dominant scheme, an infrastructure-dominant scheme, and "
   "equal weights. The classifications they produce diverge sharply. Cohen's kappa (Cohen, 1960) "
-  "against the primary classification is 0.697 for the irradiance-dominant scheme, 0.317 "
-  "for the infrastructure-dominant scheme, and −0.111 for equal weights, the last "
+  "against the primary classification is %.3f for the irradiance-dominant scheme, %.3f "
+  "for the infrastructure-dominant scheme, and %.3f for equal weights, the last "
   "indicating agreement no better than chance. Of the %d assessed cells, %d — %.1f per "
   "cent — change suitability tier under at least one scheme."
-  % (n_keep, sens, 100 * sens / n_keep))
+  % (K("irradiance-dominant"), K("infrastructure-dominant"), K("equal"),
+     n_keep, sens, 100 * sens / n_keep))
 P("**Only %d cells, %.1f per cent of those assessed and approximately %s km2, are "
   "classified high or very high under all four weighting schemes.** These are reported "
   "as the robust set, and they are the defensible output of this analysis. The five-tier "
@@ -574,10 +577,10 @@ P("The robust set is concentrated along the central watershed between %.1f and %
   "province it falls in %s. The single highest-scoring cell reaches a suitability index "
   "of %.3f at 29.8 degrees east, 18.9 degrees south, on the Kadoma–Chegutu section of "
   "that corridor."
-  % (LON[rob].min(), LON[rob].max(), prov, np.nanmax(np.where(keep, sui.si_AHP.values, np.nan))))
+  % (LON[rob].min(), LON[rob].max(), prov, np.nanmax(np.where(keep, sui.si_primary.values, np.nan))))
 
 FIG("08_suitability_primary.png", "Suitability index and five-tier classification "
-    "under the primary AHP weights.")
+    "under the primary weights.")
 FIG("09_suitability_schemes.png", "The four weighting schemes and the robust set. "
     "Nearly nine assessed cells in ten change tier under at least one scheme.")
 
@@ -588,7 +591,7 @@ TBL(["Period", "Mean GHI (W m-2)", "Mean SI", "Very high", "High"],
      for p in ["present", "ssp245_near_term_2026_2050", "ssp245_mid_term_2051_2075",
                "ssp245_long_term_2076_2100", "ssp585_near_term_2026_2050",
                "ssp585_mid_term_2051_2075", "ssp585_long_term_2076_2100"]],
-    "Table 4.10. Suitability by period under the primary AHP weights. All periods are "
+    "Table 4.10. Suitability by period under the primary weights. All periods are "
     "standardised on the present-day range so the tiers remain comparable.")
 P("Suitability rises under every scenario and horizon, and the count of cells in the "
   "highest tier increases from %d in the present to %d under SSP5-8.5 by 2076 to 2100. "
@@ -715,11 +718,9 @@ P("This chapter is generated by build_chapter4.py from the evaluation CSVs, so t
   "rather than this document.")
 P("Citations are plain author-year text and must be converted to live Zotero fields in "
   "Word. Most cite works already in the Chapter 2 and Chapter 3 bibliographies and need "
-  "only re-citing. FOUR ARE NOT YET IN THE LIBRARY and must be added before the "
+  "only re-citing. THREE ARE NOT YET IN THE LIBRARY and must be added before the "
   "reference list is regenerated:")
 for _ref in [
-    "Saaty, T.L. (1980). The Analytic Hierarchy Process. McGraw-Hill, New York. "
-    "— cited in Section 4.8 for the AHP weighting.",
     "Cohen, J. (1960). A coefficient of agreement for nominal scales. Educational and "
     "Psychological Measurement 20(1), 37–46. — cited in Section 4.8.1 for kappa.",
     "Efron, B. (1987). Better bootstrap confidence intervals. Journal of the American "
@@ -730,6 +731,12 @@ for _ref in [
 ]:
     _p = doc.add_paragraph(_ref, style="List Bullet")
     _p.runs[0].font.size = Pt(11)
+P("Saaty (1980) is no longer on that list. This chapter does not cite it: the weights "
+  "of Table 3.5 are presented as the primary weighting scheme, not as the output of the "
+  "Analytic Hierarchy Process, because Section 3.9.4 records that no pairwise comparison "
+  "matrix was elicited or retained. Chapter 3 Section 3.9.4 still names the AHP once, as "
+  "the source of the ordinal logic the weights follow. Add Saaty only if you choose to "
+  "cite it there; nothing in either chapter requires it.")
 P("Figures are inserted from the figures directory by this generator. Regenerating the "
   "figures and rebuilding this chapter keeps them in step; pasting them by hand would "
   "not.")

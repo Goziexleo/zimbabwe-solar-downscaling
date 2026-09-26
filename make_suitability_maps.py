@@ -2,7 +2,7 @@
 
 Four figures:
   07  the seven standardised criteria and the exclusion mask
-  08  the primary AHP suitability map with its five tiers
+  08  the primary suitability map with its five tiers
   09  the four weighting schemes side by side, and the robust set
   10  suitability by period, and the change against the ERA5-basis present
 
@@ -26,6 +26,7 @@ warnings.filterwarnings("ignore")
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 SUIT = os.path.join(ROOT, "data/processed/suitability")
+EVAL = os.path.join(ROOT, "data/processed/evaluation")
 FIG = os.path.join(ROOT, "figures")
 
 DEEP, PETROL, GOLD = "#0F2E3A", "#1E4E5F", "#C07A1E"
@@ -57,7 +58,7 @@ def show(ax, da, lat, lon, mask=None, **kw):
 
 def fig_criteria(lay, suit):
     lat, lon = lay.lat.values, lay.lon.values
-    ex = suit.tier_AHP.values == 4
+    ex = suit.tier_primary.values == 4
     panels = [
         ("Irradiance (SARAH)", lay.ghi_present_sarah.values, "W m$^{-2}$"),
         ("Slope", lay.slope.values, "degrees"),
@@ -103,13 +104,13 @@ def fig_criteria(lay, suit):
 def fig_primary(suit):
     lat, lon = suit.lat.values, suit.lon.values
     fig, (a1, a2) = plt.subplots(1, 2, figsize=(11.2, 4.6))
-    ex = suit.tier_AHP.values == 4
-    im = show(a1, suit.si_AHP.values, lat, lon, mask=ex, cmap="cividis",
+    ex = suit.tier_primary.values == 4
+    im = show(a1, suit.si_primary.values, lat, lon, mask=ex, cmap="cividis",
               vmin=.3, vmax=.8)
-    _frame(a1, lat, lon, "Suitability index — primary AHP weights")
+    _frame(a1, lat, lon, "Suitability index — primary weights")
     fig.colorbar(im, ax=a1, fraction=.046).set_label("SI", size=8)
     cmap = ListedColormap(TIER_COLOURS)
-    show(a2, suit.tier_AHP.values, lat, lon, cmap=cmap,
+    show(a2, suit.tier_primary.values, lat, lon, cmap=cmap,
          norm=BoundaryNorm(range(6), 5))
     _frame(a2, lat, lon, "Five-tier classification")
     from matplotlib.patches import Patch
@@ -122,8 +123,8 @@ def fig_primary(suit):
 
 def fig_schemes(suit):
     lat, lon = suit.lat.values, suit.lon.values
-    keys = ["AHP", "irradiance-dominant", "infrastructure-dominant", "equal"]
-    names = ["AHP (primary)", "irradiance-dominant", "infrastructure-dominant",
+    keys = ["primary", "irradiance-dominant", "infrastructure-dominant", "equal"]
+    names = ["primary", "irradiance-dominant", "infrastructure-dominant",
              "equal weights"]
     fig, axes = plt.subplots(1, 5, figsize=(16.5, 3.8))
     cmap = ListedColormap(TIER_COLOURS)
@@ -132,13 +133,20 @@ def fig_schemes(suit):
              norm=BoundaryNorm(range(6), 5))
         _frame(ax, lat, lon, n)
     rob = suit.robustly_suitable.values.astype(float)
-    rob[suit.tier_AHP.values == 4] = np.nan
+    rob[suit.tier_primary.values == 4] = np.nan
     show(axes[4], rob, lat, lon, cmap=ListedColormap(["#EDEDEA", "#7A3E00"]),
          vmin=0, vmax=1)
+    # Read, never hardcoded. These titles said "42 cells" and "90.8%" - correct
+    # for the first run, wrong from the decay resolution onward, and embedded in
+    # a figure that appears in both Chapter 4 and Chapter 5 while the generated
+    # captions around it said 145 and 87.8%.
+    import pandas as pd
+    r = pd.read_csv(os.path.join(EVAL, "suitability_robustness.csv")).iloc[0]
     _frame(axes[4], lat, lon,
-           "Robust: high or better\nunder ALL four schemes (42 cells)")
-    fig.suptitle("Weighting sensitivity — 90.8% of retained cells change tier "
-                 "under at least one scheme", y=1.02, fontsize=11)
+           "Robust: high or better\nunder ALL four schemes (%d cells)" % r.robust)
+    fig.suptitle("Weighting sensitivity — %.1f%% of retained cells change tier "
+                 "under at least one scheme"
+                 % (100 * r.weight_sensitive / r.assessed), y=1.02, fontsize=11)
     fig.tight_layout()
     fig.savefig(os.path.join(FIG, "09_suitability_schemes.png"), bbox_inches="tight")
     plt.close(fig)
@@ -151,7 +159,7 @@ def fig_periods(suit):
            ("ssp245_long_term_2076_2100", "SSP2-4.5 long"),
            ("ssp585_near_term_2026_2050", "SSP5-8.5 near"),
            ("ssp585_long_term_2076_2100", "SSP5-8.5 long")]
-    ex = suit.tier_AHP.values == 4
+    ex = suit.tier_primary.values == 4
     fig, axes = plt.subplots(2, 5, figsize=(16.5, 7.0))
     for ax, (k, n) in zip(axes[0], per):
         im = show(ax, suit["si_" + k].values, lat, lon, mask=ex, cmap="cividis",

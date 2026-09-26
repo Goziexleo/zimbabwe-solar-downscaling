@@ -334,3 +334,64 @@ def test_reconstructed_ahp_cr_is_never_published():
     assert not problems, (
         "The reconstructed AHP consistency ratio is not a result:\n  "
         + "\n  ".join(problems))
+
+
+def test_scheme_kappa_is_read_from_disk_not_hardcoded():
+    """Chapter 4's Cohen's kappa values must come from the CSV.
+
+    They were literals - 0.697, 0.317, -0.111 - because compute_suitability.py
+    only ever printed them. The decay resolution changed every one of them
+    (to 0.725, 0.476, -0.091) and the literals stayed, so the generator whose
+    stated purpose is that "no figure in the prose can drift from the analysis"
+    was itself carrying three stale numbers. They are persisted now.
+    """
+    import pandas as pd
+
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    csv = os.path.join(root, "data/processed/evaluation/suitability_schemes.csv")
+    assert os.path.exists(csv), "suitability_schemes.csv is missing; re-run compute_suitability.py"
+
+    sch = pd.read_csv(csv).set_index("scheme")
+    assert "kappa_vs_primary" in sch.columns
+    assert pd.isna(sch.loc["primary", "kappa_vs_primary"]), \
+        "the primary scheme has no kappa against itself"
+
+    def code_only(path):
+        """Source with comments stripped.
+
+        The first version of this check flagged its own explanatory comment in
+        make_suitability_maps.py, which names the stale numbers in order to
+        record why they are read from disk now. A guard that cannot tell code
+        from prose fails on documentation, which teaches people to delete the
+        documentation.
+        """
+        import io
+        import tokenize
+        out = []
+        with open(path, "rb") as fh:
+            for tok in tokenize.tokenize(fh.readline):
+                if tok.type != tokenize.COMMENT:
+                    out.append(tok.string)
+        return "\n".join(out)
+
+    src = code_only(os.path.join(root, "build_chapter4.py"))
+    stale = [v for v in ("0.697", "0.317", "0.111") if v in src]
+    assert not stale, f"build_chapter4.py hardcodes superseded kappa values: {stale}"
+
+    live = ["%.3f" % sch.loc[s, "kappa_vs_primary"]
+            for s in ("irradiance-dominant", "infrastructure-dominant", "equal")]
+    assert not [v for v in live if v.lstrip("-") in src], (
+        "build_chapter4.py hardcodes the current kappa values; read them from the CSV "
+        "so the next regeneration cannot leave them behind")
+
+    # Same class of defect, and it reached the reader more directly: figure 09's
+    # own title said "42 cells" and "90.8%" while the generated caption beside it
+    # said 145 and 87.8%. The figure appears in Chapter 4 and Chapter 5.
+    maps = code_only(os.path.join(root, "make_suitability_maps.py"))
+    rb = pd.read_csv(os.path.join(root, "data/processed/evaluation",
+                                  "suitability_robustness.csv")).iloc[0]
+    baked = [v for v in ("42 cells", "90.8", "1.8%",
+                         "%d cells" % rb.robust,
+                         "%.1f" % (100 * rb.weight_sensitive / rb.assessed))
+             if v in maps]
+    assert not baked, f"make_suitability_maps.py bakes robustness numbers into titles: {baked}"

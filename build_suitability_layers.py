@@ -2,7 +2,7 @@
 
 Section 3.9 specifies seven criteria and four exclusion categories. This script
 puts all of them on the 71 x 81 grid the downscaled product uses and writes one
-NetCDF; compute_suitability.py then does the AHP weighting and the overlay.
+NetCDF; compute_suitability.py then does the criterion weighting and the overlay.
 
 Two deviations from the chapter, both deliberate and both recorded here rather
 than discovered later:
