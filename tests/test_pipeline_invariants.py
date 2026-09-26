@@ -395,3 +395,56 @@ def test_scheme_kappa_is_read_from_disk_not_hardcoded():
                          "%.1f" % (100 * rb.weight_sensitive / rb.assessed))
              if v in maps]
     assert not baked, f"make_suitability_maps.py bakes robustness numbers into titles: {baked}"
+
+
+def test_figure_titles_carry_no_baked_results():
+    """No rendered figure label may hardcode a result.
+
+    Three were found by looking at the rendered PNGs, which nothing else in
+    this project does - every guard here reads text:
+
+      * figure 09's title said "90.8%" and "42 cells" against a generated
+        caption saying 87.8% and 145;
+      * figure 05's title said the U-Net ratio ran "0.72 to 0.01" and the CNN
+        "0.91-1.29", while the annotations beside it were computed from the cut
+        sweep - so the panel contradicted itself after the honest retrain
+        (0.86-0.01 and 0.92-1.59);
+      * figure 01's title said "U-Net's zero mean is cancellation, not
+        accuracy", true of the leakage-selected U-Net and false once its mean
+        bias became +2.50.
+
+    All three now read from disk. This asserts the superseded values are gone
+    and that today's values are not baked in to replace them.
+    """
+    import pandas as pd
+    import tokenize
+
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+    def code_only(path):
+        out = []
+        with open(path, "rb") as fh:
+            for tok in tokenize.tokenize(fh.readline):
+                if tok.type != tokenize.COMMENT:
+                    out.append(tok.string)
+        return "\n".join(out)
+
+    figs = code_only(os.path.join(root, "make_figures.py"))
+    problems = []
+
+    for v in ("0.72 to 0.01", "0.91-1.29", "zero mean is cancellation"):
+        if v in figs:
+            problems.append(f"make_figures.py still carries the superseded {v!r}")
+
+    sens = pd.read_csv(os.path.join(root, "data/processed/evaluation",
+                                    "effective_resolution_cut_sensitivity.csv")
+                       ).set_index("field")
+    live = ["%.2f" % sens.loc[m, c]
+            for m in ("U-Net", "CNN") for c in ("min", "max")]
+    for v in set(live):
+        # 1.00 and the like are legitimate axis limits, so only flag the
+        # distinctive ones the title would quote.
+        if v not in ("1.00", "0.00") and f'"{v}' in figs:
+            problems.append(f"make_figures.py bakes the cut-sweep value {v}")
+
+    assert not problems, "\n  ".join(["Figure labels must be computed:"] + problems)

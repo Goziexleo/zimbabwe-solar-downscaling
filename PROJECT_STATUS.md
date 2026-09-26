@@ -1188,6 +1188,56 @@ rename, and the only change in `suitability_weights.csv` is the row label.
 
 ---
 
+## 12f. Figure audit: three more baked results, and one the retrain falsified
+
+Prompted by the question "are there other hardcoded numbers in the figures?"
+after figure 09 was caught by eye. Method: a static scan of both figure
+generators for digit-bearing string literals reaching a rendered label
+(`set_title`, `suptitle`, `text`, `legend`, axis labels), then **viewing every
+one of the ten PNGs** and checking what they assert against the canonical CSVs.
+The scan alone would have missed the third finding, which carries no digits.
+
+| Figure | Said | Should have said |
+|---|---|---|
+| 05 power spectra | U-Net ratio "0.72 to 0.01", CNN "0.91-1.29" | **0.86 to 0.01**, **0.92-1.59** |
+| 01 per-cell bias | "U-Net's zero mean is cancellation, not accuracy" | U-Net's mean bias is **+2.50** |
+| 09 schemes | "90.8%", "42 cells" | 87.8%, 145 (fixed in §12e) |
+
+**Figure 05 contradicted itself.** The annotations beside the panel were computed
+from the cut sweep while the title was hardcoded, so after the honest retrain the
+figure displayed "0.86-0.01x over cuts" next to a title reading "0.72 to 0.01".
+
+**Figure 01's defect carries no number at all.** "U-Net's zero mean is
+cancellation, not accuracy" was true of the leakage-selected U-Net. The honest
+retrain moved its mean bias to +2.50, which the panel beside it printed correctly
+the whole time. The claim survives in a form the data can carry, and is now
+computed: *"CNN spans 31 W m-2 across cells, Random Forest only 3"* - the point
+was always the spread, not the mean.
+
+**Cleared.** Figures 02, 03, 04, 06, 07 and 10 carry no baked results: every
+number in them is read from the CSVs, and the non-numeric claims check out - clt
+really is top on both importance measures, the topographic importances really are
+exactly zero (now derived, with a visible fallback if they ever stop being),
+architecture variance really does overtake GCM by the long horizon, and figure
+07's "1 km buffer" and 200 m river corridor match `build_suitability_layers.py`.
+
+**One layout defect fixed in passing.** Figure 02's legend sat across the second
+line of its own title and `set_xlabel` on a polar axis landed on top of the
+radial tick labels. Both are placed in figure coordinates now.
+
+`test_figure_titles_carry_no_baked_results` rejects the three superseded strings
+and any current cut-sweep value baked back in; injection-tested. It strips
+comments first, like the kappa guard.
+
+**The standing gap this leaves.** Every automated check in this project reads
+text - chapters, status, brief, deck, CSVs. **Nothing reads a figure.** All three
+findings here needed a human-equivalent look at a PNG. The guards added can only
+reject known-bad strings in the generators; they cannot tell that a rendered
+number disagrees with the analysis. Figures should be re-viewed after any retrain
+or regeneration, and that is a procedure, not a test.
+
+---
+
 ## 13. Outstanding
 
 **Not started**

@@ -39,13 +39,24 @@ def fig_bias_distribution():
     truth = ds["ghi_true"].values
     fig, (ax, ax2) = plt.subplots(1, 2, figsize=(11, 4.2),
                                   gridspec_kw={"width_ratios": [1.4, 1]})
+    spans = {}
     for label, var in MODELS:
         b = (ds[var].values - truth).mean(axis=0).ravel()
+        spans[label] = (b.mean(), b.max() - b.min())
         ax.hist(b, bins=70, histtype="step", lw=1.8, label=label, color=C[label])
     ax.axvline(0, color="k", lw=0.8, ls="--")
     ax.set_xlabel("Per-cell bias (W m$^{-2}$)")
     ax.set_ylabel("Grid cells")
-    ax.set_title("Per-cell bias distribution\nU-Net's zero mean is cancellation, not accuracy")
+    # This title used to read "U-Net's zero mean is cancellation, not accuracy",
+    # which was true of the leakage-selected U-Net and false after the honest
+    # retrain - its mean bias is no longer near zero. The point survives in a
+    # form the data can carry: the neural models' per-cell spread dwarfs the
+    # pixel-wise models', whatever their means. Both numbers are computed.
+    _worst = max(spans, key=lambda k: spans[k][1])
+    _best = min(spans, key=lambda k: spans[k][1])
+    ax.set_title("Per-cell bias distribution\n"
+                 "%s spans %.0f W m$^{-2}$ across cells, %s only %.0f"
+                 % (_worst, spans[_worst][1], _best, spans[_best][1]))
     ax.legend(frameon=False, fontsize=9)
 
     stats = []
@@ -68,7 +79,7 @@ def fig_bias_distribution():
 # ---------------------------------------------------------- 2. Taylor ------
 def fig_taylor():
     df = pd.read_csv(os.path.join(EVAL, "taylor_diagram_stats.csv"))
-    fig = plt.figure(figsize=(6.4, 6.2))
+    fig = plt.figure(figsize=(8.8, 6.0))
     ax = fig.add_subplot(111, polar=True)
     ax.set_thetalim(0, np.pi / 2)
     ax.set_rlim(0, 1.35)
@@ -80,11 +91,16 @@ def fig_taylor():
     ax.plot(0, 1.0, "*", ms=18, color="k", label="Reference", zorder=4)
     ticks = [0.5, 0.8, 0.9, 0.95, 0.99, 0.999, 1.0]
     ax.set_thetagrids(np.degrees(np.arccos(ticks)), [str(t) for t in ticks])
-    ax.set_xlabel("Standard-deviation ratio")
+    # On a polar axis set_xlabel lands on top of the radial tick labels, and the
+    # legend at (1.32, 1.13) sat across the second line of the title. Both are
+    # placed in figure coordinates instead.
     ax.set_title("Taylor diagram — time-mean spatial pattern\n"
-                 "angle = spatial correlation, radius = amplitude ratio", pad=22)
-    ax.legend(loc="upper right", bbox_to_anchor=(1.32, 1.13), frameon=False, fontsize=8.4)
-    fig.tight_layout(); fig.savefig(f"{FIG}/02_taylor.png"); plt.close(fig)
+                 "angle = spatial correlation, radius = amplitude ratio", pad=18)
+    ax.legend(loc="upper left", bbox_to_anchor=(1.04, 0.92), frameon=False,
+              fontsize=8.6, borderaxespad=0)
+    fig.text(0.35, 0.015, "Standard-deviation ratio", ha="center", fontsize=10)
+    fig.subplots_adjust(left=0.06, right=0.70, top=0.86, bottom=0.10)
+    fig.savefig(f"{FIG}/02_taylor.png", bbox_inches="tight"); plt.close(fig)
 
 
 # ------------------------------------------------ 3. feature importance ----
@@ -100,7 +116,11 @@ def fig_feature_importance():
                  "cloud fraction dominates; topography is exactly zero")
     for i, f in enumerate(df["feature"]):
         if f in ("elevation", "slope", "svf"):
-            ax.text(0.004, i, "0.00000 — constant within each cell",
+            _v = df.loc[df["feature"] == f, ["rf_mdi", "rf_permutation",
+                                             "xgb_gain", "xgb_cover"]].to_numpy()
+            _lab = ("0.00000 — constant within each cell" if (_v == 0).all()
+                    else "%.5f — NO LONGER ZERO, check the label" % _v.max())
+            ax.text(0.004, i, _lab,
                     va="center", fontsize=8, color="0.35")
     ax.legend(frameon=False)
     fig.tight_layout(); fig.savefig(f"{FIG}/03_feature_importance.png"); plt.close(fig)
@@ -178,23 +198,28 @@ def fig_spectra():
     a1.legend(frameon=False, fontsize=8.2)
 
     # --- CSI ratio. The U-Net damping is robust across every cut; the CNN
-    # ratio is not (0.91-1.29 over k>=3..20), so the panel states the
-    # direction and refuses the spurious two-decimal agreement.
+    # ratio is not, so the panel states the direction and refuses the spurious
+    # two-decimal agreement. Every number in the title is read from the cut
+    # sweep: the title used to hardcode "0.72 to 0.01" and "0.91-1.29" while
+    # the annotations beside it were computed, so after the honest retrain the
+    # panel contradicted itself - the real ranges are 0.86-0.01 and 0.92-1.59.
+    sens = pd.read_csv(os.path.join(EVAL, "effective_resolution_cut_sensitivity.csv")
+                       ).set_index("field")
     for c in cols[1:]:
         a2.loglog(df["wavelength_km"], df["CSI " + c] / df["CSI Truth (ERA5)"],
                   lw=1.9, color=C[c], label=c)
     a2.axhline(1, color="k", lw=0.9, ls="--")
     wavelength_axis(a2)
     a2.set_ylabel("CSI power ratio to truth")
-    a2.set_title("U-Net DAMPS fine scales at every cut (0.72 to 0.01);\n"
-                 "the CNN does not - but its ratio is cut-dependent, 0.91-1.29")
+    a2.set_title("U-Net DAMPS fine scales at every cut (%.2f to %.2f);\n"
+                 "the CNN does not - but its ratio is cut-dependent, %.2f-%.2f"
+                 % (sens.loc["U-Net", "max"], sens.loc["U-Net", "min"],
+                    sens.loc["CNN", "min"], sens.loc["CNN", "max"]))
     a2.legend(frameon=False, fontsize=8.2)
     # Annotate the RANGE over cuts, not the single k>10 value. Printing "1.04x"
     # beside a panel whose title says the ratio is cut-dependent would have the
     # figure contradict itself, and 1.04x is the most flattering point of the
     # sweep.
-    sens = pd.read_csv(os.path.join(EVAL, "effective_resolution_cut_sensitivity.csv")
-                       ).set_index("field")
     for c, dy in [("CNN", 2.6), ("U-Net", 0.30)]:
         if c in sens.index:
             lo, hi = sens.loc[c, "min"], sens.loc[c, "max"]
