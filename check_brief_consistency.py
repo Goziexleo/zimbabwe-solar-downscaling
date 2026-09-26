@@ -206,6 +206,19 @@ def canonical_anchors():
 # now false; each survived at least one round of correction because the table it
 # summarised was fixed and it was not.
 RETIRED = [
+    # scenario-discrimination values superseded by the honest retrain
+    ("+1.393",
+     "CNN near-term scenario separation before the honest retrain; now +1.272"),
+    ("+4.053",
+     "CNN mid-term scenario separation before the honest retrain; now +3.851"),
+    ("+9.643",
+     "CNN long-term scenario separation before the honest retrain; now +9.478"),
+    ("+1.075",
+     "U-Net near-term scenario separation before the honest retrain; now +1.034"),
+    ("+1.998",
+     "U-Net mid-term scenario separation before the honest retrain; now +2.039"),
+    ("+4.631",
+     "U-Net long-term scenario separation before the honest retrain; now +4.703"),
     ("every severe bug was silent",
      "refuted by the table beneath it, which lists three that moved aggregate metrics"),
     ("Aggregate metrics did not move for any of these",

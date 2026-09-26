@@ -89,6 +89,19 @@ def canonical_anchors():
 # Values replaced by a correction. Each must never reappear in the document.
 # Format: (superseded value as written, what replaced it and why)
 RETIRED = [
+    # scenario-discrimination values superseded by the honest retrain
+    ("+1.393",
+     "CNN near-term scenario separation before the honest retrain; now +1.272"),
+    ("+4.053",
+     "CNN mid-term scenario separation before the honest retrain; now +3.851"),
+    ("+9.643",
+     "CNN long-term scenario separation before the honest retrain; now +9.478"),
+    ("+1.075",
+     "U-Net near-term scenario separation before the honest retrain; now +1.034"),
+    ("+1.998",
+     "U-Net mid-term scenario separation before the honest retrain; now +2.039"),
+    ("+4.631",
+     "U-Net long-term scenario separation before the honest retrain; now +4.703"),
     ("0.6922", "ablation config B skill, computed against the leaked 17.98 climatology"),
     ("0.4932", "ablation config C skill, same leaked reference"),
     ("17.98", "climatology reference built from the validation period (A7 leakage)"),

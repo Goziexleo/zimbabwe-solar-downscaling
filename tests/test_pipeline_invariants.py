@@ -448,3 +448,54 @@ def test_figure_titles_carry_no_baked_results():
             problems.append(f"make_figures.py bakes the cut-sweep value {v}")
 
     assert not problems, "\n  ".join(["Figure labels must be computed:"] + problems)
+
+
+def test_scenario_discrimination_is_read_from_disk():
+    """Table 4.5 must come from the CSV, and the CSV must exist.
+
+    The screen is the evidence for the deployment decision, and it lived as
+    twelve literals typed into build_chapter4.py with nothing on disk behind
+    them. Random Forest and XGBoost were right - neither was ever retrained.
+    Every CNN and U-Net figure was stale, because the honest retrain
+    regenerated their projections and nothing regenerated the table:
+    +1.393/+4.053/+9.643 against a true +1.272/+3.851/+9.478, and a CNN
+    ordering score printed as 100.0% that is really 99.9%.
+    """
+    import pandas as pd
+    import tokenize
+
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    csv = os.path.join(root, "data/processed/evaluation/scenario_discrimination.csv")
+    assert os.path.exists(csv), (
+        "scenario_discrimination.csv is missing; run compute_scenario_discrimination.py")
+
+    scr = pd.read_csv(csv).set_index("model")
+    for m in ("Random Forest", "XGBoost", "CNN", "U-Net"):
+        assert m in scr.index, f"{m} missing from the screen"
+
+    # The screen's verdict on the Random Forest is load-bearing for §4.4: it is
+    # the reason the second-most-accurate model is not deployed.
+    rf = scr.loc["Random Forest"]
+    assert not rf.grows, "the Random Forest no longer fails the screen; §4.4 needs rewriting"
+    assert scr.loc["XGBoost"].passes_screen, "XGBoost no longer passes its own screen"
+
+    def code_only(path):
+        out = []
+        with open(path, "rb") as fh:
+            for tok in tokenize.tokenize(fh.readline):
+                if tok.type != tokenize.COMMENT:
+                    out.append(tok.string)
+        return "\n".join(out)
+
+    stale = ("1.393", "4.053", "9.643", "1.075", "1.998", "4.631")
+    problems = []
+    for name in ("build_chapter4.py", "build_chapter5.py"):
+        src = code_only(os.path.join(root, name))
+        problems += [f"{name} hardcodes the superseded {v}" for v in stale if v in src]
+        # and today's values must not be baked in to replace them
+        for m in ("CNN", "U-Net"):
+            for h in ("near", "mid", "long"):
+                v = "%.3f" % scr.loc[m, "sep_%s_term" % h]
+                if v in src:
+                    problems.append(f"{name} hardcodes the current {m} {h}-term value {v}")
+    assert not problems, "\n  ".join(["Table 4.5 must be read from the CSV:"] + problems)

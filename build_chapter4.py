@@ -35,6 +35,7 @@ cut = pd.read_csv(os.path.join(EVAL, "effective_resolution_cut_sensitivity.csv")
 info = pd.read_csv(os.path.join(EVAL, "information_content.csv")).set_index("field")
 per = pd.read_csv(os.path.join(EVAL, "suitability_by_period.csv")).set_index("period")
 sch = pd.read_csv(os.path.join(EVAL, "suitability_schemes.csv")).set_index("scheme")
+scr = pd.read_csv(os.path.join(EVAL, "scenario_discrimination.csv")).set_index("model")
 K = lambda scheme: sch.loc[scheme, "kappa_vs_primary"]
 sar = pd.read_csv(os.path.join(EVAL, "sarah_era5_monthly.csv"))
 lay = xr.open_dataset(os.path.join(SUIT, "criterion_layers.nc"))
@@ -285,22 +286,34 @@ P("Every metric in Sections 4.2 and 4.3 is computed over 2011 to 2024, a period 
   "from another out to 2100. That capability was therefore tested directly: the "
   "difference between the SSP5-8.5 and SSP2-4.5 ensemble means should be positive and "
   "should grow with lead time.")
+def _grows(r):
+    """The verdict the screen actually reaches, not a typed label.
+
+    XGBoost dips before it rises, so "yes" would overstate it and "no" would be
+    wrong: the separation at the long horizon is nearly double the near-term one.
+    """
+    if not r.grows:
+        return "No — shrinks"
+    return "Yes" if r.monotonic else "Yes, overall"
+
+
 TBL(["Model", "Near-term", "Mid-term", "Long-term", "Grows?", "Cells ordered correctly"],
-    [["Random Forest", "+0.465", "+0.307", "+0.167", "No — shrinks", "71.7%"],
-     ["XGBoost", "+0.754", "+0.741", "+1.444", "Yes, overall", "96.7%"],
-     ["CNN", "+1.393", "+4.053", "+9.643", "Yes", "100.0%"],
-     ["U-Net", "+1.075", "+1.998", "+4.631", "Yes", "100.0%"]],
+    [[m, "%+.3f" % scr.loc[m, "sep_near_term"], "%+.3f" % scr.loc[m, "sep_mid_term"],
+      "%+.3f" % scr.loc[m, "sep_long_term"], _grows(scr.loc[m]),
+      "%.1f%%" % scr.loc[m, "pct_ordered_long_term"]]
+     for m in ("Random Forest", "XGBoost", "CNN", "U-Net")],
     "Table 4.5. Scenario separation, SSP5-8.5 minus SSP2-4.5, in W m-2 by horizon.")
 P("The Random Forest fails. Its separation shrinks as forcing grows, the opposite of the "
   "physical expectation, it inverts outright on the long-term change signal, and only "
-  "71.7 per cent of cells order the two pathways correctly. The mechanism is tree "
+  "%.1f per cent of cells order the two pathways correctly. The mechanism is tree "
   "extrapolation. A regression tree (Breiman, 2001) predicts a constant beyond the range of its "
   "training data, and the proportion of predictor values falling outside the 1985 to 2010 range "
   "grows sharply under the higher pathway: temperature moves from 0.36 per cent "
   "out-of-range in the near term to 11.48 per cent in the long term under SSP5-8.5, "
   "against 0.32 to 1.34 per cent under SSP2-4.5. The scenario that should produce the "
   "larger response is precisely the one in which the model's response is most strongly "
-  "clipped, which is why the separation shrinks rather than merely being small.")
+  "clipped, which is why the separation shrinks rather than merely being small."
+  % scr.loc["Random Forest", "pct_ordered_long_term"])
 P("This test is used as a screen and not as a ranking, and the distinction is essential, "
   "and it is the transferability question that Dixon et al. (2016) and Lanzante et al. "
   "(2020) raise for statistical downscaling generally. "
@@ -308,11 +321,12 @@ P("This test is used as a screen and not as a ranking, and the distinction is es
   "growth; it cannot establish that a larger response is a more correct one, because "
   "nothing in this study validates projection magnitude. There is no observed 2100 to "
   "check against. Ordering the three passing models by the size of their response would "
-  "read precision into an unvalidated quantity, and treating the CNN's 100.0 per cent as "
-  "better than XGBoost's 96.7 per cent would be the same error. Among the models that "
+  "read precision into an unvalidated quantity, and treating the CNN's %.1f per cent as "
+  "better than XGBoost's %.1f per cent would be the same error. Among the models that "
   "pass the screen, selection therefore falls back to validated historical performance, "
   "where XGBoost has the lowest aggregate error with intervals excluding zero and wins "
-  "all four rolling-origin folds. XGBoost is deployed on that basis.")
+  "all four rolling-origin folds. XGBoost is deployed on that basis."
+  % (scr.loc["CNN", "pct_ordered_long_term"], scr.loc["XGBoost", "pct_ordered_long_term"]))
 P("The wider point is that a model can satisfy every validation metric in Table 4.1 and "
   "still be unfit for the purpose the product serves. The Random Forest is second on "
   "aggregate error, better than the deployed model on two of five tested axes, and "

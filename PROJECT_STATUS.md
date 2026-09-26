@@ -435,8 +435,8 @@ Validation measures how well a model reproduces 2011–2024. The product is a pr
 |---|---|---|---|---|---|
 | **Random Forest** | +0.465 | +0.307 | **+0.167** | **NO — shrinks** | **71.7%** |
 | XGBoost | +0.754 | +0.741 | +1.444 | yes, overall | 96.7% |
-| CNN | +1.393 | +4.053 | +9.643 | yes | 100.0% |
-| U-Net | +1.075 | +1.998 | +4.631 | yes | 100.0% |
+| CNN | +1.272 | +3.851 | +9.478 | yes | 99.9% |
+| U-Net | +1.034 | +2.039 | +4.703 | yes | 100.0% |
 
 **Random Forest's scenario separation shrinks as forcing grows** — the opposite of the physical expectation — and it inverts outright on the long-term change signal (+1.648 under SSP2-4.5 against +1.349 under SSP5-8.5).
 
@@ -460,7 +460,7 @@ Validation measures how well a model reproduces 2011–2024. The product is a pr
 
 This is the concrete form of the stationarity caveat in §14.2, and it matters more for a projection product than any validation metric: a suitability map that cannot distinguish emission pathways fails at the task it exists for.
 
-**A caution against over-reading it in the other direction.** All four scenario separations are small beside σ_DS ≈ 10 W m⁻². The CNN's +9.643 is not obviously *better* for being larger — it is comparable to the model's own error, and its long-term change of +16.6 W m⁻² is implausibly large for a 75-year irradiance trend. The honest reading is that RF is disqualified on this axis, XGBoost is adequate, and the neural models' larger responses are unverifiable rather than demonstrably right.
+**A caution against over-reading it in the other direction.** All four scenario separations are small beside σ_DS ≈ 10 W m⁻². The CNN's +9.478 is not obviously *better* for being larger — it is comparable to the model's own error, and its long-term change of **+26.3 W m⁻²** is implausibly large for a 75-year irradiance trend. *(Both figures were wrong here until the table audit: the separation was the pre-retrain +9.643, and the +16.6 W m⁻² quoted as the CNN's change is the U-Net's — the CNN's was always larger, so the point held for the wrong reason.)* The honest reading is that RF is disqualified on this axis, XGBoost is adequate, and the neural models' larger responses are unverifiable rather than demonstrably right.
 
 ### 7.12 §3.4.3's quality control did not exist, and the null result is the interesting part
 
@@ -1235,6 +1235,65 @@ findings here needed a human-equivalent look at a PNG. The guards added can only
 reject known-bad strings in the generators; they cannot tell that a rendered
 number disagrees with the analysis. Figures should be re-viewed after any retrain
 or regeneration, and that is a procedure, not a test.
+
+---
+
+## 12g. Table audit: Table 4.5 had no source at all
+
+Same method as the figures - a static scan of `build_chapter4.py` for string
+constants inside `TBL(...)` rows carrying a bare number, then every rendered cell
+of all fifteen tables checked against the canonical CSVs or recomputed from the
+layers.
+
+**Nine of Chapter 4's ten tables are clean**, and were verified rather than
+assumed: 4.1 against `table_3_3.csv`, 4.2 against the Taylor statistics, 4.3
+against `rolling_origin.csv` including the difference column, 4.4 against
+`bca_intervals.csv` (the "mean bias magnitude" row correctly takes the `|MBE|`
+entry, not `MBE`), 4.6 against the cut sweep, 4.7 recomputed from
+`mme_aggregations_xgb` against the present field, 4.8 against the variance
+decomposition, 4.9 recomputed cell by cell from `criterion_layers.nc`, and 4.10
+against `suitability_by_period.csv`. Chapter 3's two numeric tables are clean
+too: the ablation table already has a cell-level guard, and Table 3.5's weights
+match `PRIMARY_WEIGHTS` exactly. Chapter 5 has no tables.
+
+**Table 4.5 was the exception, and it was the worst case available.** Twelve
+separations and four ordering percentages, typed as literals, with **no CSV
+behind them anywhere in the project**. The Random Forest and XGBoost rows were
+right, because neither model was ever retrained. Every CNN and U-Net figure was
+stale:
+
+| | Chapter said (superseded) | Actual |
+|---|---|---|
+| CNN | previously +1.393 / +4.053 / +9.643, 100.0% — stale | **+1.272 / +3.851 / +9.478, 99.9%** |
+| U-Net | previously +1.075 / +1.998 / +4.631, 100.0% — stale | **+1.034 / +2.039 / +4.703, 100.0%** |
+
+The honest retrain regenerated both models' projections - the directory
+timestamps show it - and nothing regenerated the table, because there was nothing
+to regenerate. **This is the table that justifies the deployment decision.** The
+conclusions are unaffected: the Random Forest still fails, XGBoost still grows,
+both neural models still pass. But the evidence for a deployment decision cannot
+be a number a reader has no way to re-derive.
+
+`compute_scenario_discrimination.py` now writes
+**`scenario_discrimination.csv`**, and Chapters 4 and 5 read from it - including
+the "Grows?" verdict, which is evaluated from the separations rather than typed,
+and which reproduces the original labels exactly (XGBoost dips before it rises,
+so it is "Yes, overall" rather than "Yes"). The same values were stale in
+PROJECT_STATUS 7.11, the viva brief and the interview deck's chart series; all
+three are corrected, and the six superseded figures are now retired phrases in
+both the status and brief guards.
+
+**One further error the audit found in 7.11's prose.** The caution paragraph
+previously read *"The CNN's +9.643 ... its long-term change of +16.6 W m⁻² is
+implausibly large"*, and both of those numbers were wrong: the separation was the
+stale pre-retrain value, and **+16.6 is the U-Net's change, not the CNN's**. The CNN's is +26.3, so the point stood for
+the wrong reason. Corrected, with the substitution noted in place.
+
+`test_scenario_discrimination_is_read_from_disk` rejects the superseded values and
+today's values as literals in either generator, and asserts the two verdicts §4.4
+leans on - that the Random Forest fails the screen and XGBoost passes it - so a
+regenerated CSV that quietly reversed either would fail rather than silently
+rewrite the chapter's argument. Injection-tested.
 
 ---
 

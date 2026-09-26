@@ -25,6 +25,7 @@ t33 = pd.read_csv(os.path.join(EVAL, "table_3_3.csv")).set_index("model")
 unc = pd.read_csv(os.path.join(EVAL, "uncertainty_decomposition_summary.csv"))
 info = pd.read_csv(os.path.join(EVAL, "information_content.csv")).set_index("field")
 per = pd.read_csv(os.path.join(EVAL, "suitability_by_period.csv")).set_index("period")
+scr = pd.read_csv(os.path.join(EVAL, "scenario_discrimination.csv")).set_index("model")
 sar = pd.read_csv(os.path.join(EVAL, "sarah_era5_monthly.csv"))
 lay = xr.open_dataset(os.path.join(SUIT, "criterion_layers.nc"))
 sui = xr.open_dataset(os.path.join(SUIT, "suitability_index.nc"))
@@ -171,11 +172,12 @@ P("The deployment decision followed from a test that no accuracy metric could pe
   "The Random Forest, second on aggregate error and better than the deployed model on "
   "two of five tested axes, inverts the scenario signal it would be required to project: "
   "its separation between pathways shrinks with lead time rather than growing, and only "
-  "71.7 per cent of cells order the two pathways correctly. The mechanism is tree "
+  "%.1f per cent of cells order the two pathways correctly. The mechanism is tree "
   "extrapolation (Breiman, 2001), and the failure is categorical rather than a matter "
   "of degree. This is "
   "why the improved U-Net configuration identified after the fact does not reopen the "
-  "decision on accuracy alone: it has not been put through that screen.")
+  "decision on accuracy alone: it has not been put through that screen."
+  % scr.loc["Random Forest", "pct_ordered_long_term"])
 
 H("5.2.4 RQ4: where suitability is highest", 3)
 P("Of %d assessed locations, **%d — %.1f per cent, approximately %s km2 — are classified "
