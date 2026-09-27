@@ -1361,6 +1361,37 @@ cost.
 
 ---
 
+## 12i. Chapters 1 and 2, which have no guard
+
+The prose pass covered the generated chapters. Chapters 1 and 2 are hand-written
+and nothing checks them, so they were scanned separately for result-like decimals.
+
+**Neither chapter reports a result of this study.** Every number in them is a
+literature value, a resolution, a policy target or a section cross-reference —
+0.25° for ERA5, 0.05° for SARAH, 16.5% and 26.5% from the NREP, Maposa's 0.92.
+Nothing there can go stale when this study's numbers move, which is why the
+honest retrain left them untouched. Two exceptions:
+
+**Chapter 2 told the reader the suitability analysis had not been done.**
+Paragraph 140 closed the gap analysis with the integration of the irradiance
+layer *"specified in Section 3.9 and remains to be executed"*. It has been
+executed and is reported in Section 4.8. The paragraph now says so, and points at
+the weighting sensitivity analysis as the result rather than the five-tier map.
+
+**Chapter 2 overstated the warming between the two periods.** Paragraph 119 said
+the validation period is *"approximately 0.5 to 0.8 degrees Celsius warmer"*.
+Measured on `tas` in the aligned stack, the domain mean is **+0.501 °C** and the
+per-cell range is **+0.196 to +0.777**. The printed range described the upper part
+of the spatial spread as though it were the typical shift. Now stated as 0.5 in
+the domain mean, 0.2 to 0.8 across cells. The argument is unaffected — a warmer
+validation period is still a within-sample stationarity test — but a reader
+sizing the test would have taken the shift as larger than it is.
+
+Zotero integrity held: unchanged field and paragraph counts before and after.
+Backup: `CR_Madukwe_Chapter2_BACKUP_pre_prose_audit.docx`.
+
+---
+
 ## 13. Outstanding
 
 **Not started**
