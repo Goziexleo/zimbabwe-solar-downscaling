@@ -36,6 +36,11 @@ import pandas as pd
 import xarray as xr
 import xgboost as xgb
 from joblib import Parallel, delayed
+
+# Half the cores, floored at 2: each worker holds its own copy of the fold's
+# predictor slice, so the pool size is a memory setting, not just a speed one.
+N_JOBS = int(os.environ.get("ROLLING_N_JOBS", max(2, (os.cpu_count() or 4) // 2)))
+WORKER_TIMEOUT = float(os.environ.get("ROLLING_TIMEOUT", "3600"))
 from sklearn.ensemble import RandomForestRegressor
 
 from ml_dataset_common import csi_to_ghi
@@ -85,14 +90,31 @@ def neural_rmse(script, env_extra, train_f, test_f):
     question this script exists to answer, so the summary reports every model
     relative to its own deployed-split fold.
     """
+    # The inner selection split has to live inside THIS fold's training window.
+    # INNER_SPLIT_YEAR defaults to 2005, so on the 1985-1998 fold every month
+    # fell in the fit half, the selection half was empty, and the CNN died with
+    # ZeroDivisionError. Split at the year holding the last fifth of the fold's
+    # own months instead.
+    _tt = pd.DatetimeIndex(xr.open_dataset(train_f).time.values)
+    _split = int(np.quantile(_tt.year.values, 0.8))
+    if _split <= _tt.year.min():
+        _split = int(_tt.year.min()) + 1
     env = dict(os.environ, ML_TRAIN_PATH=train_f, ML_VAL_PATH=test_f,
-               KMP_DUPLICATE_LIB_OK="TRUE", **env_extra)
+               KMP_DUPLICATE_LIB_OK="TRUE",
+               INNER_SPLIT_YEAR=str(_split), **env_extra)
     r = subprocess.run([sys.executable, "-u", script], cwd=ROOT, env=env,
                        capture_output=True, text=True)
     if r.returncode != 0:
         print(f"      {script} failed: {r.stderr.strip().splitlines()[-1:]}")
         return np.nan
-    m = re.findall(r"best validation MSE: ([0-9.]+)", r.stdout)
+    # Both scripts printed "best validation MSE" until the honest-selection
+    # rewrite renamed it to "best inner-select MSE" (Section 6.13). The regex was
+    # not updated, so every neural cell in this table silently became nan and the
+    # values already on disk came from the superseded code path. Match both.
+    m = (re.findall(r"best inner-select MSE ([0-9.]+)", r.stdout)
+         or re.findall(r"best validation MSE: ([0-9.]+)", r.stdout))
+    if not m:
+        print(f"      {script}: no selection score found in output")
     return float(m[-1]) if m else np.nan
 
 
@@ -149,7 +171,16 @@ def main():
 
         for name, fn in [("Random Forest", fit_rf), ("XGBoost", fit_xgb)]:
             print(f"  fitting {name}...")
-            res = Parallel(n_jobs=-1)(delayed(fn)(i, j) for i, j in cells)
+            # n_jobs=-1 deadlocked on fold 3 of the honest-HPO rerun: loky lost
+            # workers to memory pressure ("A worker stopped while some jobs were
+            # given to the executor"), and the parent then waited forever with
+            # zero CPU. Capping the pool and dispatching in bounded batches keeps
+            # peak memory to the number of live workers rather than the whole
+            # 5,751-cell task list, and a timeout turns any repeat of that hang
+            # into an error instead of a stall.
+            res = Parallel(n_jobs=N_JOBS, timeout=WORKER_TIMEOUT,
+                           pre_dispatch="2*n_jobs", max_nbytes=None)(
+                delayed(fn)(i, j) for i, j in cells)
             pred = np.zeros_like(y_te)
             for i, j, p in res:
                 pred[:, i, j] = p

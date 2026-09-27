@@ -158,6 +158,74 @@ Invisible in training because `build_ml_features_and_targets.py` used the *same*
 
 **Consequences, all corrected:** models were fed the wrong month's irradiance as a high-weight feature at validation only, degrading every Table 3.3 figure (XGBoost RMSE 22.94 → 5.54 on fixing this alone). The baseline was computed from the same lagged field, inflating its RMSE from 0.233 to 32.38 and turning deeply negative skill scores into apparently positive ones. Both build scripts now match on calendar month.
 
+## 6.14 The neural hyperparameter search was the last live leak — now closed
+
+§3.6.7's grid search for the CNN and U-Net was scored on "validation MSE": the withheld
+2011–2024 record. That is selection on the evaluation set, the same defect corrected for
+XGBoost's boosting rounds (§6.12) and both networks' epoch counts (§6.13). It was the one
+instance still live, flagged in §12j and recommended in Chapter 5 §5.6.
+
+**`hpo_neural.py` re-runs Table 3.2's grids entirely inside the training period.** Each
+candidate is fitted on 1985–2004 and scored on an inner selection split of 2005–2010,
+through the real training scripts under `PHASE_A_ONLY=1` rather than a reimplementation —
+the U-Net sweep had already shown that a reimplemented baseline does not reproduce the
+deployed model. Seven candidates, ~70 minutes.
+
+| model | lr | λ_gp | inner-select MSE | |
+|---|---|---|---|---|
+| CNN | 0.0005 | 0.001 | 0.000448 | |
+| CNN | 0.0005 | 0.01 | 0.000424 | **deployed before** |
+| CNN | 0.001 | 0.001 | 0.000400 | |
+| CNN | 0.001 | 0.01 | 0.000418 | |
+| U-Net | 0.0002 | — | 0.128886 | **deployed before** |
+| U-Net | 0.0005 | — | 0.126946 | |
+| U-Net | 0.001 | — | 0.124575 | |
+
+**Both configurations changed.** The CNN moves to lr 1e-3 with λ_gp 1e-3; the U-Net to
+lr 1e-3. Neither had been reachable by the old search, which was comparing candidates on
+the wrong data.
+
+**What it was worth on the withheld record**, with the two corrections separated because
+they pull opposite ways:
+
+| | leaky checkpoint + leaky HPO | honest checkpoint, leaky HPO (§6.13) | honest throughout |
+|---|---|---|---|
+| CNN | 10.14 | 11.09 | **10.08** |
+| U-Net | 10.11 | 11.03 | **10.71** |
+
+**The CNN's honest configuration reproduces its leaked result almost exactly** (10.08
+against 10.14). Its apparent accuracy was not bought by the leakage so much as by a
+configuration the leakage happened to find, and an honest search finds an equally good one.
+The U-Net ends at 10.71 against 10.11, so for that architecture part of the original
+figure genuinely was selection on the test set.
+
+**The ordering changed again, and again the evidence did not.** The order is now XGBoost
+9.24, CNN 10.08, RF 10.30, U-Net 10.71 — the CNN has overtaken the Random Forest.
+**That reordering is not established**: RF − CNN is +0.217 [-0.368, +1.105] and RF − U-Net is
+-0.413 [-1.052, +0.394], both spanning zero. What *is* established is the deployed model's
+margin over both networks: XGBoost − CNN -0.841 [-1.090, -0.353] and XGBoost − U-Net
+-1.471 [-1.893, -1.022]. **The deployment is unaffected** — it turned on scenario
+discrimination, and the Random Forest still fails that screen.
+
+**σ_arch fell from 35.40% to 26.56%** of long-term variance, with σ_DS at 67.79%.
+Improving two of the four members narrowed the spread between architectures, which is
+exactly what that term measures — the mirror image of what the §6.13 correction did to it.
+Chapter 5's methodological point stands: architecture choice still dominates GCM choice
+(5.10%) by a factor of about five.
+
+**Two bugs found while regenerating.** `compute_rolling_origin.py` deadlocked on fold 3
+(`Parallel(n_jobs=-1)` lost workers to memory pressure and the parent waited forever at
+zero CPU); it now caps the pool, dispatches in bounded batches and carries a timeout. And
+its neural leg had been silently returning `nan` since §6.13 renamed the line it greps for
+— the CSI values in the table on disk came from the superseded code path — while a fixed
+`INNER_SPLIT_YEAR=2005` left the 1985–1998 fold with an empty selection split and killed
+the CNN with `ZeroDivisionError`. Both fixed; the split now follows each fold's own window.
+
+**One gap in my own cascade, caught by checking mtimes rather than trusting it.**
+`compute_spatial_verification.py` was omitted, so `taylor_diagram_stats.csv` and
+`spatial_verification_maps.nc` still held pre-retrain values after the cascade reported
+success. Regenerated: CNN spatial correlation 0.8937 → 0.9228, U-Net 0.9028 → 0.8847.
+
 ### 6.12 XGBoost was early-stopped on the validation set
 `train_pixelwise_xgb.py` fitted each cell with `eval_set=[(X_val, y_val)]` and `early_stopping_rounds=50`, so the number of boosting rounds — each cell's effective capacity — was chosen by watching the data the model was then scored against. 5,751 hyperparameters fitted on the evaluation set.
 
@@ -639,9 +707,9 @@ A 150-cell subsampled CV search picked configurations for both tree models that 
 | Model | RMSE | MAE | Pearson R | MBE | SS vs climatology | R² |
 |---|---|---|---|---|---|---|
 | **XGBoost (deployed)** | **9.24** | **6.85** | **0.9707** | +1.20 | **0.5155** | **0.9410** |
-| U-Net | 11.03 | 8.10 | 0.9593 | +2.4954 | 0.4218 | 0.9159 |
-| CNN | 11.09 | 8.50 | 0.9647 | +4.5529 | 0.4186 | 0.9150 |
+| CNN | 10.08 | 7.77 | 0.9670 | +2.77 | 0.4715 | 0.9297 |
 | Random Forest | 10.30 | 7.73 | 0.9636 | +0.25 | 0.4601 | 0.9267 |
+| U-Net | 10.71 | 8.01 | 0.9603 | +1.45 | 0.4384 | 0.9207 |
 
 Regenerate with `compute_table33.py` — a single canonical script scoring every model against
 identical references, so the table cannot drift between scripts and needs no retraining.
@@ -681,8 +749,8 @@ Targets are R > 0.90 and |MBE| < 5. **All four models clear both for the first t
 | Baseline (bilinear) | 0.9998 | 0.9949 | 0.161 | 2.0% |
 | **Random Forest** | **0.9978** | 0.9725 | **0.571** | **7.2%** |
 | XGBoost | 0.9963 | 0.9608 | 0.742 | 9.3% |
-| CNN | 0.8937 | 0.9687 | 3.629 | 40.5% |
-| U-Net | 0.9028 | 0.9745 | 3.479 | 44.4% |
+| CNN | 0.9228 | 0.9368 | 3.076 | 38.5% |
+| U-Net | 0.8847 | 0.9061 | 3.723 | 46.7% |
 
 The pixel-wise models reproduce the spatial climatology far more faithfully than the shared-weight ones. **The gap between the two pixel-wise models splits, and §7.10 settles it under BCa.** On **centred RMSE** the Random Forest's advantage **is established**: −0.171 [−0.360, −0.041]. On **spatial correlation** it is not: +0.0015 [−0.0008, +0.0040]. So read the bold on the RF row as an established advantage on centred RMSE and a point estimate only on spatial R. An earlier version of this note said both spanned zero, on percentile intervals that are invalid for centred RMSE — see §7.10.
 
@@ -697,7 +765,7 @@ which is what made the mismatch confusing.
 |---|---|---|---|---|---|---|---|---|
 | **XGB (deployed)** | Near-term | 1.92 | 0.43 | 2.34 | 9.24 | 9.74 | 90.10% | 5.79% |
 | **XGB (deployed)** | Mid-term | 2.20 | 0.48 | 3.90 | 9.24 | 10.28 | 80.81% | 14.41% |
-| **XGB (deployed)** | Long-term | 2.54 | 0.83 | 7.12 | 9.24 | 11.97 | 59.63% | **35.40%** |
+| **XGB (deployed)** | Long-term | 2.54 | 0.83 | 5.79 | 9.24 | 11.23 | 67.79% | **26.56%** |
 | U-Net | Near-term | 2.03 | 0.56 | 3.30 | 11.03 | 11.70 | 88.95% | 7.97% |
 | U-Net | Mid-term | 3.20 | 1.02 | 5.09 | 11.03 | 12.57 | 77.05% | 16.44% |
 | U-Net | Long-term | 4.00 | 2.99 | 7.12 | 11.03 | 13.86 | 63.34% | **26.40%** |

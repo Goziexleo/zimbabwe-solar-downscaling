@@ -27,6 +27,13 @@ info = pd.read_csv(os.path.join(EVAL, "information_content.csv")).set_index("fie
 per = pd.read_csv(os.path.join(EVAL, "suitability_by_period.csv")).set_index("period")
 scr = pd.read_csv(os.path.join(EVAL, "scenario_discrimination.csv")).set_index("model")
 uo = pd.read_csv(os.path.join(EVAL, "unet_optimisation.csv")).set_index("variant")
+leaky5 = pd.read_csv(os.path.join(ROOT, "data/processed/models/_pre_honest_selection",
+                                  "table_3_3.csv")).set_index("model")
+_order = list(t33["RMSE"].sort_values().index)
+_ORD = {1: "lowest", 2: "second-lowest", 3: "third-lowest", 4: "highest"}
+def rank(m):
+    """Ordinal position on aggregate RMSE, so the prose cannot outlive the table."""
+    return _ORD[_order.index(m) + 1]
 sar = pd.read_csv(os.path.join(EVAL, "sarah_era5_monthly.csv"))
 lay = xr.open_dataset(os.path.join(SUIT, "criterion_layers.nc"))
 sui = xr.open_dataset(os.path.join(SUIT, "suitability_index.nc"))
@@ -108,21 +115,28 @@ P("The comparison between architectures is answered with more care than the ques
   "invites. Resampling establishes that XGBoost is better than the Random Forest on "
   "aggregate error, that the Random Forest is better on mean bias and on the spatial "
   "structure of its error, and that the two cannot be separated on spatial correlation. "
-  "The answer is a split decision, not a ranking. The Random Forest returns the second "
-  "lowest aggregate error, but its separation from the two neural models is not "
-  "established: both differences carry intervals containing zero. Only XGBoost is "
-  "established as better than all three others on that axis.")
+  "The answer is a split decision, not a ranking. The Random Forest returns the %s "
+  "aggregate error, behind the CNN, but its separation from either neural model is not "
+  "established: both differences carry intervals containing zero, and the ordering among "
+  "those three has already changed once under a correction that did not touch the "
+  "evidence separating them. Only XGBoost is established as better than all three others "
+  "on that axis." % rank("Random Forest"))
 P("Two qualifications belong with that answer, and both concern how the comparison was "
   "produced rather than what it found. The convolutional models originally selected "
-  "their saved weights on the evaluation record, which inflated their accuracy by "
-  "roughly nine per cent; they were retrained with the epoch count chosen on an inner "
-  "split of the training period, and the figures above are the corrected ones. "
+  "their saved weights and their hyperparameters on the evaluation record. Both were "
+  "corrected: the epoch count is now chosen on an inner split of the training period, "
+  "and the hyperparameter grids were re-run inside that period as well. The two "
+  "corrections pull opposite ways, and Section 4.2 separates them; the net is that the "
+  "CNN ends at %.2f W m-2 against the %.2f it reported under full leakage, and the U-Net "
+  "at %.2f against %.2f. "
   "Separately, a controlled sweep shows the U-Net reaches %.2f W m-2 under honest "
   "selection once its dropout setting is removed, which is below the deployed model. "
   "Neither fact overturns the deployment, for the reason given under RQ3, but together "
   "they mean this study compares particular configurations, selected in a particular "
   "way, rather than architectures in the abstract."
-  % uo.loc["drop_0", "test_rmse"])
+  % (t33.loc["CNN", "RMSE"], leaky5.loc["CNN", "RMSE"],
+     t33.loc["U-Net", "RMSE"], leaky5.loc["U-Net", "RMSE"],
+     uo.loc["drop_0", "test_rmse"]))
 P("Against traditional baselines the answer is unambiguous only for the admissible one. "
   "All four models beat a per-cell, per-calendar-month climatology. Scores against "
   "interpolation of the coarse irradiance field are not skill, because that field is a "
@@ -171,7 +185,7 @@ P("The uncertainty attached to those projections carries a result the question d
   "wrong by that margin, whichever architecture it had chosen."
   % (u.loc["long_term_2076_2100", "pct_var_arch"], u.loc["long_term_2076_2100", "pct_var_gcm"]))
 P("The deployment decision followed from a test that no accuracy metric could perform. "
-  "The Random Forest, second on aggregate error and better than the deployed model on "
+  "The Random Forest, %s on aggregate error and better than the deployed model on "
   "two of five tested axes, inverts the scenario signal it would be required to project: "
   "its separation between pathways shrinks with lead time rather than growing, and only "
   "%.1f per cent of cells order the two pathways correctly. The mechanism is tree "
@@ -179,7 +193,8 @@ P("The deployment decision followed from a test that no accuracy metric could pe
   "of degree. This is "
   "why the improved U-Net configuration identified after the fact does not reopen the "
   "decision on accuracy alone: it has not been put through that screen."
-  % scr.loc["Random Forest", "pct_ordered_long_term"])
+  % (rank("Random Forest").replace("-lowest", ""),
+     scr.loc["Random Forest", "pct_ordered_long_term"]))
 
 H("5.2.4 RQ4: where suitability is highest", 3)
 P("Of %d assessed locations, **%d — %.1f per cent, approximately %s km2 — are classified "
@@ -221,10 +236,11 @@ P("**A quantified architecture-uncertainty term for solar downscaling.** The stu
   "sets the largest of the three terms to zero."
   % u.loc["long_term_2076_2100", "pct_var_arch"])
 P("**A demonstration that historical validation cannot substitute for a projection test.** "
-  "The Random Forest passes every accuracy threshold, is second on aggregate error, and "
+  "The Random Forest passes every accuracy threshold, is %s on aggregate error, and "
   "is better than the deployed model on two of five resampled axes, yet cannot produce "
   "the deliverable. The screen that detects this is cheap, is not standard practice, and "
-  "would have changed the model selection in this study had it not been applied.")
+  "would have changed the model selection in this study had it not been applied."
+  % rank("Random Forest").replace("-lowest", ""))
 P("**An explicit account of what the product does not contain.** The round-trip test "
   "establishes that the fields carry essentially no sub-grid information, and the study "
   "reports that rather than presenting resolution as achievement. The same applies to the "

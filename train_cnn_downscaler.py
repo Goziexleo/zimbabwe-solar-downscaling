@@ -18,12 +18,15 @@ model_path = os.environ.get("CNN_MODEL_PATH", os.path.join(model_output_dir, "cn
 
 # Section 3.6.7/Table 3.2 hyperparameters, overridable for the HPO grid search.
 # These defaults are the DEPLOYED configuration selected by hpo_pixelwise.py's
-# CNN grid search (lr 5e-4, lambda_gp 1e-2). They previously read 0.001/0.001 -
+# Table 3.2, re-searched honestly (Section 3.6.7, hpo_neural.py): lr 1e-3 and
+# lambda_gp 1e-3 win on an inner 2005-2010 split at 0.000400 against the
+# previous 5e-4 / 1e-2 at 0.000424. The earlier values came from a grid scored
+# on the withheld record. Before that they read 0.001/0.001 -
 # the pre-HPO values - and the deployed settings were supplied only as
 # command-line environment overrides, so a plain rerun silently reproduced a
 # different model from the one reported in Table 3.3.
-LEARNING_RATE = float(os.environ.get("CNN_LEARNING_RATE", "0.0005"))
-LAMBDA_GP = float(os.environ.get("CNN_LAMBDA_GP", "0.01"))
+LEARNING_RATE = float(os.environ.get("CNN_LEARNING_RATE", "0.001"))
+LAMBDA_GP = float(os.environ.get("CNN_LAMBDA_GP", "0.001"))
 BATCH_SIZE = int(os.environ.get("CNN_BATCH_SIZE", "16"))
 
 print("Loading datasets for CNN spatial super-resolution...")
@@ -178,6 +181,20 @@ for epoch in range(EPOCHS):
     if (epoch + 1) % 20 == 0 or epoch == 0:
         print(f"  epoch {epoch + 1}/{EPOCHS} | fit {tr:.6f} | select {sel:.6f}")
 print(f"Phase A: best inner-select MSE {best_sel:.6f} at epoch {best_epoch}.")
+
+# Honest hyperparameter search (Section 3.6.7). With PHASE_A_ONLY=1 the script
+# stops after Phase A and reports the inner-selection score, so a grid search can
+# compare candidates without any of them ever touching the withheld record. The
+# search that fixed Table 3.2 was scored on the validation MSE; this is the same
+# search moved inside the training period.
+if os.environ.get("PHASE_A_ONLY", "0") == "1":
+    _out = os.environ.get("PHASE_A_OUT", "")
+    if _out:
+        import json
+        json.dump({"inner_select_mse": float(best_sel),
+                   "selected_epoch": int(best_epoch)}, open(_out, "w"))
+    print("PHASE_A_ONLY: stopping before the refit.")
+    raise SystemExit(0)
 
 # --- Phase B: refit on the full training period for that many epochs ---
 print(f"\nPhase B: refitting on all {len(train_dataset)} training months for {best_epoch} epochs...")

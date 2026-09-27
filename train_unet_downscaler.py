@@ -40,7 +40,10 @@ FINE_DYNAMIC_VARS = ["solar_zenith_angle", "sin_doy", "cos_doy"]
 target_var = "clear_sky_index"  # lives on the fine (fine_lat, fine_lon) target grid
 
 # Deployed configuration (Section 3.6.7): the HPO grid search selected
-# lr 2e-4; batch size, early-stop patience and weight decay were already at
+# lr 1e-3 from the honest re-search (Section 3.6.7, hpo_neural.py): it wins on an
+# inner 2005-2010 split at 0.124575 against 2e-4 at 0.128886. The 2e-4 that
+# stood here came from a grid scored on the withheld record.
+# Batch size, early-stop patience and weight decay were already at
 # their deployed values, and dropout 0.3 is set as DROPOUT_P in unet_model.py.
 # LEARNING_RATE previously defaulted to the pre-HPO 5e-4 and the deployed 2e-4
 # was supplied only as a command-line environment override, so a plain rerun
@@ -48,7 +51,7 @@ target_var = "clear_sky_index"  # lives on the fine (fine_lat, fine_lon) target 
 BATCH_SIZE = int(os.environ.get("UNET_BATCH_SIZE", "16"))
 EPOCHS = int(os.environ.get("EPOCHS", "100"))
 EARLY_STOP_PATIENCE = int(os.environ.get("UNET_EARLY_STOP_PATIENCE", "20"))
-LEARNING_RATE = float(os.environ.get("UNET_LEARNING_RATE", "2e-4"))
+LEARNING_RATE = float(os.environ.get("UNET_LEARNING_RATE", "1e-3"))
 WEIGHT_DECAY = float(os.environ.get("UNET_WEIGHT_DECAY", "1e-4"))
 
 device = torch.device("mps" if torch.backends.mps.is_available() else ("cuda" if torch.cuda.is_available() else "cpu"))
@@ -314,6 +317,20 @@ for epoch in range(EPOCHS):
         print(f"  inner selection stopped at epoch {epoch + 1}")
         break
 print(f"Phase A: best inner-select MSE {best_sel:.4f} at epoch {best_epoch}.")
+
+# Honest hyperparameter search (Section 3.6.7). With PHASE_A_ONLY=1 the script
+# stops after Phase A and reports the inner-selection score, so a grid search can
+# compare candidates without any of them ever touching the withheld record. The
+# search that fixed Table 3.2 was scored on the validation MSE; this is the same
+# search moved inside the training period.
+if os.environ.get("PHASE_A_ONLY", "0") == "1":
+    _out = os.environ.get("PHASE_A_OUT", "")
+    if _out:
+        import json
+        json.dump({"inner_select_mse": float(best_sel),
+                   "selected_epoch": int(best_epoch)}, open(_out, "w"))
+    print("PHASE_A_ONLY: stopping before the refit.")
+    raise SystemExit(0)
 
 print(f"\nPhase B: refitting on all {len(train_dataset)} training months for {best_epoch} epochs...")
 model, optimizer, scheduler = _build()

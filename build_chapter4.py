@@ -39,6 +39,11 @@ scr = pd.read_csv(os.path.join(EVAL, "scenario_discrimination.csv")).set_index("
 agr = pd.read_csv(os.path.join(EVAL, "architecture_agreement.csv"))
 uo = pd.read_csv(os.path.join(EVAL, "unet_optimisation.csv")).set_index("variant")
 lc = pd.read_csv(os.path.join(EVAL, "layer_choice_sensitivity.csv")).iloc[0]
+# The two superseded states of the neural models, preserved so the corrections
+# can be quantified from the record rather than from memory.
+leaky = pd.read_csv(os.path.join(ROOT, "data/processed/models/_pre_honest_selection",
+                                 "table_3_3.csv")).set_index("model")
+honest_ckpt = pd.read_csv(os.path.join(EVAL, "_pre_honest_hpo", "table_3_3.csv")).set_index("model")
 _dep = agr[(agr.model_a == "XGBoost") | (agr.model_b == "XGBoost")]
 K = lambda scheme: sch.loc[scheme, "kappa_vs_primary"]
 sar = pd.read_csv(os.path.join(EVAL, "sarah_era5_monthly.csv"))
@@ -187,14 +192,34 @@ P("The figures in Table 4.1 are comparable across all four models, which require
   "2005 to 2010 for selection, after which each model is refitted from scratch on the "
   "full training record for that number of epochs, so all four architectures see the "
   "same 312 months and none sees the evaluation period.")
-P("The correction is quantified rather than asserted. The U-Net's error rose from 10.11 "
-  "to %.2f W m-2 and the CNN's from 10.14 to %.2f, while the two pixel-wise models are "
-  "unchanged to four decimal places, as they must be, having not been refitted. "
-  "Approximately nine per cent of each neural model's previously reported accuracy was "
-  "therefore selection on the evaluation record. One consequence is visible in the "
-  "ordering: the Random Forest now returns the second-lowest aggregate error rather than "
-  "the highest. Section 4.3 shows that this reordering is not statistically established."
-  % (R("U-Net", "RMSE"), R("CNN", "RMSE")))
+P("Two separate corrections were applied to the neural models, and they pull in opposite "
+  "directions, so both are quantified rather than netted off. The first removed the "
+  "checkpoint selection: weights had been saved on the evaluation record, and choosing "
+  "them honestly instead cost the CNN %.2f W m-2 and the U-Net %.2f, taking them from "
+  "%.2f and %.2f to %.2f and %.2f. The second removed the same defect from the "
+  "hyperparameters, which had been chosen by a grid scored on that record; re-running the "
+  "grid inside the training period (Section 3.6.7) recovered %.2f W m-2 for the CNN and "
+  "%.2f for the U-Net, giving the %.2f and %.2f reported here. The two pixel-wise models "
+  "are unchanged to four decimal places throughout, as they must be, having not been "
+  "refitted."
+  % (honest_ckpt.loc["CNN", "RMSE"] - leaky.loc["CNN", "RMSE"],
+     honest_ckpt.loc["U-Net", "RMSE"] - leaky.loc["U-Net", "RMSE"],
+     leaky.loc["CNN", "RMSE"], leaky.loc["U-Net", "RMSE"],
+     honest_ckpt.loc["CNN", "RMSE"], honest_ckpt.loc["U-Net", "RMSE"],
+     honest_ckpt.loc["CNN", "RMSE"] - R("CNN", "RMSE"),
+     honest_ckpt.loc["U-Net", "RMSE"] - R("U-Net", "RMSE"),
+     R("CNN", "RMSE"), R("U-Net", "RMSE")))
+P("The net effect is the informative part. The CNN ends at %.2f W m-2 against the %.2f it "
+  "reported when both its checkpoint and its hyperparameters were chosen on the evaluation "
+  "record: an honest procedure reproduces the leaked result almost exactly, and the "
+  "apparent accuracy was not being bought by the leakage so much as by a configuration the "
+  "leakage happened to find. The U-Net ends at %.2f against %.2f, so for that architecture "
+  "part of the original figure genuinely was selection on the test set. One consequence is "
+  "visible in the ordering: the CNN now returns the second-lowest aggregate error and the "
+  "Random Forest the third. Section 4.3 shows that neither that reordering nor the previous "
+  "one is statistically established."
+  % (R("CNN", "RMSE"), leaky.loc["CNN", "RMSE"],
+     R("U-Net", "RMSE"), leaky.loc["U-Net", "RMSE"]))
 P("The Taylor decomposition in Table 4.2 shows that the aggregate ranking conceals a "
   "sharp division in the spatial structure of the error. The two pixel-wise models "
   "reproduce the spatial pattern of the time-mean field almost exactly, at correlations "
@@ -394,8 +419,11 @@ P("One result from the same sweep points the other way and is reported because i
   "to unity of any variant tested, while the penalty variants span %.2f to %.2f. An "
   "earlier version of this section stated that the gradient penalty barely moves the "
   "ratio and that a smoothness prior was therefore refuted. Neither half of that holds. "
-  "What can be said is that the deployed U-Net damps fine scales, that its damping is "
-  "robust to the wavenumber cut, and that the mechanism remains open."
+  "A further reason for caution is that the sweep predates the hyperparameter correction "
+  "of Section 3.6.7 and was run at the superseded learning rate, so its baseline differs "
+  "from the deployed model in that setting as well as in failing to reproduce the "
+  "damping. What can be said is that the deployed U-Net damps fine scales, that its "
+  "damping is robust to the wavenumber cut, and that the mechanism remains open."
   % (uo.loc["gp_none", "test_spec_ratio"],
      uo.loc[["baseline", "gp_none", "gp_match", "gp_match_strong"], "test_spec_ratio"].min(),
      uo.loc[["baseline", "gp_none", "gp_match", "gp_match_strong"], "test_spec_ratio"].max()))
