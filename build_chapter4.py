@@ -38,9 +38,11 @@ sch = pd.read_csv(os.path.join(EVAL, "suitability_schemes.csv")).set_index("sche
 scr = pd.read_csv(os.path.join(EVAL, "scenario_discrimination.csv")).set_index("model")
 agr = pd.read_csv(os.path.join(EVAL, "architecture_agreement.csv"))
 uo = pd.read_csv(os.path.join(EVAL, "unet_optimisation.csv")).set_index("variant")
+lc = pd.read_csv(os.path.join(EVAL, "layer_choice_sensitivity.csv")).iloc[0]
 _dep = agr[(agr.model_a == "XGBoost") | (agr.model_b == "XGBoost")]
 K = lambda scheme: sch.loc[scheme, "kappa_vs_primary"]
 sar = pd.read_csv(os.path.join(EVAL, "sarah_era5_monthly.csv"))
+_sar_off = 100 * (1 - sar.ratio.mean())
 lay = xr.open_dataset(os.path.join(SUIT, "criterion_layers.nc"))
 sui = xr.open_dataset(os.path.join(SUIT, "suitability_index.nc"))
 
@@ -527,17 +529,18 @@ P("The suitability analysis of Section 3.9 combines the irradiance layer with si
   "in the lowest tier despite not being excluded." % (n_keep, n_low))
 P("The present-day irradiance layer is the SARAH satellite record rather than the "
   "ERA5-derived field, for the reason established in Section 4.6 and quantified here. "
-  "The two layers differ by only 3 per cent in the mean and their ratio is close to "
+  "The two layers differ by only %.1f per cent in the mean and their ratio is close to "
   "spatially uniform, which suggests the choice should be immaterial under a min-max "
   "standardisation. It is not. Because each criterion is rescaled by its own range, the "
   "standardisation amplifies exactly the spatial structure that the near-uniform ratio "
-  "conceals: the two layers rank the domain at a Spearman correlation of 0.860, and 27.2 "
-  "per cent of cells fall on opposite sides of the highest suitability threshold "
+  "conceals: the two layers rank the domain at a Spearman correlation of %.3f, and %.1f "
+  "per cent of assessed cells fall on opposite sides of the highest suitability threshold "
   "depending on which is used. Under the ERA5 layer the analysis returns %d cells in the "
   "highest tier; under SARAH it returns %d. An independent observation is preferred to a "
   "reanalysis for a present-day siting assessment, and the choice is reported because it "
   "is consequential rather than because it is close."
-  % (per.loc["present_era5_basis", "very_high"], per.loc["present", "very_high"]))
+  % (_sar_off, lc.spearman_rho, lc["pct_crossing_0.75"],
+     per.loc["present_era5_basis", "very_high"], per.loc["present", "very_high"]))
 
 FIG("07_suitability_criteria.png", "The seven standardised criterion layers and the "
     "exclusion mask. Excluded cells are left blank rather than drawn on the score ramp.")

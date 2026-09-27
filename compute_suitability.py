@@ -382,6 +382,31 @@ def main():
     out.to_netcdf(OUT_NC)
     pd.DataFrame([dict(scheme=k, **v) for k, v in schemes.items()]).to_csv(
         os.path.join(OUT_DIR, "suitability_weights.csv"), index=False)
+    # The ERA5-vs-SARAH layer choice, measured on the standardised score that
+    # Section 3.9.3 actually feeds the overlay. Section 7.17 reported rho 0.860,
+    # mean |diff| 0.170 and 1,485 cells crossing 0.75; none of those reproduce on
+    # the current layers, and they were never written to disk, so they could not
+    # be re-derived when the layers changed. They are computed here.
+    from scipy.stats import spearmanr
+    _se = minmax(ds["ghi_present_era5"].values, keep)
+    _ss = minmax(ds["ghi_present_sarah"].values, keep)
+    _rows = [dict(
+        basis="assessed cells",
+        n=int(keep.sum()),
+        spearman_rho=float(spearmanr(_se[keep], _ss[keep]).correlation),
+        mean_abs_score_diff=float(np.nanmean(np.abs(_se[keep] - _ss[keep]))))]
+    for _thr in (0.75, 0.60):
+        _x = ((_se >= _thr) != (_ss >= _thr)) & keep
+        _rows[0]["cells_crossing_%.2f" % _thr] = int(_x.sum())
+        _rows[0]["pct_crossing_%.2f" % _thr] = float(100 * _x.sum() / keep.sum())
+    pd.DataFrame(_rows).to_csv(
+        os.path.join(OUT_DIR, "layer_choice_sensitivity.csv"), index=False)
+    print("\nERA5 vs SARAH on the standardised GHI score (assessed cells):")
+    print("  Spearman rho %.3f | mean |score diff| %.3f | crossing 0.75 %d (%.1f%%) | crossing 0.60 %d (%.1f%%)"
+          % (_rows[0]["spearman_rho"], _rows[0]["mean_abs_score_diff"],
+             _rows[0]["cells_crossing_0.75"], _rows[0]["pct_crossing_0.75"],
+             _rows[0]["cells_crossing_0.60"], _rows[0]["pct_crossing_0.60"]))
+
     pd.DataFrame(scheme_rows).to_csv(
         os.path.join(OUT_DIR, "suitability_schemes.csv"), index=False)
     pd.DataFrame([dict(assessed=int(keep.sum()),

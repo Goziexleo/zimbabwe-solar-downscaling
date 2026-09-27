@@ -580,6 +580,8 @@ The first quantity in this project measured against something that is not ERA5. 
 
 It does not carry to a present-day siting map, and the expected escape route turns out to be closed. **The offset is spatially near-uniform** — ratio sd 0.0142, range 0.919 to 1.067 — which suggested it would cancel under §3.9.3's min-max normalisation and leave the ranking untouched. **It does not.** Min-max rescales by the *range*, so it amplifies exactly the small spatial structure the ratio sd conceals:
 
+**SUPERSEDED — never written to disk, and they do not reproduce on the current layers (§12j).** Kept as the record of what the decision was actually made on:
+
 | | |
 |---|---|
 | Spearman ρ of the min-max GHI score | **0.860** |
@@ -587,7 +589,16 @@ It does not carry to a present-day siting map, and the expected escape route tur
 | cells crossing the 0.75 tier threshold | **1,485 (27.2%)** |
 | cells crossing 0.60 | 2,503 (45.9%) |
 
-Nearly half the domain changes tier on the irradiance criterion alone. **So the layer choice is a methodological decision, not a presentational one**, and defaulting to ERA5 without measuring it would have put an unexamined choice under every suitability map.
+**CURRENT**, from `layer_choice_sensitivity.csv`, on the 2,386 assessed cells:
+
+| | |
+|---|---|
+| Spearman ρ of the min-max GHI score | **0.875** |
+| mean absolute score difference | 0.087 |
+| cells crossing the 0.75 tier threshold | **371 (15.5%)** |
+| cells crossing 0.60 | 213 (8.9%) |
+
+About one assessed cell in six changes tier on the irradiance criterion alone — weaker than the "nearly half the domain" the superseded figures supported, and still enough to make the layer choice consequential rather than presentational. **So the layer choice is a methodological decision, not a presentational one**, and defaulting to ERA5 without measuring it would have put an unexamined choice under every suitability map.
 
 **Resolution: SARAH for the present-day map** — an independent retrieval at 0.05°, finer than the target grid, over a region where reanalysis is weakest. **ERA5-derived for present-to-future change**, so the change signal stays within one measurement system. `build_suitability_layers.py` writes both and `compute_suitability.py` prefers SARAH.
 
@@ -1389,6 +1400,92 @@ sizing the test would have taken the shift as larger than it is.
 
 Zotero integrity held: unchanged field and paragraph counts before and after.
 Backup: `CR_Madukwe_Chapter2_BACKUP_pre_prose_audit.docx`.
+
+---
+
+## 12j. Chapter 3 prose: method descriptions that outlived the code
+
+Every numeric claim in Chapter 3's prose was extracted and checked against the
+code or the data — 61 paragraphs carrying numbers. **Most of the chapter is
+exactly right**, including several things that looked wrong until checked
+properly:
+
+| Checked | Result |
+|---|---|
+| QC flag counts (38,843 of 6,063,552, 0.64%, 107 aerosol, 751 of 957 cells, max 277) | **all exact** |
+| 1,794,312 / 966,168 values, CSI max 0.6323, constraint never binds | exact |
+| Elevation 124 m to 1840 m given to PVLIB | exact (124–1839) |
+| Clear-sky ratio 1.724, sd 0.033 | exact |
+| Out-of-range tas, 4.95% under SSP5-8.5 against 0.79% | **exact** |
+| Hwange 14,651, Mana Pools 2,196, Gonarezhou 5,053 km² | exact against WDPA `REP_AREA` |
+| BCa intervals, centred RMSE by model, MBE, rolling-origin | all exact |
+| Bilinear baseline 0.23 W m⁻² | exact (0.2331) |
+| Decay 0.37/0.14, tiers, scheme weights, land-cover scores, ONI 0.5/20% | all exact |
+| 71×81, 29×33, 2.45, 312/168, 9,496/5,114 daily, 1.25°×1.875° → 12.5/18.8 | all exact |
+| RF 500 trees / leaf 5; XGB depth 6, eta 0.05, subsample 0.8, mcw 3; CNN 64 filters, 100 epochs, lr 5e-4, λ 0.01; U-Net 64–512 + 1×1 1024, dropout 0.3, lr 2e-4, batch 16 | all exact |
+
+Two of my own checks were wrong before the chapter was: the elevation range
+(I read it off the wrong grid) and Mana Pools (I matched the World Heritage
+complex, 6,766 km², rather than the National Park). **The chapter was right both
+times.**
+
+**What was actually wrong: the methods chapter described two procedures that had
+been removed as leakage.**
+
+- **§3.6.4 said XGBoost's boosting rounds were "determined by early stopping on
+  the validation split with a patience of 50 rounds".** That is §6.12's defect
+  verbatim — the thing that was found and fixed. The model uses a **fixed 200
+  rounds**; `early_stopping_rounds` is `None`. The text now says so, gives the
+  measured cost of the fix (9.11 leaky against 9.24 clean) and why an inner-split
+  variant scored worse (10.02).
+- **§3.6.6 said the U-Net used "early stopping on the validation MSE with a
+  patience of 20 epochs".** That is §6.13's defect. The script now runs two-phase
+  honest selection — Phase A fits 1985–2004 and stops on a 2005–2010 inner split,
+  Phase B refits on the full training period for that epoch count. The text now
+  describes what the code does.
+
+A methods chapter that documents a corrected defect as current practice is worse
+than one that never mentioned it: it tells the examiner the leakage is still
+there.
+
+**Two claims that the project had overtaken.** §3.6.3 and §3.6.4 both said
+predictor importances "were not extracted in the present implementation". All
+four measures were extracted, live in `feature_importance.csv`, and carry a
+figure and a section in Chapter 4. Both now point at §4.7.
+
+**Two figures that could not be reproduced.** §3.9 gave the ERA5-versus-SARAH
+layer comparison as ρ = 0.860 with 27.2% of cells crossing the top tier. Neither
+reproduces on the current layers under any basis tried, and neither was ever
+written to disk. Recomputed on the standardised score the overlay actually uses,
+over the 2,386 assessed cells: **ρ = 0.875, 15.5% crossing**. Now written to
+`layer_choice_sensitivity.csv` by `compute_suitability.py`, and read by Chapter 4.
+The argument holds — one assessed cell in six still changes tier on the
+irradiance criterion alone — but it is weaker than "nearly half the domain".
+
+**One ambiguity tightened.** §3.7.3 compared the bilinear baseline "against a
+target standard deviation near 19". The target's raw standard deviation is 38.04;
+7.98 for the time-mean field; and about its seasonal climatology it is 17.98 — which
+collides numerically with the retired A7 climatology reference and has nothing to do
+with it. The intended
+comparator is the 19.08 W m⁻² climatology RMSE, and the text now names it.
+
+**One live defect left in place and flagged rather than fixed.** §3.6.7 states
+that the neural hyperparameter search "was scored directly on the validation mean
+squared error". That is true, it is selection on the withheld record, and unlike
+the epoch count it has **not** been corrected. The paragraph now says so and
+points to §5.6, where it is already the first recommendation. Correcting it means
+re-running the grid search inside the training period — a real piece of work, not
+an edit.
+
+Six literal anchors added to the Chapter 3 guard; injection-tested. Zotero
+integrity held through every edit: 25 `ZOTERO_ITEM`, 1 `ZOTERO_BIBL`, 156
+`fldChar`, 222 paragraphs, 5 tables, unchanged.
+
+*One near-miss worth recording: an intermediate version of this edit collapsed
+paragraph 102's runs to apply a replacement, which destroyed a live Zotero field
+(25 → 24 items, 156 → 150 `fldChar`). Caught by the integrity counter, restored
+from backup, redone run-by-run leaving the field runs untouched. Run-level
+surgery is the rule for a reason.*
 
 ---
 
