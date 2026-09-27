@@ -213,11 +213,15 @@ exactly what that term measures — the mirror image of what the §6.13 correcti
 Chapter 5's methodological point stands: architecture choice still dominates GCM choice
 (5.10%) by a factor of about five.
 
-**Table 4.3 is unaffected, which was checked rather than assumed.** It prints only the
-Random Forest and XGBoost columns, and neither model was refitted, so its four folds stand
-unchanged — 11.73/9.47, 12.84/11.29, 9.05/8.16, 10.83/9.62. The rolling-origin rerun below
-matters only for the CNN and U-Net CSI column, which appears in this document and in no
-chapter.
+**Table 4.3 is unaffected, and this was verified against the completed rerun rather than
+argued.** It prints only the Random Forest and XGBoost columns, and neither model was
+refitted. All four folds reproduce to the decimal the chapter prints: 11.7272/9.4716,
+12.8372/11.2859, 9.0493/8.1634, 10.8254/9.6165 against 11.73/9.47, 12.84/11.29, 9.05/8.16
+and 10.83/9.62. The rerun mattered only for the CNN and U-Net CSI column, which appears in
+this document and in no chapter — which is why the chapters could be finished while it ran.
+
+**The rerun completed without deadlocking, including on fold 3**, the fold that hung under
+`n_jobs=-1`, so the capped pool is the fix rather than a coincidence.
 
 **Two bugs found while regenerating.** `compute_rolling_origin.py` deadlocked on fold 3
 (`Parallel(n_jobs=-1)` lost workers to memory pressure and the parent waited forever at
@@ -407,8 +411,15 @@ Relative to each model's own deployed-split fold, no architecture is unusually p
 |---|---|---|---|---|---|
 | Random Forest | 1.30 | 1.42 | 1.00 | 1.20 | 1.42 |
 | XGBoost | 1.16 | 1.38 | 1.00 | 1.18 | 1.38 |
-| CNN | 1.29 | 1.36 | 1.00 | 1.26 | 1.36 |
-| U-Net | 1.12 | 1.43 | 1.00 | 1.17 | 1.43 |
+| CNN | 1.08 | 1.00 | 1.00 | 0.71 | 1.53 |
+| U-Net | 0.96 | 0.80 | 1.00 | 0.67 | 1.49 |
+
+**The CNN and U-Net columns are CSI validation MSE, not RMSE, and the two networks report it in different units** — the CNN on the raw clear-sky index, the U-Net on a standardised anomaly — so they are comparable to themselves across folds and to nothing else. These had been silently `nan` since §6.13 renamed the line the parser greps for (§6.14); the values below are the first honest ones:
+
+| Model | 1999–2004 | 2005–2010 | 2011–2016 | 2017–2024 |
+|---|---|---|---|---|
+| CNN | 0.000451 | 0.000419 | 0.000418 | 0.000295 |
+| U-Net | 0.125600 | 0.105000 | 0.131200 | 0.087800 |
 
 All four sit within a spread of ~1.4, and all four find 2005–2010 hardest and 2011–2016 easiest — a property of the periods, not of any model.
 
