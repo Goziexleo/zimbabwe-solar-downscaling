@@ -213,6 +213,12 @@ exactly what that term measures — the mirror image of what the §6.13 correcti
 Chapter 5's methodological point stands: architecture choice still dominates GCM choice
 (5.10%) by a factor of about five.
 
+**Table 4.3 is unaffected, which was checked rather than assumed.** It prints only the
+Random Forest and XGBoost columns, and neither model was refitted, so its four folds stand
+unchanged — 11.73/9.47, 12.84/11.29, 9.05/8.16, 10.83/9.62. The rolling-origin rerun below
+matters only for the CNN and U-Net CSI column, which appears in this document and in no
+chapter.
+
 **Two bugs found while regenerating.** `compute_rolling_origin.py` deadlocked on fold 3
 (`Parallel(n_jobs=-1)` lost workers to memory pressure and the parent waited forever at
 zero CPU); it now caps the pool, dispatches in bounded batches and carries a timeout. And
