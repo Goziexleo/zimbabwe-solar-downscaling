@@ -187,6 +187,7 @@ dependencies:
       - aioitertools==0.13.0
       - aiosignal==1.4.0
       - appdirs==1.4.4
+      - babel==2.18.0
       - beautifulsoup4==4.15.0
       - botocore==1.43.46
       - bounded-pool-executor==0.0.3
@@ -196,6 +197,7 @@ dependencies:
       - cligj==0.7.2
       - cycler==0.12.1
       - defusedxml==0.7.1
+      - docxcompose==2.2.0
       - earthaccess==0.17.0
       - ecmwf-datastores-client==0.5.1
       - elevation==1.1.3

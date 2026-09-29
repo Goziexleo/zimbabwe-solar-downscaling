@@ -1574,6 +1574,79 @@ surgery is the rule for a reason.*
 
 ---
 
+## 12k. The dissertation is assembled, and the SARAH question is answered with numbers
+
+**Why the product is not validated against SARAH, computed rather than argued.**
+`validate_against_sarah.py` scores every model against both references over the same
+168 withheld months and cells:
+
+| | RMSE v ERA5 | RMSE v SARAH | bias v SARAH |
+|---|---|---|---|
+| XGBoost (deployed) | 9.24 | 13.67 | -6.95 |
+| Random Forest | 10.30 | 14.42 | -7.91 |
+| CNN | 10.04 | 13.89 | -5.33 |
+| U-Net | 10.33 | 14.59 | -6.79 |
+| Baseline (bilinear) | 0.24 | 13.83 | -8.16 |
+| **the ERA5 target itself** | **0.00** | **13.84** | **-8.14** |
+
+Three things follow, and together they are the justification. The ERA5 target's own
+distance from SARAH is **13.84 W m⁻²** against a spread across the four
+architectures of **1.09**, a factor of **12.7**. The bilinear baseline, which reproduces
+the target to 0.24 and therefore contains no downscaling at all, scores
+13.83 against SARAH: the test cannot distinguish a trained model from an
+interpolation. And XGBoost's 13.67 is *lower* than the target it was trained to
+reproduce, because its small positive bias against ERA5 partially cancels ERA5's
+-8.14 against SARAH. A model beating its own training target is conclusive
+evidence that the quantity measured is the reference, not the model.
+
+So the answer is not that the validation is unnecessary. It is that **re-scoring an
+ERA5-trained product against SARAH is not an observational validation**; it requires
+refitting against SARAH as the target at 0.05°, which is Chapter 5 §5.6's first
+recommendation and a separate study. Written up as Chapter 4 §4.6.1 and summarised in
+§5.4.
+
+**The dissertation is now one document.** `build_thesis.py` builds front matter in
+University of Zimbabwe styling (crest from the University's own site, wordmark purple
+`#2C1A70` and crest blue `#3251A1` sampled from it), merges Chapters 1 to 5 with
+`docxcompose` so that Zotero fields, tables, figures and OMML equations survive, then
+appends the consolidated references and two appendices. 648 paragraphs, 18 tables,
+11 images, **60 in-text Zotero fields intact**, ~30,750 words.
+
+- **Front matter:** title page, abstract (~600 words, every figure read from the
+  result CSVs so it cannot drift), acknowledgements, and a Word contents field.
+- **Page setup normalised.** The chapters arrived with three different left margins;
+  every section is now A4 with a 3.5 cm binding edge, roman numerals for the front
+  matter and arabic restarting at 1 for the body.
+- **One reference list, not four.** Chapters 1, 2 and 3 each carried their own
+  bibliography, two Zotero-generated. 82 paragraphs of per-chapter lists were removed
+  and replaced by a single author-date list; the in-text fields were left untouched,
+  since those are what Zotero needs. Chapter 2 cites numerically and the others by
+  author-date, so the consolidated list is normalised to author-date, which is what a
+  single style will emit on refresh.
+- **Em-dashes removed** from the generators and from Chapter 3, so regeneration cannot
+  reintroduce them. Spaced em-dashes became commas, unspaced ones hyphens. The
+  dissertation contains zero. En-dashes in numeric ranges are left, being correct.
+- **Appendix A** states the reproducibility case and names what the repository does
+  not contain. **Appendix B** declares the use of AI for language, code generation and
+  debugging, and states what it was not used for.
+
+**One error caught in my own abstract, and it is the error this project keeps
+finding.** The first draft reported the projected change as +4.0 W m⁻², differencing
+the SSP5-8.5 projection against the **SARAH**-based present. The projections come from
+an ERA5-trained chain, so that subtracts one instrument from another and calls the
+difference climate, which is precisely what §7.17 exists to prevent. Recomputed on the
+ERA5 basis, as Table 4.7 computes it: **+9.6 W m⁻²**.
+
+**Repository prepared for publication.** README rewritten as a front door rather than
+developer notes: the reproducibility argument, a dataset table naming every provider
+and licence, the full pipeline in order with runtimes, how to run the guards, and the
+AI disclosure. Plus `LICENSE` (MIT, explicitly not covering the data), `CITATION.cff`,
+and a regenerated `environment.yml`. Chapter 3 §3.11 and Appendix A both state the
+repository's existence and its limits, so the reproducibility claim is in the
+dissertation and not only in the code.
+
+---
+
 ## 13. Outstanding
 
 **Not started**

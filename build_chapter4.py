@@ -39,10 +39,13 @@ scr = pd.read_csv(os.path.join(EVAL, "scenario_discrimination.csv")).set_index("
 agr = pd.read_csv(os.path.join(EVAL, "architecture_agreement.csv"))
 uo = pd.read_csv(os.path.join(EVAL, "unet_optimisation.csv")).set_index("variant")
 lc = pd.read_csv(os.path.join(EVAL, "layer_choice_sensitivity.csv")).iloc[0]
+spv = pd.read_csv(os.path.join(EVAL, "sarah_product_validation.csv")).set_index("model")
+_sp_models = ("XGBoost", "Random Forest", "CNN", "U-Net")
+_sp_spread = (max(spv.loc[m, "rmse_vs_era5"] for m in _sp_models)
+              - min(spv.loc[m, "rmse_vs_era5"] for m in _sp_models))
 # The two superseded states of the neural models, preserved so the corrections
 # can be quantified from the record rather than from memory.
-leaky = pd.read_csv(os.path.join(ROOT, "data/processed/models/_pre_honest_selection",
-                                 "table_3_3.csv")).set_index("model")
+leaky = pd.read_csv(os.path.join(ROOT, "data/processed/models/_pre_honest_selection", "table_3_3.csv")).set_index("model")
 honest_ckpt = pd.read_csv(os.path.join(EVAL, "_pre_honest_hpo", "table_3_3.csv")).set_index("model")
 _dep = agr[(agr.model_a == "XGBoost") | (agr.model_b == "XGBoost")]
 K = lambda scheme: sch.loc[scheme, "kappa_vs_primary"]
@@ -168,19 +171,15 @@ P("All four architectures were evaluated on the withheld 2011 to 2024 period, 16
   "monthly fields at 0.1 degree resolution, against the ERA5-derived target (Hersbach et al., 2020). Table 4.1 "
   "reports the aggregate metrics. All four exceed the correlation threshold of 0.90 set "
   "in Section 3.7.1 and all four hold mean bias below 5 W m-2.")
-TBL(["Model", "RMSE (W m-2)", "MAE", "Pearson R", "MBE", "Skill vs climatology", "R2"],
-    [[m, "%.2f" % R(m, "RMSE"), "%.2f" % R(m, "MAE"), "%.4f" % R(m, "Pearson R"),
-      "%+.2f" % R(m, "MBE"), "%.4f" % R(m, "SS vs climatology"), "%.4f" % R(m, "R2")]
-     for m in ["XGBoost", "U-Net", "CNN", "Random Forest"]],
-    "Table 4.1. Validation metrics on the withheld 2011–2024 record, computed by "
+TBL(["Model", "RMSE (W m-2)", "MAE", "Pearson R", "MBE", "Skill vs climatology", "R2"], [[m, "%.2f" % R(m, "RMSE"), "%.2f" % R(m, "MAE"), "%.4f" % R(m, "Pearson R"), "%+.2f" % R(m, "MBE"), "%.4f" % R(m, "SS vs climatology"), "%.4f" % R(m, "R2")]
+     for m in ["XGBoost", "U-Net", "CNN", "Random Forest"]], "Table 4.1. Validation metrics on the withheld 2011–2024 record, computed by "
     "compute_table33.py from the saved prediction fields. Skill is measured against the "
     "training-period climatology, whose RMSE on this period is 19.08 W m-2.")
 P("The pixel-wise XGBoost ensemble attains the lowest aggregate error at %.2f W m-2, "
   "a skill score of %.4f against climatology, and a Pearson correlation of %.4f. The "
   "spread across architectures is %.2f W m-2 between best and worst, and Section 4.3 "
   "addresses which part of that spread is statistically established."
-  % (R("XGBoost", "RMSE"), R("XGBoost", "SS vs climatology"), R("XGBoost", "Pearson R"),
-     t33["RMSE"].max() - t33["RMSE"].min()))
+  % (R("XGBoost", "RMSE"), R("XGBoost", "SS vs climatology"), R("XGBoost", "Pearson R"), t33["RMSE"].max() - t33["RMSE"].min()))
 P("The figures in Table 4.1 are comparable across all four models, which required a "
   "correction. Earlier versions of both neural training procedures saved the checkpoint "
   "scoring best on the withheld record itself, and the U-Net additionally early-stopped "
@@ -202,13 +201,7 @@ P("Two separate corrections were applied to the neural models, and they pull in 
   "%.2f for the U-Net, giving the %.2f and %.2f reported here. The two pixel-wise models "
   "are unchanged to four decimal places throughout, as they must be, having not been "
   "refitted."
-  % (honest_ckpt.loc["CNN", "RMSE"] - leaky.loc["CNN", "RMSE"],
-     honest_ckpt.loc["U-Net", "RMSE"] - leaky.loc["U-Net", "RMSE"],
-     leaky.loc["CNN", "RMSE"], leaky.loc["U-Net", "RMSE"],
-     honest_ckpt.loc["CNN", "RMSE"], honest_ckpt.loc["U-Net", "RMSE"],
-     honest_ckpt.loc["CNN", "RMSE"] - R("CNN", "RMSE"),
-     honest_ckpt.loc["U-Net", "RMSE"] - R("U-Net", "RMSE"),
-     R("CNN", "RMSE"), R("U-Net", "RMSE")))
+  % (honest_ckpt.loc["CNN", "RMSE"] - leaky.loc["CNN", "RMSE"], honest_ckpt.loc["U-Net", "RMSE"] - leaky.loc["U-Net", "RMSE"], leaky.loc["CNN", "RMSE"], leaky.loc["U-Net", "RMSE"], honest_ckpt.loc["CNN", "RMSE"], honest_ckpt.loc["U-Net", "RMSE"], honest_ckpt.loc["CNN", "RMSE"] - R("CNN", "RMSE"), honest_ckpt.loc["U-Net", "RMSE"] - R("U-Net", "RMSE"), R("CNN", "RMSE"), R("U-Net", "RMSE")))
 P("The net effect is the informative part. The CNN ends at %.2f W m-2 against the %.2f it "
   "reported when both its checkpoint and its hyperparameters were chosen on the evaluation "
   "record: an honest procedure reproduces the leaked result almost exactly, and the "
@@ -218,8 +211,7 @@ P("The net effect is the informative part. The CNN ends at %.2f W m-2 against th
   "visible in the ordering: the CNN now returns the second-lowest aggregate error and the "
   "Random Forest the third. Section 4.3 shows that neither that reordering nor the previous "
   "one is statistically established."
-  % (R("CNN", "RMSE"), leaky.loc["CNN", "RMSE"],
-     R("U-Net", "RMSE"), leaky.loc["U-Net", "RMSE"]))
+  % (R("CNN", "RMSE"), leaky.loc["CNN", "RMSE"], R("U-Net", "RMSE"), leaky.loc["U-Net", "RMSE"]))
 P("The Taylor decomposition in Table 4.2 shows that the aggregate ranking conceals a "
   "sharp division in the spatial structure of the error. The two pixel-wise models "
   "reproduce the spatial pattern of the time-mean field almost exactly, at correlations "
@@ -228,16 +220,12 @@ P("The Taylor decomposition in Table 4.2 shows that the aggregate ranking concea
   "the architectures: a per-cell model is free to fit each location independently and "
   "cannot smear structure across space, whereas a shared-weight convolutional model "
   "trades spatial fidelity for the ability to exploit spatial context (Vandal et al., 2017; Lin et al., 2023)."
-  % (tay.loc["Random Forest", "spatial_correlation"], tay.loc["XGBoost", "spatial_correlation"],
-     tay.loc["CNN", "spatial_correlation"], tay.loc["U-Net", "spatial_correlation"]))
+  % (tay.loc["Random Forest", "spatial_correlation"], tay.loc["XGBoost", "spatial_correlation"], tay.loc["CNN", "spatial_correlation"], tay.loc["U-Net", "spatial_correlation"]))
 FIG("02_taylor.png", "Taylor diagram of the four architectures on the time-mean "
     "validation field. The two pixel-wise models sit close to the reference arc; the "
     "convolutional models do not.")
-TBL(["Field", "Spatial correlation", "Std ratio", "Centred RMSE", "Domain-mean bias"],
-    [[m, "%.4f" % tay.loc[m, "spatial_correlation"], "%.4f" % tay.loc[m, "std_ratio"],
-      "%.4f" % tay.loc[m, "centered_rmse"], "%+.4f" % tay.loc[m, "domain_mean_bias"]]
-     for m in ["Baseline (bilinear)", "Random Forest", "XGBoost", "CNN", "U-Net"]],
-    "Table 4.2. Taylor statistics on the time-mean validation field.")
+TBL(["Field", "Spatial correlation", "Std ratio", "Centred RMSE", "Domain-mean bias"], [[m, "%.4f" % tay.loc[m, "spatial_correlation"], "%.4f" % tay.loc[m, "std_ratio"], "%.4f" % tay.loc[m, "centered_rmse"], "%+.4f" % tay.loc[m, "domain_mean_bias"]]
+     for m in ["Baseline (bilinear)", "Random Forest", "XGBoost", "CNN", "U-Net"]], "Table 4.2. Taylor statistics on the time-mean validation field.")
 
 _rf = roll[roll.model == "Random Forest"].set_index("fold")
 _xg = roll[roll.model == "XGBoost"].set_index("fold")
@@ -249,10 +237,7 @@ P("Because every figure above rests on a single 1985–2010 / 2011–2024 split,
   "of %s W m-2. The ranking between the two pixel-wise models is therefore not an "
   "artefact of where the single split was placed."
   % " and ".join("%.2f" % (_rf.loc[f, "RMSE"] - _xg.loc[f, "RMSE"]) for f in folds))
-TBL(["Fold", "Random Forest RMSE", "XGBoost RMSE", "Difference"],
-    [[f, "%.2f" % _rf.loc[f, "RMSE"], "%.2f" % _xg.loc[f, "RMSE"],
-      "%+.2f" % (_rf.loc[f, "RMSE"] - _xg.loc[f, "RMSE"])] for f in folds],
-    "Table 4.3. Rolling-origin evaluation across four expanding windows. Each fold's "
+TBL(["Fold", "Random Forest RMSE", "XGBoost RMSE", "Difference"], [[f, "%.2f" % _rf.loc[f, "RMSE"], "%.2f" % _xg.loc[f, "RMSE"], "%+.2f" % (_rf.loc[f, "RMSE"] - _xg.loc[f, "RMSE"])] for f in folds], "Table 4.3. Rolling-origin evaluation across four expanding windows. Each fold's "
     "climatology reference is built from that fold's own training window.")
 
 FIG("01_per_cell_bias.png", "Per-cell mean bias for each architecture over the "
@@ -271,14 +256,10 @@ P("Table 4.1 orders four models on quantities computed from a single 168-month r
   "percentile method assumes an approximately unbiased distribution and is the wrong "
   "interval here.")
 rows = []
-for metric, label in [("RMSE", "Aggregate RMSE"), ("|MBE|", "Mean bias magnitude"),
-                      ("centred RMSE", "Centred RMSE"), ("spatial R", "Spatial correlation"),
-                      ("std ratio dev", "Std ratio deviation")]:
+for metric, label in [("RMSE", "Aggregate RMSE"), ("|MBE|", "Mean bias magnitude"), ("centred RMSE", "Centred RMSE"), ("spatial R", "Spatial correlation"), ("std ratio dev", "Std ratio deviation")]:
     v, lo, hi, spans = pair("Random Forest", "XGBoost", metric)
-    rows.append([label, "%+.4f" % v, "%+.3f to %+.3f" % (lo, hi),
-                 "spans zero" if spans else "established"])
-TBL(["Axis", "RF − XGBoost", "95% BCa interval", "Verdict"], rows,
-    "Table 4.4. Paired differences between the two pixel-wise models, with BCa intervals "
+    rows.append([label, "%+.4f" % v, "%+.3f to %+.3f" % (lo, hi), "spans zero" if spans else "established"])
+TBL(["Axis", "RF − XGBoost", "95% BCa interval", "Verdict"], rows, "Table 4.4. Paired differences between the two pixel-wise models, with BCa intervals "
     "from a year-block bootstrap. A negative value favours the Random Forest.")
 v_r, lo_r, hi_r, _ = pair("Random Forest", "XGBoost", "RMSE")
 v_m, lo_m, hi_m, _ = pair("Random Forest", "XGBoost", "|MBE|")
@@ -302,9 +283,7 @@ P("The Random Forest's second place on aggregate error is not established agains
   "is %+.3f W m-2 with an interval of %+.3f to %+.3f, and from the CNN %+.3f with %+.3f "
   "to %+.3f; both intervals contain zero. The order in Table 4.1 changed when the neural "
   "models were retrained, but the evidence separating those three did not."
-  % (pair("Random Forest", "U-Net", "RMSE")[0], pair("Random Forest", "U-Net", "RMSE")[1],
-     pair("Random Forest", "U-Net", "RMSE")[2], pair("Random Forest", "CNN", "RMSE")[0],
-     pair("Random Forest", "CNN", "RMSE")[1], pair("Random Forest", "CNN", "RMSE")[2]))
+  % (pair("Random Forest", "U-Net", "RMSE")[0], pair("Random Forest", "U-Net", "RMSE")[1], pair("Random Forest", "U-Net", "RMSE")[2], pair("Random Forest", "CNN", "RMSE")[0], pair("Random Forest", "CNN", "RMSE")[1], pair("Random Forest", "CNN", "RMSE")[2]))
 P("Against the convolutional models the aggregate comparison is unambiguous: XGBoost is "
   "lower by %.3f W m-2 against the CNN and %.3f against the U-Net, both intervals "
   "excluding zero." % (abs(xc[0]), abs(xu[0])))
@@ -323,16 +302,12 @@ def _grows(r):
     wrong: the separation at the long horizon is nearly double the near-term one.
     """
     if not r.grows:
-        return "No — shrinks"
+        return "No, shrinks"
     return "Yes" if r.monotonic else "Yes, overall"
 
 
-TBL(["Model", "Near-term", "Mid-term", "Long-term", "Grows?", "Cells ordered correctly"],
-    [[m, "%+.3f" % scr.loc[m, "sep_near_term"], "%+.3f" % scr.loc[m, "sep_mid_term"],
-      "%+.3f" % scr.loc[m, "sep_long_term"], _grows(scr.loc[m]),
-      "%.1f%%" % scr.loc[m, "pct_ordered_long_term"]]
-     for m in ("Random Forest", "XGBoost", "CNN", "U-Net")],
-    "Table 4.5. Scenario separation, SSP5-8.5 minus SSP2-4.5, in W m-2 by horizon.")
+TBL(["Model", "Near-term", "Mid-term", "Long-term", "Grows?", "Cells ordered correctly"], [[m, "%+.3f" % scr.loc[m, "sep_near_term"], "%+.3f" % scr.loc[m, "sep_mid_term"], "%+.3f" % scr.loc[m, "sep_long_term"], _grows(scr.loc[m]), "%.1f%%" % scr.loc[m, "pct_ordered_long_term"]]
+     for m in ("Random Forest", "XGBoost", "CNN", "U-Net")], "Table 4.5. Scenario separation, SSP5-8.5 minus SSP2-4.5, in W m-2 by horizon.")
 P("The Random Forest fails. Its separation shrinks as forcing grows, the opposite of the "
   "physical expectation, it inverts outright on the long-term change signal, and only "
   "%.1f per cent of cells order the two pathways correctly. The mechanism is tree "
@@ -398,22 +373,17 @@ P("The cause was investigated with a controlled sweep fitting on 1985 to 2004 an
   "configuration applies at a rate of %.1f improves held-out error from %.2f to %.2f "
   "W m-2, spatial correlation from %.3f to %.3f, and centred error from %.2f to %.2f. "
   "Dropout at this rate costs the U-Net a substantial amount of accuracy."
-  % (uo.loc["baseline", "cfg_dropout"], uo.loc["baseline", "test_rmse"],
-     uo.loc["drop_0", "test_rmse"], uo.loc["baseline", "test_spatial_r"],
-     uo.loc["drop_0", "test_spatial_r"], uo.loc["baseline", "test_centred_rmse"],
-     uo.loc["drop_0", "test_centred_rmse"]))
+  % (uo.loc["baseline", "cfg_dropout"], uo.loc["baseline", "test_rmse"], uo.loc["drop_0", "test_rmse"], uo.loc["baseline", "test_spatial_r"], uo.loc["drop_0", "test_spatial_r"], uo.loc["baseline", "test_centred_rmse"], uo.loc["drop_0", "test_centred_rmse"]))
 P("The sweep does not, however, identify the cause of the damping reported above, and an "
   "earlier version of this section claimed that it did. The difficulty is that the "
   "sweep's own baseline does not reproduce the damping it was built to explain. That "
   "baseline carries the same dropout rate as the deployed model, yet its spectral ratio "
-  "at wavenumber %d is %.2f — an excess of fine-scale power, not a deficit — against the "
+  "at wavenumber %d is %.2f, an excess of fine-scale power, not a deficit, against the "
   "deployed model's %.3f at wavenumber 11. Removing dropout moves the sweep's ratio to "
   "%.2f, which is no closer to unity than the baseline was: %.2f against %.2f in absolute "
   "deviation. A sweep whose baseline does not exhibit the failure cannot isolate its "
   "cause, and the attribution to dropout is therefore withdrawn."
-  % (10, uo.loc["baseline", "test_spec_ratio"], cut.loc["U-Net", "k>=11"],
-     uo.loc["drop_0", "test_spec_ratio"], abs(1 - uo.loc["drop_0", "test_spec_ratio"]),
-     abs(1 - uo.loc["baseline", "test_spec_ratio"])))
+  % (10, uo.loc["baseline", "test_spec_ratio"], cut.loc["U-Net", "k>=11"], uo.loc["drop_0", "test_spec_ratio"], abs(1 - uo.loc["drop_0", "test_spec_ratio"]), abs(1 - uo.loc["baseline", "test_spec_ratio"])))
 P("One result from the same sweep points the other way and is reported because it is "
   "inconvenient: removing the gradient penalty gives a spectral ratio of %.3f, the closest "
   "to unity of any variant tested, while the penalty variants span %.2f to %.2f. An "
@@ -424,14 +394,10 @@ P("One result from the same sweep points the other way and is reported because i
   "from the deployed model in that setting as well as in failing to reproduce the "
   "damping. What can be said is that the deployed U-Net damps fine scales, that its "
   "damping is robust to the wavenumber cut, and that the mechanism remains open."
-  % (uo.loc["gp_none", "test_spec_ratio"],
-     uo.loc[["baseline", "gp_none", "gp_match", "gp_match_strong"], "test_spec_ratio"].min(),
-     uo.loc[["baseline", "gp_none", "gp_match", "gp_match_strong"], "test_spec_ratio"].max()))
-TBL(["Field"] + [c for c in cut.columns if c.startswith("k>=")] + ["Verdict"],
-    [[f] + ["%.2f" % cut.loc[f, c] for c in cut.columns if c.startswith("k>=")]
+  % (uo.loc["gp_none", "test_spec_ratio"], uo.loc[["baseline", "gp_none", "gp_match", "gp_match_strong"], "test_spec_ratio"].min(), uo.loc[["baseline", "gp_none", "gp_match", "gp_match_strong"], "test_spec_ratio"].max()))
+TBL(["Field"] + [c for c in cut.columns if c.startswith("k>=")] + ["Verdict"], [[f] + ["%.2f" % cut.loc[f, c] for c in cut.columns if c.startswith("k>=")]
      + [cut.loc[f, "robust"]]
-     for f in ["Random Forest", "XGBoost", "CNN", "U-Net"]],
-    "Table 4.6. Ratio of retained clear-sky-index power to the target's, as the "
+     for f in ["Random Forest", "XGBoost", "CNN", "U-Net"]], "Table 4.6. Ratio of retained clear-sky-index power to the target's, as the "
     "wavenumber cut is moved. The verdict column distinguishes findings that survive the "
     "choice of cut from those that do not.")
 P("The CNN does not damp: it never falls below %.2f at any cut and never approaches the "
@@ -463,10 +429,7 @@ P("The ERA5-derived field sits %.2f W m-2 below SARAH in the domain mean, a diff
   "the late dry season, and crosses above unity in October and November, reaching %.3f. "
   "ERA5 therefore understates the wet-season resource over this domain and slightly "
   "overstates it in the late dry season."
-  % (abs(b), 100 * abs(b) / sar.sarah_wm2.mean(),
-     sar.assign(m=pd.PeriodIndex(sar.month, freq="M").month).groupby("m").ratio.mean().loc[1:7].min(),
-     sar.assign(m=pd.PeriodIndex(sar.month, freq="M").month).groupby("m").ratio.mean().loc[1:7].max(),
-     sar.assign(m=pd.PeriodIndex(sar.month, freq="M").month).groupby("m").ratio.mean().loc[11]))
+  % (abs(b), 100 * abs(b) / sar.sarah_wm2.mean(), sar.assign(m=pd.PeriodIndex(sar.month, freq="M").month).groupby("m").ratio.mean().loc[1:7].min(), sar.assign(m=pd.PeriodIndex(sar.month, freq="M").month).groupby("m").ratio.mean().loc[1:7].max(), sar.assign(m=pd.PeriodIndex(sar.month, freq="M").month).groupby("m").ratio.mean().loc[11]))
 P("This comparison does not validate the downscaled product, and is not presented as if "
   "it did. It compares two estimates of the same quantity, one of which is the target "
   "the models were fitted to. What it establishes is the size and structure of the "
@@ -475,15 +438,47 @@ P("This comparison does not validate the downscaled product, and is not presente
   "disagreement within which those figures should be read. It also has a direct "
   "consequence for the suitability analysis, taken up in Section 4.8.")
 
+H("4.6.1 Why the product is not scored against SARAH", 3)
+P("The SARAH record is held for the whole study period, so the natural question is why "
+  "the downscaled product is not simply validated against it and the ERA5 target set "
+  "aside. The question was answered by computing it rather than by argument. Scored over "
+  "the same 168 withheld months and the same cells, the deployed model returns %.2f W m-2 "
+  "against SARAH where it returns %.2f against the ERA5-derived target, and the other "
+  "three architectures land between %.2f and %.2f."
+  % (spv.loc["XGBoost", "rmse_vs_sarah"], spv.loc["XGBoost", "rmse_vs_era5"], min(spv.loc[m, "rmse_vs_sarah"] for m in ("Random Forest", "CNN", "U-Net")), max(spv.loc[m, "rmse_vs_sarah"] for m in ("Random Forest", "CNN", "U-Net"))))
+P("Those numbers are not a validation, and the reason is visible in the same table. The "
+  "ERA5 target itself sits %.2f W m-2 from SARAH, and the bilinear baseline, which "
+  "reproduces that target to %.2f W m-2 and therefore contains no downscaling at all, "
+  "scores %.2f against SARAH. The entire spread across the four architectures is %.2f W "
+  "m-2. A score against SARAH is therefore dominated by the choice of reference, not by "
+  "the quality of the model: it separates the models by %.2f while the reference "
+  "disagreement it also contains is %.1f times larger, and it cannot distinguish a "
+  "trained model from an interpolation that adds nothing."
+  % (spv.loc["ERA5 target itself", "rmse_vs_sarah"], spv.loc["Baseline (bilinear)", "rmse_vs_era5"], spv.loc["Baseline (bilinear)", "rmse_vs_sarah"], _sp_spread, _sp_spread, spv.loc["ERA5 target itself", "rmse_vs_sarah"] / _sp_spread))
+P("The mean bias makes the same point more sharply. ERA5 runs %.2f W m-2 below SARAH over "
+  "these months, and every model inherits most of that offset, from %.2f to %.2f. "
+  "XGBoost's %.2f against SARAH is in fact marginally lower than the %.2f of the target "
+  "it was trained to reproduce, because its small positive bias against ERA5 partially "
+  "cancels ERA5's negative bias against SARAH. A model scoring better than its own "
+  "training target is a clear signal that the quantity being measured is the reference "
+  "rather than the model."
+  % (spv.loc["ERA5 target itself", "bias_vs_sarah"], min(spv.loc[m, "bias_vs_sarah"] for m in ("XGBoost", "Random Forest", "CNN", "U-Net")), max(spv.loc[m, "bias_vs_sarah"] for m in ("XGBoost", "Random Forest", "CNN", "U-Net")), spv.loc["XGBoost", "rmse_vs_sarah"], spv.loc["ERA5 target itself", "rmse_vs_sarah"]))
+P("What follows is not that an observational validation is unnecessary, but that "
+  "re-scoring an ERA5-trained product against SARAH is not one. The models were fitted to "
+  "minimise error against ERA5; penalising them for ERA5's offset measures the reanalysis, "
+  "which Section 4.6 has already measured directly and more cleanly. A genuine "
+  "observational validation requires SARAH to be the target rather than the yardstick, "
+  "which means refitting the whole chain against it at 0.05 degrees. That is the first "
+  "recommendation of Section 5.6, the data is held for it, and it is a separate study "
+  "rather than an additional table in this one. Until it is done, the skill figures in "
+  "this chapter are out-of-sample against a reanalysis and are reported as such."
+  )
+
 H("4.7 Projected Irradiance to 2100 and Its Uncertainty")
 base = lay.ghi_present_era5.values
 proj = {v.replace("ghi_", ""): lay[v].values for v in lay.data_vars if v.startswith("ghi_ssp")}
-TBL(["Scenario and horizon", "Mean change (W m-2)", "Percent", "Range across domain"],
-    [[k.replace("_", " "), "%+.2f" % (proj[k] - base).mean(),
-      "%+.2f%%" % (100 * (proj[k] - base).mean() / base.mean()),
-      "%+.2f to %+.2f" % ((proj[k] - base).min(), (proj[k] - base).max())]
-     for k in sorted(proj)],
-    "Table 4.7. Projected change in annual-mean GHI from the deployed XGBoost ensemble, "
+TBL(["Scenario and horizon", "Mean change (W m-2)", "Percent", "Range across domain"], [[k.replace("_", " "), "%+.2f" % (proj[k] - base).mean(), "%+.2f%%" % (100 * (proj[k] - base).mean() / base.mean()), "%+.2f to %+.2f" % ((proj[k] - base).min(), (proj[k] - base).max())]
+     for k in sorted(proj)], "Table 4.7. Projected change in annual-mean GHI from the deployed XGBoost ensemble, "
     "relative to the ERA5-derived present, across three GCMs.")
 P("All six projections give an increase in surface irradiance over Zimbabwe, ranging "
   "from %+.2f W m-2 in the near term under SSP2-4.5 to %+.2f W m-2 in the long term "
@@ -499,15 +494,9 @@ P("All six projections give an increase in surface irradiance over Zimbabwe, ran
   "Random Forest impurity and permutation importance and 0.470 and 0.178 for XGBoost gain "
   "and cover, so a projected reduction in cloud translates directly into projected "
   "irradiance gain."
-  % ((proj["ssp245_near_term_2026_2050"] - base).mean(),
-     (proj["ssp585_long_term_2076_2100"] - base).mean(),
-     100 * (proj["ssp245_near_term_2026_2050"] - base).mean() / base.mean(),
-     100 * (proj["ssp585_long_term_2076_2100"] - base).mean() / base.mean()))
+  % ((proj["ssp245_near_term_2026_2050"] - base).mean(), (proj["ssp585_long_term_2076_2100"] - base).mean(), 100 * (proj["ssp245_near_term_2026_2050"] - base).mean() / base.mean(), 100 * (proj["ssp585_long_term_2076_2100"] - base).mean() / base.mean()))
 u = unc[unc.model == "xgb"].set_index("period")
-TBL(["Horizon", "Downscaling", "Architecture", "GCM", "Scenario"],
-    [[p.replace("_", " "), "%.1f%%" % u.loc[p, "pct_var_ds"], "%.1f%%" % u.loc[p, "pct_var_arch"],
-      "%.1f%%" % u.loc[p, "pct_var_gcm"], "%.1f%%" % u.loc[p, "pct_var_ssp"]] for p in u.index],
-    "Table 4.8. Variance decomposition of the projection uncertainty for the deployed "
+TBL(["Horizon", "Downscaling", "Architecture", "GCM", "Scenario"], [[p.replace("_", " "), "%.1f%%" % u.loc[p, "pct_var_ds"], "%.1f%%" % u.loc[p, "pct_var_arch"], "%.1f%%" % u.loc[p, "pct_var_gcm"], "%.1f%%" % u.loc[p, "pct_var_ssp"]] for p in u.index], "Table 4.8. Variance decomposition of the projection uncertainty for the deployed "
     "model, as a percentage of total variance at each horizon.")
 P("The uncertainty budget carries the more consequential result. At every horizon the "
   "downscaling error itself dominates, but its share falls from %.1f per cent in the "
@@ -516,9 +505,7 @@ P("The uncertainty budget carries the more consequential result. At every horizo
   "and still less the emission scenario at under 1 per cent throughout. It is the choice "
   "of downscaling architecture, which rises from %.1f per cent to %.1f per cent and "
   "becomes the second-largest term by 2076 to 2100."
-  % (u.loc["near_term_2026_2050", "pct_var_ds"], u.loc["long_term_2076_2100", "pct_var_ds"],
-     u.loc["near_term_2026_2050", "pct_var_gcm"], u.loc["long_term_2076_2100", "pct_var_gcm"],
-     u.loc["near_term_2026_2050", "pct_var_arch"], u.loc["long_term_2076_2100", "pct_var_arch"]))
+  % (u.loc["near_term_2026_2050", "pct_var_ds"], u.loc["long_term_2076_2100", "pct_var_ds"], u.loc["near_term_2026_2050", "pct_var_gcm"], u.loc["long_term_2076_2100", "pct_var_gcm"], u.loc["near_term_2026_2050", "pct_var_arch"], u.loc["long_term_2076_2100", "pct_var_arch"]))
 P("The correct reading of that number is not that architecture contributes %.0f per cent "
   "and this study has identified the right architecture. It is that a study using a "
   "single architecture would have reported zero architecture uncertainty and been wrong "
@@ -529,10 +516,7 @@ P("The correct reading of that number is not that architecture contributes %.0f 
   "supporting result points the same way: no pair of architectures correlates above %.2f "
   "on the spatial pattern of projected change, and the deployed model agrees with the "
   "others at %.2f to %.2f. Agreement on the present is not agreement on the future."
-  % (u.loc["long_term_2076_2100", "pct_var_arch"],
-     u.loc["long_term_2076_2100", "pct_var_arch"],
-     agr.r_projected_change.max(),
-     _dep.r_projected_change.min(), _dep.r_projected_change.max()))
+  % (u.loc["long_term_2076_2100", "pct_var_arch"], u.loc["long_term_2076_2100", "pct_var_arch"], agr.r_projected_change.max(), _dep.r_projected_change.min(), _dep.r_projected_change.max()))
 
 FIG("03_feature_importance.png", "Predictor importance across the four measures. "
     "The topographic covariates score exactly zero for the pixel-wise models, which is "
@@ -549,7 +533,7 @@ P("The suitability analysis of Section 3.9 combines the irradiance layer with si
   "supervisors, but that matrix is not held in the project archive, and a ratio "
   "recomputed from a matrix reconstructed to reproduce Table 3.5's weights would measure "
   "the reconstruction rather than the elicitation. The question a consistency ratio is "
-  "meant to answer \u2014 whether the ranking can be relied upon given the weights \u2014 is "
+  "meant to answer, whether the ranking can be relied upon given the weights, is "
   "addressed directly, and far less favourably, in Section 4.8.1. "
   "Of the 5,751 cells in the analysis box, 2,460 fall "
   "outside Zimbabwe, 895 lie predominantly within protected areas, and smaller numbers "
@@ -567,8 +551,7 @@ P("The present-day irradiance layer is the SARAH satellite record rather than th
   "highest tier; under SARAH it returns %d. An independent observation is preferred to a "
   "reanalysis for a present-day siting assessment, and the choice is reported because it "
   "is consequential rather than because it is close."
-  % (_sar_off, lc.spearman_rho, lc["pct_crossing_0.75"],
-     per.loc["present_era5_basis", "very_high"], per.loc["present", "very_high"]))
+  % (_sar_off, lc.spearman_rho, lc["pct_crossing_0.75"], per.loc["present_era5_basis", "very_high"], per.loc["present", "very_high"]))
 
 FIG("07_suitability_criteria.png", "The seven standardised criterion layers and the "
     "exclusion mask. Excluded cells are left blank rather than drawn on the score ramp.")
@@ -582,10 +565,9 @@ P("Section 3.9.6 repeated the weighted overlay under four weighting schemes: the
   "equal weights. The classifications they produce diverge sharply. Cohen's kappa (Cohen, 1960) "
   "against the primary classification is %.3f for the irradiance-dominant scheme, %.3f "
   "for the infrastructure-dominant scheme, and %.3f for equal weights, the last "
-  "indicating agreement no better than chance. Of the %d assessed cells, %d — %.1f per "
-  "cent — change suitability tier under at least one scheme."
-  % (K("irradiance-dominant"), K("infrastructure-dominant"), K("equal"),
-     n_keep, sens, 100 * sens / n_keep))
+  "indicating agreement no better than chance. Of the %d assessed cells, %d, %.1f per "
+  "cent, change suitability tier under at least one scheme."
+  % (K("irradiance-dominant"), K("infrastructure-dominant"), K("equal"), n_keep, sens, 100 * sens / n_keep))
 P("**Only %d cells, %.1f per cent of those assessed and approximately %s km2, are "
   "classified high or very high under all four weighting schemes.** These are reported "
   "as the robust set, and they are the defensible output of this analysis. The five-tier "
@@ -600,26 +582,7 @@ P("Section 3.9.3 previously printed the distance decay as Score = e^(-d/d_ref) w
   "the function as written, on the grounds that a site 10 km from an existing "
   "transmission line is routinely connectable for utility-scale development and should "
   "not be scored as though it were remote. The figures reported here use that reading.")
-TBL(["Criterion", "Robust set mean", "All assessed cells", "Ratio"],
-    [["Irradiance (W m-2)", "%.2f" % lay.ghi_present_sarah.values[rob].mean(),
-      "%.2f" % lay.ghi_present_sarah.values[keep].mean(),
-      "%.2f" % (lay.ghi_present_sarah.values[rob].mean() / lay.ghi_present_sarah.values[keep].mean())],
-     ["Slope (degrees)", "%.2f" % lay.slope.values[rob].mean(),
-      "%.2f" % lay.slope.values[keep].mean(),
-      "%.2f" % (lay.slope.values[rob].mean() / lay.slope.values[keep].mean())],
-     ["Land cover score", "%.2f" % lay.landcover_score.values[rob].mean(),
-      "%.2f" % lay.landcover_score.values[keep].mean(),
-      "%.2f" % (lay.landcover_score.values[rob].mean() / lay.landcover_score.values[keep].mean())],
-     ["Distance to roads (km)", "%.2f" % lay.dist_roads.values[rob].mean(),
-      "%.2f" % lay.dist_roads.values[keep].mean(),
-      "%.2f" % (lay.dist_roads.values[rob].mean() / lay.dist_roads.values[keep].mean())],
-     ["Distance to grid (km)", "%.2f" % lay.dist_grid.values[rob].mean(),
-      "%.2f" % lay.dist_grid.values[keep].mean(),
-      "%.2f" % (lay.dist_grid.values[rob].mean() / lay.dist_grid.values[keep].mean())],
-     ["Distance to settlements (km)", "%.2f" % lay.dist_settlements.values[rob].mean(),
-      "%.2f" % lay.dist_settlements.values[keep].mean(),
-      "%.2f" % (lay.dist_settlements.values[rob].mean() / lay.dist_settlements.values[keep].mean())]],
-    "Table 4.9. Mean criterion values on the robust set against all assessed cells. The "
+TBL(["Criterion", "Robust set mean", "All assessed cells", "Ratio"], [["Irradiance (W m-2)", "%.2f" % lay.ghi_present_sarah.values[rob].mean(), "%.2f" % lay.ghi_present_sarah.values[keep].mean(), "%.2f" % (lay.ghi_present_sarah.values[rob].mean() / lay.ghi_present_sarah.values[keep].mean())], ["Slope (degrees)", "%.2f" % lay.slope.values[rob].mean(), "%.2f" % lay.slope.values[keep].mean(), "%.2f" % (lay.slope.values[rob].mean() / lay.slope.values[keep].mean())], ["Land cover score", "%.2f" % lay.landcover_score.values[rob].mean(), "%.2f" % lay.landcover_score.values[keep].mean(), "%.2f" % (lay.landcover_score.values[rob].mean() / lay.landcover_score.values[keep].mean())], ["Distance to roads (km)", "%.2f" % lay.dist_roads.values[rob].mean(), "%.2f" % lay.dist_roads.values[keep].mean(), "%.2f" % (lay.dist_roads.values[rob].mean() / lay.dist_roads.values[keep].mean())], ["Distance to grid (km)", "%.2f" % lay.dist_grid.values[rob].mean(), "%.2f" % lay.dist_grid.values[keep].mean(), "%.2f" % (lay.dist_grid.values[rob].mean() / lay.dist_grid.values[keep].mean())], ["Distance to settlements (km)", "%.2f" % lay.dist_settlements.values[rob].mean(), "%.2f" % lay.dist_settlements.values[keep].mean(), "%.2f" % (lay.dist_settlements.values[rob].mean() / lay.dist_settlements.values[keep].mean())]], "Table 4.9. Mean criterion values on the robust set against all assessed cells. The "
     "final column is the ratio; values far from 1.00 identify the criteria that "
     "distinguish the robust set.")
 P("Table 4.9 makes the character of the robust set clear, and the result is not the "
@@ -628,14 +591,10 @@ P("Table 4.9 makes the character of the robust set clear, and the result is not 
   "per cent. What distinguishes them is infrastructure: they lie a mean of %.2f km from "
   "the transmission network against %.2f km for the domain, a factor of %.1f, and %.2f "
   "km from a road against %.2f km."
-  % (lay.ghi_present_sarah.values[rob].mean(), lay.ghi_present_sarah.values[keep].mean(),
-     100 * (lay.ghi_present_sarah.values[rob].mean() / lay.ghi_present_sarah.values[keep].mean() - 1),
-     lay.dist_grid.values[rob].mean(), lay.dist_grid.values[keep].mean(),
-     lay.dist_grid.values[keep].mean() / lay.dist_grid.values[rob].mean(),
-     lay.dist_roads.values[rob].mean(), lay.dist_roads.values[keep].mean()))
+  % (lay.ghi_present_sarah.values[rob].mean(), lay.ghi_present_sarah.values[keep].mean(), 100 * (lay.ghi_present_sarah.values[rob].mean() / lay.ghi_present_sarah.values[keep].mean() - 1), lay.dist_grid.values[rob].mean(), lay.dist_grid.values[keep].mean(), lay.dist_grid.values[keep].mean() / lay.dist_grid.values[rob].mean(), lay.dist_roads.values[rob].mean(), lay.dist_roads.values[keep].mean()))
 P("This has a straightforward explanation and a substantive implication. Irradiance over "
-  "Zimbabwe varies within a narrow band — the assessed cells span roughly 214 to 258 "
-  "W m-2 — so after standardisation the irradiance criterion cannot separate sites "
+  "Zimbabwe varies within a narrow band, the assessed cells span roughly 214 to 258 "
+  "W m-2, so after standardisation the irradiance criterion cannot separate sites "
   "strongly no matter how heavily it is weighted. Distance to the grid varies over two "
   "orders of magnitude and enters through a decay function, so it separates sites "
   "decisively under every weighting. Robustness to weighting is therefore achieved by "
@@ -659,13 +618,8 @@ FIG("09_suitability_schemes.png", "The four weighting schemes and the robust set
     "Nearly nine assessed cells in ten change tier under at least one scheme.")
 
 H("4.8.2 Suitability under the projected climate", 3)
-TBL(["Period", "Mean GHI (W m-2)", "Mean SI", "Very high", "High"],
-    [[p.replace("_", " "), "%.2f" % per.loc[p, "mean_ghi"], "%.4f" % per.loc[p, "mean_si"],
-      int(per.loc[p, "very_high"]), int(per.loc[p, "high"])]
-     for p in ["present", "ssp245_near_term_2026_2050", "ssp245_mid_term_2051_2075",
-               "ssp245_long_term_2076_2100", "ssp585_near_term_2026_2050",
-               "ssp585_mid_term_2051_2075", "ssp585_long_term_2076_2100"]],
-    "Table 4.10. Suitability by period under the primary weights. All periods are "
+TBL(["Period", "Mean GHI (W m-2)", "Mean SI", "Very high", "High"], [[p.replace("_", " "), "%.2f" % per.loc[p, "mean_ghi"], "%.4f" % per.loc[p, "mean_si"], int(per.loc[p, "very_high"]), int(per.loc[p, "high"])]
+     for p in ["present", "ssp245_near_term_2026_2050", "ssp245_mid_term_2051_2075", "ssp245_long_term_2076_2100", "ssp585_near_term_2026_2050", "ssp585_mid_term_2051_2075", "ssp585_long_term_2076_2100"]], "Table 4.10. Suitability by period under the primary weights. All periods are "
     "standardised on the present-day range so the tiers remain comparable.")
 P("Suitability rises under every scenario and horizon, and the count of cells in the "
   "highest tier increases from %d in the present to %d under SSP5-8.5 by 2076 to 2100. "
@@ -727,9 +681,9 @@ P("**Two exclusion criteria do not bind at this resolution.** The slope exclusio
   "two cells, because averaging 90 m terrain over a 121 km2 cell smooths individual "
   "steep faces; the riparian exclusion removes none, because a 200 m corridor is 1.8 per "
   "cent of a cell width. Both rules are sound at their native scale and neither can "
-  "operate at 0.1 degrees. The relief is present in the data — 81 cells have more than 20 "
+  "operate at 0.1 degrees. The relief is present in the data, 81 cells have more than 20 "
   "per cent of their area above 15 degrees, and 80 per cent of those lie east of 32 "
-  "degrees — and the Eastern Highlands are penalised through the slope criterion rather "
+  "degrees, and the Eastern Highlands are penalised through the slope criterion rather "
   "than removed by the exclusion.")
 P("**The suitability classification is weight-sensitive.** %.1f per cent of assessed "
   "cells change tier under at least one defensible weighting, and equal weights agree "
@@ -738,7 +692,7 @@ P("**The suitability classification is weight-sensitive.** %.1f per cent of asse
 P("**The future suitability maps hold infrastructure and population constant.** They "
   "describe how the resource changes at present-day sites, not where future sites will "
   "be.")
-P("**Model selection on the evaluation record — identified and corrected.** The CNN and "
+P("**Model selection on the evaluation record, identified and corrected.** The CNN and "
   "U-Net previously saved the checkpoint scoring best on the withheld period. Both have "
   "been retrained with the epoch count chosen on an inner split of the training data, "
   "which raised their errors by 0.92 and 0.95 W m-2 respectively. The figures reported "
@@ -772,9 +726,7 @@ P("The projections give an increase in surface irradiance over Zimbabwe of %.1f 
   "what distinguishes them is proximity to the transmission network rather than solar "
   "resource. Irradiance over Zimbabwe varies too little to discriminate between sites; "
   "grid access varies by two orders of magnitude and decides the outcome."
-  % (100 * (proj["ssp245_near_term_2026_2050"] - base).mean() / base.mean(),
-     100 * (proj["ssp585_long_term_2076_2100"] - base).mean() / base.mean(),
-     n_rob, format(n_rob * 121, ",")))
+  % (100 * (proj["ssp245_near_term_2026_2050"] - base).mean() / base.mean(), 100 * (proj["ssp585_long_term_2076_2100"] - base).mean() / base.mean(), n_rob, format(n_rob * 121, ",")))
 P("The methodological contribution is therefore narrower and firmer than a single "
   "suitability map would suggest. It is that architecture choice is a first-order source "
   "of projection uncertainty, reaching %.1f per cent of long-term variance against %.1f "
@@ -796,11 +748,9 @@ P("Citations are plain author-year text and must be converted to live Zotero fie
   "reference list is regenerated:")
 for _ref in [
     "Cohen, J. (1960). A coefficient of agreement for nominal scales. Educational and "
-    "Psychological Measurement 20(1), 37–46. — cited in Section 4.8.1 for kappa.",
-    "Efron, B. (1987). Better bootstrap confidence intervals. Journal of the American "
-    "Statistical Association 82(397), 171–185. — the BCa interval of Section 4.3.",
-    "Dozier, J. and Frew, J. (1990). Rapid calculation of terrain parameters for "
-    "radiation modeling from digital elevation data. IEEE TGRS 28(5), 963–969. — "
+    "Psychological Measurement 20(1), 37–46., cited in Section 4.8.1 for kappa.", "Efron, B. (1987). Better bootstrap confidence intervals. Journal of the American "
+    "Statistical Association 82(397), 171–185., the BCa interval of Section 4.3.", "Dozier, J. and Frew, J. (1990). Rapid calculation of terrain parameters for "
+    "radiation modeling from digital elevation data. IEEE TGRS 28(5), 963–969., "
     "already cited as plain text in Chapter 3 and still missing from the library.",
 ]:
     _p = doc.add_paragraph(_ref, style="List Bullet")

@@ -1,0 +1,33 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite the dissertation it was written for."
+title: "Machine Learning-Based Downscaling of GCM Outputs for Solar Energy Suitability Mapping over Zimbabwe"
+abstract: >-
+  Analysis code for an MSc dissertation downscaling CMIP6 surface solar radiation
+  to 0.1 degrees over Zimbabwe, benchmarking four machine learning architectures
+  against a withheld ERA5 record, projecting to 2100 under two SSP pathways, and
+  carrying the result into a multi-criteria suitability assessment for
+  utility-scale photovoltaic development.
+type: software
+authors:
+  - given-names: "Chiagozie Raphael"
+    family-names: "Madukwe"
+    affiliation: "Department of Space Science and Applied Physics, University of Zimbabwe"
+keywords:
+  - statistical downscaling
+  - CMIP6
+  - solar irradiance
+  - machine learning
+  - multi-criteria evaluation
+  - Zimbabwe
+  - reproducibility
+license: MIT
+references:
+  - type: thesis
+    title: "Machine Learning-Based Downscaling of GCM Outputs for Solar Energy Suitability Mapping over Zimbabwe"
+    authors:
+      - given-names: "Chiagozie Raphael"
+        family-names: "Madukwe"
+    thesis-type: "MSc dissertation"
+    institution:
+      name: "University of Zimbabwe"
+    year: 2026

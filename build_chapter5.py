@@ -27,8 +27,8 @@ info = pd.read_csv(os.path.join(EVAL, "information_content.csv")).set_index("fie
 per = pd.read_csv(os.path.join(EVAL, "suitability_by_period.csv")).set_index("period")
 scr = pd.read_csv(os.path.join(EVAL, "scenario_discrimination.csv")).set_index("model")
 uo = pd.read_csv(os.path.join(EVAL, "unet_optimisation.csv")).set_index("variant")
-leaky5 = pd.read_csv(os.path.join(ROOT, "data/processed/models/_pre_honest_selection",
-                                  "table_3_3.csv")).set_index("model")
+spv5 = pd.read_csv(os.path.join(EVAL, "sarah_product_validation.csv")).set_index("model")
+leaky5 = pd.read_csv(os.path.join(ROOT, "data/processed/models/_pre_honest_selection", "table_3_3.csv")).set_index("model")
 _order = list(t33["RMSE"].sort_values().index)
 _ORD = {1: "lowest", 2: "second-lowest", 3: "third-lowest", 4: "highest"}
 def rank(m):
@@ -109,8 +109,7 @@ P("Four architectures were trained on identical inputs and evaluated on a withhe
   "The deployed pixel-wise XGBoost ensemble (Chen and Guestrin, 2016) reaches %.2f W m-2 against an ERA5-derived "
   "target, a skill score of %.4f relative to a training-period climatology, and a "
   "correlation of %.4f. The spread between best and worst is %.2f W m-2."
-  % (t33.loc["XGBoost", "RMSE"], t33.loc["XGBoost", "SS vs climatology"],
-     t33.loc["XGBoost", "Pearson R"], t33["RMSE"].max() - t33["RMSE"].min()))
+  % (t33.loc["XGBoost", "RMSE"], t33.loc["XGBoost", "SS vs climatology"], t33.loc["XGBoost", "Pearson R"], t33["RMSE"].max() - t33["RMSE"].min()))
 P("The comparison between architectures is answered with more care than the question "
   "invites. Resampling establishes that XGBoost is better than the Random Forest on "
   "aggregate error, that the Random Forest is better on mean bias and on the spatial "
@@ -134,9 +133,7 @@ P("Two qualifications belong with that answer, and both concern how the comparis
   "Neither fact overturns the deployment, for the reason given under RQ3, but together "
   "they mean this study compares particular configurations, selected in a particular "
   "way, rather than architectures in the abstract."
-  % (t33.loc["CNN", "RMSE"], leaky5.loc["CNN", "RMSE"],
-     t33.loc["U-Net", "RMSE"], leaky5.loc["U-Net", "RMSE"],
-     uo.loc["drop_0", "test_rmse"]))
+  % (t33.loc["CNN", "RMSE"], leaky5.loc["CNN", "RMSE"], t33.loc["U-Net", "RMSE"], leaky5.loc["U-Net", "RMSE"], uo.loc["drop_0", "test_rmse"]))
 P("Against traditional baselines the answer is unambiguous only for the admissible one. "
   "All four models beat a per-cell, per-calendar-month climatology. Scores against "
   "interpolation of the coarse irradiance field are not skill, because that field is a "
@@ -150,17 +147,15 @@ P("**This question receives a largely negative answer, and it is the most import
   "its variance. Elevation loses %.3f per cent under the identical test, so the test "
   "detects sub-grid structure when it exists. The product therefore contains almost no "
   "spatial information below the resolution of its input grid."
-  % (info.loc["GHI target (time-mean)", "round_trip_correlation"],
-     info.loc["GHI target (time-mean)", "pct_variance_below_0.25deg"],
-     info.loc["CONTROL: elevation", "pct_variance_below_0.25deg"]))
+  % (info.loc["GHI target (time-mean)", "round_trip_correlation"], info.loc["GHI target (time-mean)", "pct_variance_below_0.25deg"], info.loc["CONTROL: elevation", "pct_variance_below_0.25deg"]))
 P("This is a property of the design rather than a failure of fitting. The predictors are "
   "0.25 degree fields and the target is derived from a 0.25 degree field, so no sub-grid "
   "information exists anywhere in the training data for a model to recover. No "
   "architecture, loss function or training schedule can manufacture it. What the study "
   "delivers is a bias-and-variability correction evaluated on a finer mesh, with genuine "
   "temporal skill, and it should be described in those terms rather than as spatial "
-  "super-resolution in the sense of Vandal et al. (2017). The physiographic correspondence the question anticipated — fine "
-  "structure aligning with Zimbabwe's relief zones — is not present to be reported, "
+  "super-resolution in the sense of Vandal et al. (2017). The physiographic correspondence the question anticipated, fine "
+  "structure aligning with Zimbabwe's relief zones, is not present to be reported, "
   "because relief-scale structure is not in the input.")
 P("The one route to a different answer is a genuinely high-resolution target. The CM SAF "
   "SARAH record at 0.05 degrees was acquired for precisely this purpose and is held for "
@@ -193,11 +188,10 @@ P("The deployment decision followed from a test that no accuracy metric could pe
   "of degree. This is "
   "why the improved U-Net configuration identified after the fact does not reopen the "
   "decision on accuracy alone: it has not been put through that screen."
-  % (rank("Random Forest").replace("-lowest", ""),
-     scr.loc["Random Forest", "pct_ordered_long_term"]))
+  % (rank("Random Forest").replace("-lowest", ""), scr.loc["Random Forest", "pct_ordered_long_term"]))
 
 H("5.2.4 RQ4: where suitability is highest", 3)
-P("Of %d assessed locations, **%d — %.1f per cent, approximately %s km2 — are classified "
+P("Of %d assessed locations, **%d, %.1f per cent, approximately %s km2, are classified "
   "highly suitable under every weighting scheme tested.** These are reported as the "
   "answer, in preference to the five-tier map, because %.1f per cent of assessed cells "
   "change tier under at least one defensible reweighting and equal weighting agrees with "
@@ -259,12 +253,19 @@ P("The limitations are stated in full in Section 4.9 and summarised here. The pr
   "resolves no structure below its input grid. Training and validation both use ERA5, so "
   "the evaluation is out-of-sample in time but not independent of the reference; the "
   "comparison against SARAH in Section 4.6 quantifies that reference uncertainty at about "
-  "3 per cent with a seasonal structure, but a validation of the product itself against "
-  "SARAH has not been performed. Two of the four architectures select their weights on "
-  "the evaluation record. Two exclusion criteria in the suitability analysis do not bind "
+  "3 per cent with a seasonal structure. A validation of the product itself against SARAH "
+  "has not been performed, and Section 4.6.1 shows why re-scoring would not supply one: "
+  "the ERA5 target sits %.2f W m-2 from SARAH while the four architectures span %.2f, so "
+  "such a score is dominated by the reference and cannot even separate a trained model "
+  "from an interpolation. The observational validation therefore requires refitting "
+  "against SARAH as the target, which Section 5.6 recommends first. Two exclusion "
+  "criteria in the suitability analysis do not bind "
   "at 0.1 degrees. The suitability index carries no propagated uncertainty. And the "
   "future suitability maps hold infrastructure and population constant, which makes them "
-  "statements about the resource at today's viable sites rather than about tomorrow's.")
+  "statements about the resource at today's viable sites rather than about tomorrow's."
+  % (spv5.loc["ERA5 target itself", "rmse_vs_sarah"],
+     max(spv5.loc[m, "rmse_vs_era5"] for m in ("XGBoost", "Random Forest", "CNN", "U-Net"))
+     - min(spv5.loc[m, "rmse_vs_era5"] for m in ("XGBoost", "Random Forest", "CNN", "U-Net"))))
 
 H("5.5 Recommendations for Policy and Practice")
 P("**Grid extension opens more suitable land than resource refinement.** This follows "
@@ -298,8 +299,8 @@ P("**Retrain against SARAH.** This is the highest-value next step and the only r
   "validation the study currently lacks.")
 P("**Extend honest selection to the hyperparameters as well as the epoch count.** The "
   "checkpoint-selection defect in the neural models has been corrected, and the epoch "
-  "count is now chosen on an inner split. The remaining hyperparameters — learning rate, "
-  "gradient-penalty weight, dropout, architecture width — were fixed by a grid search "
+  "count is now chosen on an inner split. The remaining hyperparameters, learning rate, "
+  "gradient-penalty weight, dropout, architecture width, were fixed by a grid search "
   "reported in Section 3.6.7, and the sweep described above shows at least one of them, "
   "dropout, to be costly on held-out accuracy. A search conducted entirely within the "
   "training period, "
@@ -314,8 +315,7 @@ P("**Revisit the U-Net configuration, and settle what causes its damping.** A co
   "Establishing the mechanism needs a sweep whose baseline reproduces the deployed "
   "model's spectra, and any improved configuration must pass the scenario-discrimination "
   "screen before it can be considered for deployment."
-  % (uo.loc["drop_0", "test_rmse"], uo.loc["drop_0", "test_spatial_r"],
-     uo.loc["baseline", "test_spec_ratio"]))
+  % (uo.loc["drop_0", "test_rmse"], uo.loc["drop_0", "test_spatial_r"], uo.loc["baseline", "test_spec_ratio"]))
 P("**Extend the suitability analysis with infrastructure and demographic scenarios.** "
   "The present analysis can say how the resource changes at fixed sites. Answering where "
   "future sites should be requires projections of the transmission network and population "
