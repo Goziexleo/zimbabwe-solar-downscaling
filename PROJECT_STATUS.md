@@ -1630,6 +1630,14 @@ appends the consolidated references and two appendices. 648 paragraphs, 18 table
   not contain. **Appendix B** declares the use of AI for language, code generation and
   debugging, and states what it was not used for.
 
+**Declaration page added**, between the title page and the abstract: originality,
+signature blocks for the candidate and both supervisors, and a pointer to Appendix A
+for the code. Its second paragraph declares the use of computational tools and points
+at Appendix B, because a bare claim of "my own original work" sitting in the same
+document as an AI declaration would be a contradiction the examiner has to resolve
+rather than one the author has. The funder is named as **EACEA**, confirmed by the
+author.
+
 **One error caught in my own abstract, and it is the error this project keeps
 finding.** The first draft reported the projected change as +4.0 W m⁻², differencing
 the SSP5-8.5 projection against the **SARAH**-based present. The projections come from

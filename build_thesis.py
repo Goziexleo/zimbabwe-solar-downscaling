@@ -200,6 +200,43 @@ def build_front():
     s.different_first_page_header_footer = True
     footer_page_number(s)
 
+    # ---------------- declaration ----------------
+    doc.add_page_break()
+    heading(doc, "Declaration")
+    para(doc, "I, %s, registration number %s, declare that this dissertation is my own "
+              "original work. It has not been submitted, in whole or in part, for any "
+              "degree or examination at this or any other university. All sources used "
+              "or quoted have been acknowledged by complete reference." % (AUTHOR.title(), REGNO),
+         space_after=12)
+    para(doc, "I further declare that computational tools were used in the preparation "
+              "of this work, and that their use is declared in full in Appendix B. The "
+              "research questions, the choice of methods, the interpretation of results "
+              "and the conclusions drawn are my own, and responsibility for the content "
+              "of this dissertation rests entirely with me.",
+         space_after=12)
+    para(doc, "The analysis code supporting this dissertation is published openly, as "
+              "described in Chapter 3 Section 3.11 and Appendix A, so that the results "
+              "reported here can be independently regenerated.",
+         space_after=28)
+
+    _sig = [("Candidate", AUTHOR.title()),
+            ("Supervisor", "[Supervisor]"),
+            ("Co-supervisor", "[Co-supervisor]")]
+    tbl = doc.add_table(rows=len(_sig), cols=3)
+    tbl.autofit = False
+    for row, (role, who) in zip(tbl.rows, _sig):
+        cells = row.cells
+        cells[0].width = Cm(4.0); cells[1].width = Cm(6.5); cells[2].width = Cm(4.0)
+        for cell, text in zip(cells, ["%s: %s" % (role, who),
+                                      "Signature: ......................................",
+                                      "Date: ........................"]):
+            q = cell.paragraphs[0]
+            q.paragraph_format.space_after = Pt(22)
+            q.paragraph_format.line_spacing = 1.0
+            r = q.add_run(text)
+            r.font.name = BODY_FONT
+            r.font.size = Pt(11)
+
     # ---------------- abstract ----------------
     doc.add_page_break()
     heading(doc, "Abstract")
@@ -335,9 +372,9 @@ def acknowledgements():
         "of the suitability analysis around transmission access rather than irradiance "
         "alone owes a great deal to that perspective.",
 
-        "I gratefully acknowledge the European Education and Culture Executive Agency, "
-        "which administers the Intra-Africa Academic Mobility Scheme on behalf of the "
-        "European Union, for the mobility funding that allowed me to undertake this "
+        "I gratefully acknowledge the European Education and Culture Executive Agency "
+        "(EACEA), which administers the Intra-Africa Academic Mobility Scheme on behalf "
+        "of the European Union, for the mobility funding that allowed me to undertake this "
         "degree. A scheme that moves students between African universities is the reason "
         "this work could be carried out where the results matter, rather than about a "
         "region from somewhere else.",
