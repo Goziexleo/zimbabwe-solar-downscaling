@@ -1781,6 +1781,40 @@ own inconsistency report.
 
 ---
 
+## 12o. Chapter 2's superscripts are the citations, and 20 of its citations are not fields
+
+The author asked whether Chapter 2's sub- and superscript reference markers could
+simply be deleted. **No: the superscript `[n]` markers are the Zotero field results.**
+Deleting them deletes the citations, not their formatting, and Chapter 2 would lose
+all 24 source attributions with nothing to regenerate from. They also do not need
+replacing with Zotero fields, because that is what they already are.
+
+What was actually wanted is achieved by the style change already made (§12m): under
+`elsevier-harvard` the field renders `(Wilby et al., 2002)` inline instead of a
+superscript `[1]`. Word can keep manual run formatting across a refresh, so the
+superscript and subscript properties have been cleared from all 142 affected runs in
+Chapter 2 without touching the field structure. Field counts verified identical before
+and after; zero sub/superscript runs remain in that chapter.
+
+**The genuine subscripts survive.** Eight remain in the dissertation, all in Chapter
+3's super-resolution formalism (H_low, W_low, H_high, W_high). Those are notation, not
+citations, and the clearing pass was confined to Chapter 2 so they were never at risk.
+
+**The larger finding, which the question uncovered.** Chapter 2 carries **24 live
+Zotero fields and 20 in-text markers that are plain typed text**, covering 12 distinct
+sources. On refresh the 24 will become author-date while the 20 stay as `[9]`, `[11]`
+and so on, leaving the chapter visibly half-converted. These cannot be fixed from
+outside Word: each must be re-inserted through Zotero at its position.
+`CHAPTER2_CITATIONS_TO_RELINK.md` lists all 20 with the sentence each attaches to and
+the reference it points to, so the work is mechanical rather than investigative.
+
+Three of the twenty sit at the end of a sentence as a bare marker (paragraphs 115, 117
+and 119), which is where a numbered style puts a citation and where an author-date
+style will read oddly; those are worth re-siting inside the sentence as they are
+re-cited.
+
+---
+
 ## 13. Outstanding
 
 **Not started**
