@@ -1,4 +1,4 @@
-# Chapter 2: citations that are typed text, not Zotero fields
+# Citations that are typed text, not Zotero fields
 
 20 in-text markers are plain text. On a Zotero refresh the 24 live fields will
 become author-date while these stay as `[n]`, so each needs re-inserting through
@@ -123,3 +123,13 @@ cite: D. Benatiallah and K. Bouchouicha, in (2021), pp. 1–7.
 > ...nges posed by ITCZ-driven convective regimes that directly affect solar radiation variability. **[20]**
 
 cite: A. Polasky, J. Evans, and J. Fuentes, Theoretical and Applied Climatology 155, 1 (2023).
+
+---
+
+## Chapter 1 (one marker)
+
+### paragraph 71, marker [6]
+
+> ...benchmarking contributes directly to the growing ML downscaling literature **[6]**
+
+cite: Lin, H., Tang, J., Wang, Shuyu, Wang, Shuguang, Dong, G., 2023. Deep learning downscaled high-resolution daily near surface meteorological datasets over East Asia. Scientific Data 10, 890.
