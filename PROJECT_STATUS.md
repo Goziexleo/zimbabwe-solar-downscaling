@@ -1440,7 +1440,12 @@ dropout improves held-out RMSE from 10.98 to 8.63, spatial correlation from 0.89
 to 0.970, and centred error from 3.59 to 1.97. Dropout is costly. What it does to
 the spectra is now an open question, and both chapters say so.
 
-**This is a change to a scientific claim, not a typo, and it needs the author's
+**CONFIRMED BY THE AUTHOR** ("leave it withdrawn"), after reading Section 4.5 in
+full. The withdrawal stands and should not be re-litigated without new evidence.
+The route back, if anyone wants one, is to fix the sweep so its baseline
+reproduces the deployed model's spectra and re-run it, not to restore the claim.
+
+**This was a change to a scientific claim, not a typo, and it needed the author's
 review.** Section 4.5 now reports the withdrawal and the inconvenient
 gradient-penalty result explicitly rather than dropping the paragraph; Section 5.6
 asks for a sweep whose baseline reproduces the deployed model's spectra. Nothing
