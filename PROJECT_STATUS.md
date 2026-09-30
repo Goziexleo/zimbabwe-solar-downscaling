@@ -1726,6 +1726,61 @@ Changing to a different Harvard later is a one-line edit to `ZOTERO_PREF` in
 
 ---
 
+## 12n. I destroyed the author's edits, and what now prevents it
+
+The author edited the merged dissertation on the Desktop and uploaded it. I read it
+only to scan for SARAH statements, never diffed it against my own build, and then ran
+`cp` over that exact path three times to "refresh the Desktop copy". Those copies
+destroyed the edits. The file was recovered by the author from Word.
+
+**The cause was treating a path as my output after it had become their working file.**
+The Desktop directory is now theirs; the build writes to OneDrive and files are sent,
+rather than copied into a directory the author edits in.
+
+**`apply_author_edits.py`** pushes edits from a hand-edited merged document back to
+the sources the build actually reads, which is the only place they survive a rebuild.
+Three things it does carefully:
+
+- **Word-level spans, not character-level.** A character diff widened to word
+  boundaries produced overlapping replacements: one edit yielded both
+  `("MSc.", "Master of Science")` and `("MSc.", "Science in")`, and applying both
+  would have corrupted the sentence.
+- **Only the changed spans are written, into the run that holds them.** Paragraphs are
+  never rebuilt, because a citation occupies several runs and flattening them destroys
+  the field, which has happened once in this project already.
+- **Reference sections are excluded.** The matcher would otherwise pair each chapter's
+  Zotero-generated bibliography with my consolidated list and rewrite a generated
+  bibliography with ASCII-folded names. Caught in the dry run.
+
+57 spans applied across Chapters 1 and 2; Chapter 3 needed none. Four edits sat exactly
+on the boundary between a text run and a citation field, where a missing space or comma
+belongs, and were applied there by hand. Citation field counts were verified before and
+after every file and are unchanged.
+
+**The supervisor names were in the project all along.** Chapter 1 opens with its own
+cover page carrying "Supervisor: Prof E. Mashonjowa | Programme Coordinator: Prof T.D.
+Mushore", and the degree name with it. I asked the author for information their own
+Chapter 1 already contained. That cover page is now stripped during the merge, since a
+dissertation with a title page does not need a second one, and Chapter 1 keeps it for
+reading standalone.
+
+Front-matter edits went into `build_thesis.py`, not the .docx: the abstract and
+acknowledgement rewordings, the removal of the repeated University wordmark under the
+crest, "Table of Content", the names and the October date. The abstract keeps every
+figure as a computed placeholder, so the author's prose cannot drift from the results.
+
+**One regression caught in the same pass.** Stripping Chapter 1's cover removed
+paragraphs carrying a section break, collapsing three sections into one and silently
+losing the roman/arabic page-numbering split. Such paragraphs are now emptied rather
+than deleted.
+
+Eight differences from the author's copy remain, and all eight are my later fixes that
+their copy predates: the Cohen and Efron DOIs, the punctuation repair in Chapter 4's
+to-add note, the script count, and the four scope corrections made in response to their
+own inconsistency report.
+
+---
+
 ## 13. Outstanding
 
 **Not started**

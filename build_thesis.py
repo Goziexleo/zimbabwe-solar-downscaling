@@ -46,6 +46,10 @@ DEGREE = "Master of Science in Climate Science and Climate Systems Modelling"
 DEPT = "Department of Space Science and Applied Physics"
 FACULTY = "Faculty of Science"
 UNIVERSITY = "UNIVERSITY OF ZIMBABWE"
+# Taken from Chapter 1's own cover page, where they were recorded all along.
+SUPERVISOR = "Prof E. Mashonjowa"
+COORDINATOR = "Prof T.D. Mushore"
+DATE = "October 2026"
 REPO = "https://github.com/<your-username>/zimbabwe-solar-downscaling"
 
 FILES = [
@@ -167,8 +171,8 @@ def build_front():
         p.alignment = WD_ALIGN_PARAGRAPH.CENTER
         p.paragraph_format.space_after = Pt(6)
         p.add_run().add_picture(LOGO, width=Inches(2.9))
-    para(doc, UNIVERSITY, size=17, bold=True, align=WD_ALIGN_PARAGRAPH.CENTER,
-         colour=UZ_PURPLE, space_after=2)
+    # The crest already carries the University's name, so the wordmark is not
+    # repeated as text (author's edit).
     para(doc, FACULTY, size=12, align=WD_ALIGN_PARAGRAPH.CENTER, space_after=1)
     para(doc, DEPT, size=12, align=WD_ALIGN_PARAGRAPH.CENTER, space_after=8)
     rule(doc)
@@ -187,13 +191,13 @@ def build_front():
     para(doc, DEGREE, size=13, bold=True, align=WD_ALIGN_PARAGRAPH.CENTER,
          space_after=24, line=1.3)
 
-    para(doc, "Supervisor: [Supervisor]", size=12,
+    para(doc, "Supervisor: %s" % SUPERVISOR, size=12,
          align=WD_ALIGN_PARAGRAPH.CENTER, space_after=2)
-    para(doc, "Co-supervisor: [Co-supervisor]", size=12,
+    para(doc, "Coordinator: %s" % COORDINATOR, size=12,
          align=WD_ALIGN_PARAGRAPH.CENTER, space_after=24)
 
     para(doc, "Harare, Zimbabwe", size=12, align=WD_ALIGN_PARAGRAPH.CENTER, space_after=2)
-    para(doc, "September 2026", size=12, align=WD_ALIGN_PARAGRAPH.CENTER, space_after=0)
+    para(doc, DATE, size=12, align=WD_ALIGN_PARAGRAPH.CENTER, space_after=0)
 
     # front matter in roman numerals, title page unnumbered
     page_numbering(s, "lowerRoman", start=1)
@@ -220,8 +224,8 @@ def build_front():
          space_after=28)
 
     _sig = [("Candidate", AUTHOR.title()),
-            ("Supervisor", "[Supervisor]"),
-            ("Co-supervisor", "[Co-supervisor]")]
+            ("Supervisor", SUPERVISOR),
+            ("Coordinator", COORDINATOR)]
     tbl = doc.add_table(rows=len(_sig), cols=3)
     tbl.autofit = False
     for row, (role, who) in zip(tbl.rows, _sig):
@@ -258,10 +262,7 @@ def build_front():
 
     # ---------------- contents ----------------
     doc.add_page_break()
-    heading(doc, "Table of Contents")
-    para(doc, "This table is a Word field. Right-click it and choose Update Field, "
-              "or press F9, to populate it once the document is opened.",
-         size=10, italic=True, space_after=12)
+    heading(doc, "Table of Content")
     toc = doc.add_paragraph()
     field(toc, r'TOC \o "1-3" \h \z \u')
 
@@ -298,13 +299,13 @@ def abstract_paragraphs():
     chg = float(np.nanmean(_fut - _base))
 
     return [
-        "Zimbabwe's renewable energy targets require siting decisions to be made at a "
-        "spatial scale finer than any climate projection currently provides. General "
+        "Zimbabwe's renewable energy targets require siting decisions at a spatial scale "
+        "finer than any climate projection currently provides. General "
         "circulation models resolve surface solar radiation at grid spacings of roughly "
         "100 to 250 km, while the planning decisions that depend on it are taken over "
         "distances of a few kilometres. This study addresses that mismatch by training "
         "four machine learning architectures to downscale Coupled Model Intercomparison "
-        "Project Phase 6 (CMIP6) solar radiation fields to a 0.1 degree grid over "
+        "Project Phase 6 (CMIP6) solar radiation fields to a 0.1-degree grid over "
         "Zimbabwe, and by carrying the resulting fields forward into a multi-criteria "
         "suitability assessment for utility-scale photovoltaic development.",
 
@@ -312,8 +313,8 @@ def abstract_paragraphs():
         "ERA5-derived clear-sky index target over 1985 to 2010 and evaluated on a "
         "withheld 2011 to 2024 record. A pixel-wise gradient-boosted ensemble attains "
         "the lowest aggregate error at %.2f W m-2, a skill score of %.4f against a "
-        "training-period climatology, against %.2f for a per-cell random forest, %.2f "
-        "for a convolutional network and %.2f for a U-Net. Paired year-block bootstrap "
+        "training-period climatology, compared with %.2f for a per-cell random forest, "
+        "%.2f for a convolutional network, and %.2f for a U-Net. Paired year-block bootstrap "
         "intervals establish the deployed model's margin over all three alternatives "
         "while showing that the ordering of the remaining three is not statistically "
         "separable. Model selection turned not on accuracy but on a scenario "
@@ -329,8 +330,8 @@ def abstract_paragraphs():
         "predictors, with %.3f per cent of time-mean variance residing at finer scales, "
         "so the product is a physically consistent regridding with a projected climate "
         "signal rather than a resolution gain. Second, the choice of downscaling "
-        "architecture accounts for %.1f per cent of projection variance by 2076 to 2100 "
-        "against %.1f per cent for the choice of global model, so a study reporting a "
+        "architecture accounts for %.1f per cent of projection variance by 2076 to 2100, "
+        "compared with %.1f per cent for the choice of global model, so a study reporting a "
         "single architecture would understate its own uncertainty by the larger term." % (
             info.loc["GHI target (time-mean)", "pct_variance_below_0.25deg"],
             x.pct_var_arch, x.pct_var_gcm),
@@ -354,9 +355,9 @@ def abstract_paragraphs():
         "%.2f W m-2 exceeds the whole spread across architectures by more than an order "
         "of magnitude. Refitting against the satellite record as the target is "
         "identified as the first priority for further work. The complete analysis "
-        "pipeline, the test suite that guards it and the generators that produce the "
-        "results chapters are published as an open repository, so that every figure "
-        "reported here can be regenerated from the documented inputs." % (
+        "pipeline and the test suite that guards it are published as an open "
+        "repository, so that every figure reported here can be regenerated from the "
+        "documented inputs." % (
             spv.loc["ERA5 target itself", "rmse_vs_sarah"]),
     ]
 
@@ -364,7 +365,7 @@ def abstract_paragraphs():
 def acknowledgements():
     return [
         "This dissertation was made possible by the support of several institutions and "
-        "people, and it is a pleasure to record it.",
+        "people, and I am pleased to acknowledge them.",
 
         "I thank Homegrown Clean Energy Solutions for its support of this work, and for "
         "grounding a study that could easily have remained an exercise in modelling in "
@@ -375,18 +376,18 @@ def acknowledgements():
         "I gratefully acknowledge the European Education and Culture Executive Agency "
         "(EACEA), which administers the Intra-Africa Academic Mobility Scheme on behalf "
         "of the European Union, for the mobility funding that allowed me to undertake this "
-        "degree. A scheme that moves students between African universities is the reason "
-        "this work could be carried out where the results matter, rather than about a "
-        "region from somewhere else.",
+        "degree. This scheme, which moves students between African universities, made "
+        "this work possible where the results matter, rather than in a region from "
+        "somewhere else.",
 
-        "My deepest thanks go to my parents, who let me study physics without ever once "
-        "asking me to justify it in terms of anything else. That freedom is a rarer gift "
-        "than it should be, and everything here follows from it.",
+        "My deepest thanks go to my parents, who encouraged my love for physics without "
+        "need for justification. That freedom is a rarer gift than it should be, and "
+        "everything here follows from it.",
 
-        "I thank my supervisors for their guidance throughout, and the Department of "
-        "Space Science and Applied Physics for the computational resources on which "
-        "this work was carried out. Responsibility for the analysis, and for any errors "
-        "remaining in it, is mine alone.",
+        "I thank my supervisor and project coordinator for their guidance throughout, and "
+        "the Department of Space Science and Applied Physics for the advice and "
+        "resources used to carry out this work. Responsibility for the analysis, and "
+        "for any errors remaining in it, is mine alone.",
     ]
 
 
@@ -680,6 +681,53 @@ def set_zotero_style(path):
           % Document(path).element.xml.count("ZOTERO_ITEM"))
 
 
+
+def strip_chapter_one_cover(doc):
+    """Remove Chapter 1's own cover page from the merged document.
+
+    Chapter 1 opens with a standalone cover - University, faculty, degree,
+    title, author, supervisor - which is correct when the chapter is read on its
+    own and duplicate once the dissertation has a title page of its own. It is
+    removed here rather than from the chapter file, so Chapter 1 remains
+    complete as a standalone document.
+
+    Those cover paragraphs are also where the supervisor and coordinator names
+    were recorded all along.
+    """
+    from docx.oxml.ns import qn
+
+    paras = list(doc.paragraphs)
+    start = end = None
+    for i, q in enumerate(paras):
+        if start is None and q._p.findall(".//" + qn("w:instrText")) and "TOC" in q._p.xml:
+            start = i
+        if start is not None and q.style.name == "Heading 1" \
+                and q.text.strip().lower().startswith("chapter 1"):
+            end = i
+            break
+    if start is None or end is None or end <= start + 1:
+        print("  Chapter 1 cover: nothing to remove")
+        return
+    # A paragraph can carry the section break that starts the body pages. Deleting
+    # it silently merges the front matter and the body into one section, which
+    # loses the roman/arabic page numbering split. Keep any such paragraph and
+    # empty it instead.
+    n = kept = 0
+    for q in paras[start + 1:end]:
+        if q._p.find(qn("w:pPr")) is not None \
+                and q._p.find(qn("w:pPr")).find(qn("w:sectPr")) is not None:
+            for r in list(q.runs):
+                r._r.getparent().remove(r._r)
+            kept += 1
+            continue
+        if q._p.getparent() is not None:
+            q._p.getparent().remove(q._p)
+            n += 1
+    if kept:
+        print("  kept %d paragraph(s) carrying a section break" % kept)
+    print("  removed %d paragraphs of Chapter 1's duplicate cover page" % n)
+
+
 # ------------------------------------------------------------------ merge ----
 def main():
     missing = [f for f in FILES if not os.path.exists(os.path.join(CHAPTERS, f))]
@@ -696,6 +744,7 @@ def main():
         composer.append(d)
 
     strip_chapter_reference_lists(composer.doc)
+    strip_chapter_one_cover(composer.doc)
 
     print("appending references and appendices...")
     build_back(composer.doc)
