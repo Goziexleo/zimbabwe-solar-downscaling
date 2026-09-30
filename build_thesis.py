@@ -615,6 +615,71 @@ def strip_chapter_reference_lists(doc):
           " (%d ZOTERO_BIBL anchors remained)" % (removed_paras, removed_bibl))
 
 
+
+ZOTERO_PREF = (
+    '&lt;data data-version="3" zotero-version="9.0.4"&gt;'
+    '&lt;session id="02dIrP3h"/&gt;'
+    '&lt;style id="http://www.zotero.org/styles/elsevier-harvard" hasBibliography="1" '
+    'bibliographyStyleHasBeenSet="0"/&gt;'
+    '&lt;prefs&gt;&lt;pref name="fieldType" value="Field"/&gt;&lt;/prefs&gt;&lt;/data&gt;')
+
+
+def set_zotero_style(path):
+    """Give the merged document the Zotero preferences its fields need.
+
+    The front matter is a fresh python-docx document, so the merged file has no
+    docProps/custom.xml and therefore no recorded citation style: Zotero would
+    open it with 60 live fields and no idea how to render them. This writes the
+    same Elsevier Harvard preference the chapters carry, with
+    bibliographyStyleHasBeenSet cleared so Zotero rebuilds the bibliography from
+    scratch rather than reusing what each chapter cached.
+    """
+    import shutil
+    import zipfile
+
+    CT = "[Content_Types].xml"
+    RELS = "_rels/.rels"
+    PART = "docProps/custom.xml"
+    custom = (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\r\n'
+        '<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/'
+        'custom-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument'
+        '/2006/docPropsVTypes">'
+        '<property fmtid="{D5CDD505-2E9C-101B-9397-08002B2CF9AE}" pid="2" '
+        'name="ZOTERO_PREF_1"><vt:lpwstr>%s</vt:lpwstr></property>'
+        '</Properties>' % ZOTERO_PREF)
+
+    tmp = path + ".tmp"
+    zin = zipfile.ZipFile(path)
+    names = set(zin.namelist())
+    with zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED) as zout:
+        for item in zin.infolist():
+            data = zin.read(item.filename)
+            if item.filename == CT and "custom-properties" not in data.decode("utf8"):
+                t = data.decode("utf8").replace(
+                    "</Types>",
+                    '<Override PartName="/docProps/custom.xml" ContentType='
+                    '"application/vnd.openxmlformats-officedocument.'
+                    'custom-properties+xml"/></Types>')
+                data = t.encode("utf8")
+            elif item.filename == RELS and "custom-properties" not in data.decode("utf8"):
+                t = data.decode("utf8").replace(
+                    "</Relationships>",
+                    '<Relationship Id="rIdCustom1" Type="http://schemas.openxmlformats'
+                    '.org/officeDocument/2006/relationships/custom-properties" '
+                    'Target="docProps/custom.xml"/></Relationships>')
+                data = t.encode("utf8")
+            if item.filename == PART:
+                data = custom.encode("utf8")
+            zout.writestr(item, data)
+        if PART not in names:
+            zout.writestr(PART, custom)
+    zin.close()
+    shutil.move(tmp, path)
+    print("  citation style set to Elsevier Harvard for all %d fields"
+          % Document(path).element.xml.count("ZOTERO_ITEM"))
+
+
 # ------------------------------------------------------------------ merge ----
 def main():
     missing = [f for f in FILES if not os.path.exists(os.path.join(CHAPTERS, f))]
@@ -649,6 +714,7 @@ def main():
             sec.footer.is_linked_to_previous = True
 
     composer.save(OUT)
+    set_zotero_style(OUT)
 
     d = Document(OUT)
     txt = " ".join(p.text for p in d.paragraphs)

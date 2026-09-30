@@ -1689,6 +1689,43 @@ from the author rather than from me.
 
 ---
 
+## 12m. The citation styles were never unified, and the merged file had none
+
+Raised by the author: why a different style from the Harvard the University uses.
+The answer is that no style was chosen by me. Each chapter records its own in
+`docProps/custom.xml`, and they disagreed:
+
+| | recorded style |
+|---|---|
+| Chapter 1 | `elsevier-harvard` |
+| Chapter 2 | **`taylor-and-francis-aip`** (numbered) |
+| Chapter 3 | `elsevier-harvard` |
+| merged dissertation | **none at all** |
+
+The consolidated reference list was normalised to Elsevier Harvard because that is
+what two of the three chapters already used, and it is a Harvard variant. The real
+defect was never the list: it was **Chapter 2 sitting on a numbered physics style**,
+which is why its citations render as `[5]` while every other chapter renders
+`(Vandal et al., 2017)`.
+
+**The merged dissertation was worse, and this was the more serious find.** Its front
+matter is a fresh `python-docx` document, so the merged file had no
+`docProps/custom.xml` at all: 60 live Zotero fields and no recorded style to render
+them in. Opening it and pressing Refresh would have prompted for a style rather than
+rebuilding the bibliography.
+
+Both fixed, on the author's choice of Elsevier Harvard. Chapter 2's recorded style is
+switched, and `build_thesis.py` now writes the preference block into the merged file
+after composing, with the content-type override and package relationship the part
+needs. `bibliographyStyleHasBeenSet` is cleared in both so Zotero rebuilds from
+scratch rather than reusing a cached numbered list. Verified: the package passes a
+CRC check, still opens, and all four files now report `elsevier-harvard`.
+
+Changing to a different Harvard later is a one-line edit to `ZOTERO_PREF` in
+`build_thesis.py`, or two clicks in Zotero's Document Preferences.
+
+---
+
 ## 13. Outstanding
 
 **Not started**
