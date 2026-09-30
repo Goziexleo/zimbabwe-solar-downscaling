@@ -1655,6 +1655,40 @@ dissertation and not only in the code.
 
 ---
 
+## 12l. Three scope claims the analysis had overtaken
+
+Found on a read-through by the author, who noticed that the thesis said the SARAH
+validation was not part of it while Chapter 4 reported one. The cause is ordinary and
+worth naming: **each was true when written, and each was falsified by work done later
+in the same project.** Sections written early describe a plan; sections written late
+describe what happened; nothing reconciles them unless someone looks.
+
+| Where | Said | Why it was false |
+|---|---|---|
+| Ch 2 §2.3.3 | "Validation against SARAH-2 ... is not reported in this thesis, in which ERA5 is the sole reference" | §4.6 compares the references and §4.6.1 scores the product against SARAH |
+| Ch 3 §3.3.3 | the SARAH record "is not analysed here" | it is the present-day suitability layer (§3.9.1) **and** is analysed in §4.6 and §4.6.1 |
+| Ch 3 §3.1 | §3.9 "remains to be applied to the downscaled products" | §3.9 was applied; §4.8 reports it in full |
+
+The third is the same defect found in Chapter 2 §2.6.3 during the prose audit
+(§12i), in a chapter that had already been checked. The second is an internal
+contradiction within Chapter 3 alone: one paragraph said SARAH was not analysed while
+another adopted it as the present-day irradiance layer.
+
+All three now state the position precisely, which is more useful than either the old
+claim or a blunt correction: **ERA5 remains the sole training target and evaluation
+reference; SARAH enters in three places without becoming the target** (present-day
+suitability layer, reference comparison, product diagnostic); **what is absent is
+refitting the chain against SARAH**, which is what an observational validation
+requires. Chapter 4 §4.9's limitation now says the same thing rather than "a full
+validation remains outstanding", which read as though nothing had been done.
+
+Two literal anchors added to the Chapter 3 guard. The wider lesson is that the
+guards check numbers and retired phrases but cannot check whether a statement about
+what the study *does* is still true; those need a read-through, and this one came
+from the author rather than from me.
+
+---
+
 ## 13. Outstanding
 
 **Not started**

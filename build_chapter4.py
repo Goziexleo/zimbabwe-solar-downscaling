@@ -662,8 +662,11 @@ P("**The evaluation is not independent of the training data.** Training and vali
   "reanalysis is correspondingly weak. The temporal split is genuine and forward in time, "
   "so Section 4.2 is a real out-of-sample test of the reanalysis relationship, but it is "
   "not a test against observations. Section 4.6 quantifies the reference uncertainty at "
-  "roughly 3 per cent with a seasonal structure; a full validation of the downscaled "
-  "product against SARAH remains outstanding.")
+  "roughly 3 per cent with a seasonal structure, and Section 4.6.1 scores the product "
+  "against SARAH directly, but that score is a diagnostic rather than a validation: the "
+  "disagreement between the two references exceeds the spread between the four "
+  "architectures by more than an order of magnitude. An observational validation "
+  "requires refitting against SARAH as the target and remains outstanding.")
 P("**The learning task is constrained by its own construction.** The coarse irradiance "
   "field was excluded from the predictors because it is a copy of the field the target is "
   "derived from, which made the task a genuine inference from atmospheric state. That "

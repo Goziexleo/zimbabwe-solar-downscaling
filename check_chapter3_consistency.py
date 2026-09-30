@@ -143,6 +143,11 @@ RETIRED = [
      "no consistency ratio supports this; Section 3.9.6's sensitivity analysis is the test"),
     ("Criterion Weighting Using AHP",
      "the heading claimed a procedure 3.9.4 states was not performed; now 'Criterion Weighting'"),
+    # scope claims the analysis overtook (Section 12l)
+    ("remains to be applied to the downscaled products",
+     "3.9 was applied; Chapter 4 Section 4.8 reports it"),
+    ("but it is not analysed here",
+     "SARAH is analysed: 3.9.1 uses it as the present-day layer, 4.6 and 4.6.1 score against it"),
     # method descriptions that outlived the code (Section 12j)
     ("early stopping on the validation split with a patience of 50 rounds",
      "XGBoost uses a fixed 200 rounds; early stopping on the validation split was 6.12's leakage"),
