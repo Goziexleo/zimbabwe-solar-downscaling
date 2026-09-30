@@ -748,10 +748,13 @@ P("Citations are plain author-year text and must be converted to live Zotero fie
   "reference list is regenerated:")
 for _ref in [
     "Cohen, J. (1960). A coefficient of agreement for nominal scales. Educational and "
-    "Psychological Measurement 20(1), 37–46., cited in Section 4.8.1 for kappa.", "Efron, B. (1987). Better bootstrap confidence intervals. Journal of the American "
-    "Statistical Association 82(397), 171–185., the BCa interval of Section 4.3.", "Dozier, J. and Frew, J. (1990). Rapid calculation of terrain parameters for "
-    "radiation modeling from digital elevation data. IEEE TGRS 28(5), 963–969., "
-    "already cited as plain text in Chapter 3 and still missing from the library.",
+    "Psychological Measurement 20(1), 37–46. Cited in Section 4.8.1 for kappa. "
+    "doi:10.1177/001316446002000104", "Efron, B. (1987). Better bootstrap confidence intervals. Journal of the American "
+    "Statistical Association 82(397), 171–185. The BCa interval of Section 4.3. "
+    "doi:10.1080/01621459.1987.10478410", "Dozier, J. and Frew, J. (1990). Rapid calculation of terrain parameters for "
+    "radiation modeling from digital elevation data. IEEE TGRS 28(5), 963–969. "
+    "Already cited as plain text in Chapter 3 and still missing from the library. "
+    "doi:10.1109/36.58986",
 ]:
     _p = doc.add_paragraph(_ref, style="List Bullet")
     _p.runs[0].font.size = Pt(11)

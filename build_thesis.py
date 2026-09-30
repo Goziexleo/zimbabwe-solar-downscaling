@@ -421,7 +421,8 @@ def references():
         "Proceedings of the 22nd ACM SIGKDD International Conference on Knowledge "
         "Discovery and Data Mining. Association for Computing Machinery, pp. 785-794.",
         "Cohen, J., 1960. A coefficient of agreement for nominal scales. Educational "
-        "and Psychological Measurement 20, 37-46.",
+        "and Psychological Measurement 20, 37-46. "
+        "https://doi.org/10.1177/001316446002000104",
         "Damiani, A., Ishizaki, N., Sasaki, H., Feron, S., Cordero, R., 2024. Exploring "
         "super-resolution spatial downscaling of several meteorological variables and "
         "potential applications for photovoltaic power. Scientific Reports 14. "
@@ -434,7 +435,8 @@ def references():
         "radiation modeling from digital elevation data. IEEE Transactions on "
         "Geoscience and Remote Sensing 28, 963-969. https://doi.org/10.1109/36.58986",
         "Efron, B., 1987. Better bootstrap confidence intervals. Journal of the "
-        "American Statistical Association 82, 171-185.",
+        "American Statistical Association 82, 171-185. "
+        "https://doi.org/10.1080/01621459.1987.10478410",
         "Eyring, V., Bony, S., Meehl, G.A., Senior, C.A., Stevens, B., Stouffer, R.J., "
         "Taylor, K.E., 2016. Overview of the Coupled Model Intercomparison Project "
         "Phase 6 (CMIP6) experimental design and organization. Geoscientific Model "
