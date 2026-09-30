@@ -1815,6 +1815,39 @@ re-cited.
 
 ---
 
+## 12p. The citation markers carried three layers of stray formatting
+
+The author reported that Chapter 2's citations looked wrong after the superscripts
+were cleared. They were right, and clearing the superscript had exposed rather than
+caused it. The AIP numbered style had rendered each marker as **9 pt, teal
+`#1A5F7A`, superscript**. Removing only the superscript left 9 pt teal text sitting on
+the baseline, which is worse than where it started.
+
+All three layers are now cleared, on the citation runs only:
+
+| | Chapter 1 | Chapter 2 | Chapter 3 |
+|---|---|---|---|
+| superscript/subscript | - | 142 | - |
+| explicit 9 pt size | - | 140 | - |
+| teal `#1A5F7A` | 1 | 144 | 23 |
+| grey `#808080` | 2 | 3 | 5 |
+
+Every run now inherits size and colour, which is what Chapters 1 and 3 already did for
+their own citations and is therefore the target rather than a new convention. Field
+counts were verified before and after each file and never changed.
+
+**One of these was a genuine defect rather than an inconsistency.** In Chapter 2 the
+teal colour ran past the end of a citation marker and into the body text after it, so
+a sentence in paragraph 127 began `[13] This expectation is treated here...` with the
+prose itself coloured. That is now black with the rest.
+
+**Deliberately left alone.** Chapter 2's `Gap 1:` to `Gap 4:` labels are coloured
+`#17A589` as a design choice, and the eight remaining subscripts are Chapter 3's
+H_low/W_high notation. The residual explicit sizes (10, 11, 12, 16 pt) are the front
+matter and figure captions this build writes on purpose.
+
+---
+
 ## 13. Outstanding
 
 **Not started**
