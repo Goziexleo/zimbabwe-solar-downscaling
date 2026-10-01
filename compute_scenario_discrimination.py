@@ -38,6 +38,18 @@ MME = {
     "U-Net": "mme_aggregations",
 }
 
+# Configurations that are NOT part of the deployed four-member ensemble but that
+# Section 5.6 raises as open questions. The dropout-free U-Net was found by the
+# sweep in Section 4.5 to be substantially more accurate than the deployed one,
+# and the thesis previously had to say it "has not been put through that screen".
+# It can be now. Kept out of MME so that sigma_arch, the agreement matrix and
+# every other four-member quantity are unchanged by a configuration that the
+# honest selection procedure did not choose.
+VARIANTS = {
+    "U-Net, dropout 0": "mme_aggregations_unet_drop0",
+}
+OUT_VARIANTS = os.path.join(PROC, "evaluation/scenario_discrimination_variants.csv")
+
 HORIZONS = [
     ("near_term", "near_term_2026_2050"),
     ("mid_term", "mid_term_2051_2075"),
@@ -73,6 +85,19 @@ def architecture_agreement():
         rows.append({"model_a": a, "model_b": b,
                      "r_projected_change": float(np.corrcoef(change[a], change[b])[0, 1])})
     return pd.DataFrame(rows)
+
+
+def screen(model, d):
+    row = {"model": model}
+    for short, tag in HORIZONS:
+        diff = field(d, "ssp585", tag) - field(d, "ssp245", tag)
+        row["sep_" + short] = float(np.nanmean(diff))
+        row["pct_ordered_" + short] = float(100 * np.nanmean(diff > 0))
+    seps = [row["sep_" + s_] for s_, _ in HORIZONS]
+    row["grows"] = bool(seps[-1] > seps[0])
+    row["monotonic"] = bool(seps[0] <= seps[1] <= seps[2])
+    row["passes_screen"] = bool(all(v > 0 for v in seps) and row["grows"])
+    return row
 
 
 def main():
@@ -114,6 +139,26 @@ def main():
     print("  max over all pairs        %.2f" % agree.r_projected_change.max())
     print("  deployed vs the others    %.2f to %.2f"
           % (dep.r_projected_change.min(), dep.r_projected_change.max()))
+
+    # Variants, reported separately so nothing four-member changes.
+    vrows = []
+    for model, d in VARIANTS.items():
+        if not os.path.isdir(os.path.join(PROC, d)):
+            print("\nvariant %s: aggregations absent, skipped" % model)
+            continue
+        vrows.append(screen(model, d))
+    if vrows:
+        pd.DataFrame(vrows).to_csv(OUT_VARIANTS, index=False)
+        print("\nvariants outside the deployed ensemble")
+        print("%-20s %8s %8s %8s  %-6s %-10s %s"
+              % ("configuration", "near", "mid", "long", "grows", "monotonic", "passes"))
+        for r in vrows:
+            print("%-20s %+8.3f %+8.3f %+8.3f  %-6s %-10s %s"
+                  % (r["model"], r["sep_near_term"], r["sep_mid_term"],
+                     r["sep_long_term"], "yes" if r["grows"] else "NO",
+                     "yes" if r["monotonic"] else "no",
+                     "YES" if r["passes_screen"] else "NO"))
+        print("Saved %s" % OUT_VARIANTS)
 
     print("\nSaved %s" % OUT)
     print("Saved %s" % OUT_AGREE)

@@ -38,6 +38,8 @@ sch = pd.read_csv(os.path.join(EVAL, "suitability_schemes.csv")).set_index("sche
 scr = pd.read_csv(os.path.join(EVAL, "scenario_discrimination.csv")).set_index("model")
 agr = pd.read_csv(os.path.join(EVAL, "architecture_agreement.csv"))
 uo = pd.read_csv(os.path.join(EVAL, "unet_optimisation.csv")).set_index("variant")
+udv = pd.read_csv(os.path.join(EVAL, "unet_dropout_variant.csv")).set_index("model")
+sdv = pd.read_csv(os.path.join(EVAL, "scenario_discrimination_variants.csv")).set_index("model")
 geo = pd.read_csv(os.path.join(EVAL, "robust_set_geography.csv"))
 mc = pd.read_csv(os.path.join(EVAL, "robustness_monte_carlo.csv")).set_index("frequency_threshold")
 bas = pd.read_csv(os.path.join(EVAL, "baselines.csv")).set_index("baseline")
@@ -96,6 +98,8 @@ n_low = int(((sui.tier_primary.values == 4) & keep).sum())
 lat, lon = sui.lat.values, sui.lon.values
 LON, LAT = np.meshgrid(lon, lat)
 n_rob, n_keep = int(rob.sum()), int(keep.sum())
+# Quoted with separators; "2386" beside "5,751" reads as a typo.
+S_ROB, S_KEEP = "{:,}".format(n_rob), "{:,}".format(n_keep)
 sens = int(sui.weight_sensitive.values.sum())
 
 doc = Document()
@@ -443,8 +447,30 @@ P("The cause was investigated with a controlled sweep fitting on 1985 to 2004 an
   "accuracy rather than spectra: removing the spatial dropout that the deployed "
   "configuration applies at a rate of %.1f improves held-out error from %.2f to %.2f "
   "W/m², spatial correlation from %.3f to %.3f, and centred error from %.2f to %.2f. "
-  "Dropout at this rate costs the U-Net a substantial amount of accuracy."
+  "Dropout at this rate appears to cost the U-Net a substantial amount of accuracy."
   % (uo.loc["baseline", "cfg_dropout"], uo.loc["baseline", "test_rmse"], uo.loc["drop_0", "test_rmse"], uo.loc["baseline", "test_spatial_r"], uo.loc["drop_0", "test_spatial_r"], uo.loc["baseline", "test_centred_rmse"], uo.loc["drop_0", "test_centred_rmse"]))
+P("That appearance does not survive the honest procedure, and the configuration has now "
+  "been retrained to find out. Fitted exactly as the deployed U-Net is, at the deployed "
+  "learning rate and under the same two-phase selection in which the epoch count is "
+  "chosen on an inner split and the model refitted on the full training record, the "
+  "dropout-free configuration scores %.2f W/m\u00b2 over Zimbabwe against the deployed "
+  "model's %.2f. It is worse, not better. The sweep's %.2f was obtained at a superseded "
+  "learning rate and by keeping the checkpoint that scored best on the withheld record "
+  "itself, which is selection on the evaluation data of the same kind corrected "
+  "elsewhere in this work. Neither condition survives, and with them the apparent "
+  "advantage goes."
+  % (udv.loc["U-Net, dropout 0 (variant)", "RMSE_zw"],
+     udv.loc["U-Net, dropout 0.3 (deployed)", "RMSE_zw"],
+     uo.loc["drop_0", "test_rmse"]))
+P("The same configuration was also put through the scenario-discrimination screen of "
+  "Section 4.4, which Chapter 5 previously had to leave open. It passes: separation of "
+  "%+.3f, %+.3f and %+.3f W/m\u00b2 across the three horizons, positive throughout and "
+  "growing monotonically. So the dropout-free U-Net is admissible for projection and "
+  "simply less accurate, which closes the question in favour of the deployed "
+  "configuration rather than against it."
+  % (sdv.loc["U-Net, dropout 0", "sep_near_term"],
+     sdv.loc["U-Net, dropout 0", "sep_mid_term"],
+     sdv.loc["U-Net, dropout 0", "sep_long_term"]))
 P("The sweep does not, however, identify the cause of the damping reported above, and an "
   "earlier version of this section claimed that it did. The difficulty is that the "
   "sweep's own baseline does not reproduce the damping it was built to explain. That "
@@ -708,13 +734,13 @@ P("Section 3.9.6 repeated the weighted overlay under four weighting schemes: the
   "indicating agreement no better than chance. Of the %d assessed cells, %d, %.1f per "
   "cent, change suitability tier under at least one scheme."
   % (K("irradiance-dominant"), K("infrastructure-dominant"), K("equal"), n_keep, sens, 100 * sens / n_keep))
-P("**Only %d cells, %.1f per cent of those assessed and approximately %s km2, are "
+P("**Only %d cells, %.1f per cent of those assessed and approximately %s km², are "
   "classified high or very high under all four weighting schemes.** These are reported "
   "as the robust set, and they are the defensible output of this analysis. The five-tier "
   "map is retained as supporting material, but a classification in which nine cells in "
   "ten can be moved by a defensible change of weights should not be presented as a "
   "planning product without that qualification attached."
-  % (n_rob, 100 * n_rob / n_keep, format(n_rob * 121, ",")))
+  % (n_rob, 100 * n_rob / n_keep, "{:,.0f}".format(geo["area_km2"].sum())))
 P("Section 3.9.3 previously printed the distance decay as Score = e^(-d/d_ref) while "
   "stating in prose that the score falls below 0.14 beyond d_ref, which the function does "
   "not do: e^(-1) is 0.368. That discrepancy was not cosmetic, since the two readings "
@@ -751,7 +777,7 @@ P("The robust set is concentrated along the central watershed between %.1f and %
   "degrees east, following the Harare–Bulawayo road and transmission corridor. By "
   "province it falls in %s. The single highest-scoring cell reaches a suitability index "
   "of %.3f at 29.8 degrees east, 18.9 degrees south, in Kwekwe Urban district. The set "
-  "covers %s km2, computed from the true area of each cell at its own latitude."
+  "covers %s km², computed from the true area of each cell at its own latitude."
   % (LON[rob].min(), LON[rob].max(), prov,
      np.nanmax(np.where(keep, sui.si_primary.values, np.nan)),
      "{:,.0f}".format(geo["area_km2"].sum())))
@@ -861,7 +887,7 @@ P("**The intermediate clear-sky index is not a physical clear-sky index.** Its "
   "absolute level of the intermediate should not be read as a fraction of clear-sky "
   "irradiance.")
 P("**Two exclusion criteria do not bind at this resolution.** The slope exclusion removes "
-  "two cells, because averaging 90 m terrain over a 121 km2 cell smooths individual "
+  "two cells, because averaging 90 m terrain over a 121 km² cell smooths individual "
   "steep faces; the riparian exclusion removes none, because a 200 m corridor is 1.8 per "
   "cent of a cell width. Both rules are sound at their native scale and neither can "
   "operate at 0.1 degrees. The relief is present in the data, 81 cells have more than 20 "
@@ -905,11 +931,11 @@ P("Four architectures were trained on identical inputs and evaluated on a withhe
 P("The projections give an increase in surface irradiance over Zimbabwe of %.1f to %.1f "
   "per cent by 2100 depending on pathway, and the resource is not the constraint on "
   "solar development in any case. The suitability analysis identifies %d locations, "
-  "about %s km2, that remain highly suitable under every weighting scheme tested, and "
+  "about %s km², that remain highly suitable under every weighting scheme tested, and "
   "what distinguishes them is proximity to the transmission network rather than solar "
   "resource. Irradiance over Zimbabwe varies too little to discriminate between sites; "
   "grid access varies by two orders of magnitude and decides the outcome."
-  % (100 * (proj["ssp245_near_term_2026_2050"] - base).mean() / base.mean(), 100 * (proj["ssp585_long_term_2076_2100"] - base).mean() / base.mean(), n_rob, format(n_rob * 121, ",")))
+  % (100 * (proj["ssp245_near_term_2026_2050"] - base).mean() / base.mean(), 100 * (proj["ssp585_long_term_2076_2100"] - base).mean() / base.mean(), n_rob, "{:,.0f}".format(geo["area_km2"].sum())))
 P("The methodological contribution is therefore narrower and firmer than a single "
   "suitability map would suggest. It is that architecture choice is a first-order source "
   "of projection uncertainty, reaching %.1f per cent of long-term variance against %.1f "

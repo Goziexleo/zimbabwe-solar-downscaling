@@ -101,8 +101,42 @@ def main():
     before = (x.count("ZOTERO_ITEM"), x.count('w:fldCharType="begin"'), len(d.sections))
     print("before:", before)
 
-    if any(p.text.strip() == "List of Tables" for p in d.paragraphs):
-        print("lists already present; only refreshing the field setting")
+    # Rebuild rather than skip: captions change as chapters are regenerated, and
+    # a list that silently went stale is worse than no list.
+    from docx.table import Table as _T
+    from docx.text.paragraph import Paragraph as _P
+    items = []
+    for ch in d.element.body:
+        if ch.tag.endswith("}p"):
+            items.append(_P(ch, d))
+        elif ch.tag.endswith("}tbl"):
+            items.append(_T(ch, d))
+    start = next((i for i, it in enumerate(items)
+                  if isinstance(it, _P) and it.text.strip() == "List of Tables"), None)
+    if start is not None:
+        stop = next(i for i in range(start + 1, len(items))
+                    if isinstance(items[i], _P)
+                    and items[i].style.name.startswith("Heading")
+                    and items[i].text.strip().startswith("Chapter"))
+        removed = kept = 0
+        for it in items[start:stop]:
+            node = it._p if isinstance(it, _P) else it._tbl
+            # Never remove a paragraph carrying the section break that starts the
+            # body pages. Doing so merges the front matter into the body and
+            # takes the page numbering with it.
+            pPr = node.find(qn("w:pPr")) if node.tag.endswith("}p") else None
+            if pPr is not None and pPr.find(qn("w:sectPr")) is not None:
+                for r in list(node.findall(qn("w:r"))):
+                    node.remove(r)
+                kept += 1
+                continue
+            node.getparent().remove(node)
+            removed += 1
+        print("removed %d stale list element(s); %d kept for a section break"
+              % (removed, kept))
+
+    if False:
+        pass
     else:
         tables = [p.text.strip() for p in d.paragraphs
                   if re.match(r"^Table \d+\.\d+\.", p.text.strip())]

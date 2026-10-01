@@ -23,10 +23,14 @@ warnings.filterwarnings("ignore")
 VAL_PATH = "./data/processed/ml_ready/ml_validation_dataset.nc"
 TOPO_PATH = os.path.abspath("./data/processed/topography/zimbabwe_topographic_features_0.1deg.nc")
 FINEGRID_CLEARSKY_PATH = os.path.abspath("./data/processed/era5/csi_finegrid/clearsky_ghi_finegrid_climatology.nc")
-UNET_MODEL_PATH = os.path.abspath("./data/processed/models/unet/unet_csi_downscaler.pth")
+UNET_MODEL_PATH = os.environ.get(
+    "UNET_MODEL_PATH",
+    os.path.abspath("./data/processed/models/unet/unet_csi_downscaler.pth"))
 CNN_MODEL_PATH = os.path.abspath("./data/processed/models/cnn/cnn_csi_downscaler.pth")
 RF_MODEL_DIR = os.path.abspath("./data/processed/models/pixelwise_rf")
-OUTPUT_PATH = os.path.abspath("./data/processed/evaluation/validation_spatial_fields.nc")
+OUTPUT_PATH = os.environ.get(
+    "VALIDATION_FIELDS_OUTPUT",
+    os.path.abspath("./data/processed/evaluation/validation_spatial_fields.nc"))
 os.makedirs(os.path.dirname(OUTPUT_PATH), exist_ok=True)
 
 device = torch.device("mps" if torch.backends.mps.is_available() else ("cuda" if torch.cuda.is_available() else "cpu"))

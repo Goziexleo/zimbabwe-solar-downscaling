@@ -54,9 +54,9 @@ def fig_bias_distribution():
     # pixel-wise models', whatever their means. Both numbers are computed.
     _worst = max(spans, key=lambda k: spans[k][1])
     _best = min(spans, key=lambda k: spans[k][1])
-    ax.set_title("Per-cell bias distribution\n"
-                 "%s spans %.0f W m$^{-2}$ across cells, %s only %.0f"
-                 % (_worst, spans[_worst][1], _best, spans[_best][1]))
+    # A chart title labels the data. The argument belongs in the caption, where
+    # the reader can weigh it; in the axes it reads as instruction.
+    ax.set_title("Per-cell mean bias by architecture, 2011\u20132024")
     ax.legend(frameon=False, fontsize=9)
 
     stats = []
@@ -112,8 +112,7 @@ def fig_feature_importance():
     ax.barh(y + 0.2, df["xgb_gain"], height=0.38, color=C["XGBoost"], label="XGBoost (gain)")
     ax.set_yticks(y); ax.set_yticklabels(df["feature"])
     ax.set_xlabel("Normalised importance")
-    ax.set_title("Predictor importance, pixel-wise models\n"
-                 "cloud fraction dominates; topography is exactly zero")
+    ax.set_title("Predictor importance, pixel-wise models")
     for i, f in enumerate(df["feature"]):
         if f in ("elevation", "slope", "svf"):
             _v = df.loc[df["feature"] == f, ["rf_mdi", "rf_permutation",
@@ -152,7 +151,9 @@ def fig_uncertainty():
         a2.plot(x, v, "o-", color=col, lw=2, ms=8, label=name)
     a2.set_xticks(x); a2.set_xticklabels(lbl)
     a2.set_ylabel("% of total variance")
-    a2.set_title("Architecture choice overtakes GCM choice\nby the long-term horizon")
+    # Also wrong since the correction: architecture exceeds GCM at EVERY
+    # horizon, 45.8 against 30.2 in the near term, not only by the long term.
+    a2.set_title("Variance shares by horizon")
     a2.legend(frameon=False)
     fig.tight_layout(); fig.savefig(f"{FIG}/04_uncertainty.png"); plt.close(fig)
 
@@ -194,7 +195,7 @@ def fig_spectra():
                   label=c, ls="--" if c == "Truth (ERA5)" else "-")
     wavelength_axis(a1)
     a1.set_ylabel("Power")
-    a1.set_title("CSI power spectrum — the space judged in\nthe models predict CSI, not GHI")
+    a1.set_title("Clear-sky-index power spectrum")
     a1.legend(frameon=False, fontsize=8.2)
 
     # --- CSI ratio. The U-Net damping is robust across every cut; the CNN
@@ -211,10 +212,7 @@ def fig_spectra():
     a2.axhline(1, color="k", lw=0.9, ls="--")
     wavelength_axis(a2)
     a2.set_ylabel("CSI power ratio to truth")
-    a2.set_title("U-Net DAMPS fine scales at every cut (%.2f to %.2f);\n"
-                 "the CNN does not - but its ratio is cut-dependent, %.2f-%.2f"
-                 % (sens.loc["U-Net", "max"], sens.loc["U-Net", "min"],
-                    sens.loc["CNN", "min"], sens.loc["CNN", "max"]))
+    a2.set_title("Clear-sky-index power ratio to truth, by wavenumber cut")
     a2.legend(frameon=False, fontsize=8.2)
     # Annotate the RANGE over cuts, not the single k>10 value. Printing "1.04x"
     # beside a panel whose title says the ratio is cut-dependent would have the
@@ -234,11 +232,10 @@ def fig_spectra():
     a3.axhline(1, color="k", lw=0.9, ls="--")
     wavelength_axis(a3)
     a3.set_ylabel("GHI power ratio to truth")
-    a3.set_title("GHI-space excess is a SYMPTOM of getting CSI wrong\n"
-                 "not evidence a model invented detail")
+    a3.set_title("GHI power ratio to truth")
     a3.legend(frameon=False, fontsize=8.2)
 
-    fig.suptitle("Power spectra — read the CSI panels, not the GHI one", y=1.03, fontsize=11)
+    fig.suptitle("Radially averaged power spectra", y=1.03, fontsize=11)
     fig.tight_layout()
     fig.savefig(f"{FIG}/05_power_spectra.png", bbox_inches="tight"); plt.close(fig)
 

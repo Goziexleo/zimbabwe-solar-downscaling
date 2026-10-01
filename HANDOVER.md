@@ -74,17 +74,19 @@ Only after the push is the Declaration's claim that the code "is published
 openly" true, and the Abstract no longer makes that claim at all. If you decide
 not to publish, tell me and I will reword the Declaration instead.
 
+## Rebuilding the document
+
+After any change to a results chapter, run **`./finalise_dissertation.sh`**. It
+regenerates both chapters, splices them in, reapplies the presentation pass, the
+factual corrections, the front-matter lists and the table formatting, then
+verifies. Running the splice alone silently reintroduces the generator's units
+and spacing, which is why it is one script and not six commands.
+
 ## Part 4 — Decide
 
 - **Abstract length: 412 words.** Most regulations cap at 250–350. Check the MCSM
   rule; tell me the number and I will cut to it. Paragraph three compresses most
   easily.
-- **Revision-history sentences.** Seventeen passages narrate earlier versions.
-  The examiner wants them all gone; your candour was also scored a strength. I
-  would keep the six that disclose a correction material to reading a result —
-  the leakage correction in 3.6.7, the Random Forest reversal in 3.8.4, the
-  sigma_DS error in 4.7 — and delete the eleven that only narrate drafting. Say
-  the word and I will do exactly that.
 - **The domain.** The grid stops at 22.0 S and Zimbabwe does not.
   `RUNBOOK_DOMAIN_FIX.md` gives both paths: the full rerun, or the wording to
   disclose it. This is the largest outstanding item.

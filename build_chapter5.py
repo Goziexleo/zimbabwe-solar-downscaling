@@ -27,6 +27,8 @@ info = pd.read_csv(os.path.join(EVAL, "information_content.csv")).set_index("fie
 per = pd.read_csv(os.path.join(EVAL, "suitability_by_period.csv")).set_index("period")
 scr = pd.read_csv(os.path.join(EVAL, "scenario_discrimination.csv")).set_index("model")
 uo = pd.read_csv(os.path.join(EVAL, "unet_optimisation.csv")).set_index("variant")
+udv5 = pd.read_csv(os.path.join(EVAL, "unet_dropout_variant.csv")).set_index("model")
+sdv5 = pd.read_csv(os.path.join(EVAL, "scenario_discrimination_variants.csv")).set_index("model")
 spv5 = pd.read_csv(os.path.join(EVAL, "sarah_product_validation.csv")).set_index("model")
 bas5 = pd.read_csv(os.path.join(EVAL, "baselines.csv")).set_index("baseline")
 bvm5 = pd.read_csv(os.path.join(EVAL, "baseline_vs_models.csv")).set_index("model")
@@ -156,7 +158,8 @@ P("Two qualifications belong with that answer, and both concern how the comparis
   "CNN ends at %.2f W/m² against the %.2f it reported under full leakage, and the U-Net "
   "at %.2f against %.2f. "
   "Separately, a controlled sweep shows the U-Net reaches %.2f W/m² under honest "
-  "selection once its dropout setting is removed, which is below the deployed model. "
+  "selection once its dropout setting is removed in that sweep, although Section 4.5 "
+  "reports that the improvement does not survive an honest retrain. "
   "Neither fact overturns the deployment, for the reason given under RQ3, but together "
   "they mean this study compares particular configurations, selected in a particular "
   "way, rather than architectures in the abstract."
@@ -244,7 +247,7 @@ P("The deployment decision followed from a test that no accuracy metric could pe
   % (rank("Random Forest").replace("-lowest", ""), scr.loc["Random Forest", "pct_ordered_long_term"]))
 
 H("5.2.4 RQ4: where suitability is highest", 3)
-P("Of %d assessed locations, **%d, %.1f per cent, approximately %s km2, are classified "
+P("Of %d assessed locations, **%d, %.1f per cent, approximately %s km², are classified "
   "highly suitable under every weighting scheme tested.** These are reported as the "
   "answer, in preference to the five-tier map, because %.1f per cent of assessed cells "
   "change tier under at least one defensible reweighting and equal weighting agrees with "
@@ -358,17 +361,23 @@ P("**Extend honest selection to the hyperparameters as well as the epoch count.*
   "dropout, to be costly on held-out accuracy. A search conducted entirely within the "
   "training period, "
   "over all of them jointly, is the natural completion of that correction.")
-P("**Revisit the U-Net configuration, and settle what causes its damping.** A controlled "
-  "sweep shows that removing the spatial dropout setting improves held-out error to %.2f "
-  "W/m² and spatial correlation to %.3f, so the setting is costly on accuracy. It does "
-  "not show what causes the spectral damping: the sweep's baseline carries the same "
-  "dropout rate as the deployed model and shows an excess of fine-scale power (%.2f) "
-  "rather than the deployed model's deficit, so it never reproduced the failure it was "
-  "built to explain. Section 4.5 sets this out and withdraws the earlier attribution. "
-  "Establishing the mechanism needs a sweep whose baseline reproduces the deployed "
-  "model's spectra, and any improved configuration must pass the scenario-discrimination "
-  "screen before it can be considered for deployment."
-  % (uo.loc["drop_0", "test_rmse"], uo.loc["drop_0", "test_spatial_r"], uo.loc["baseline", "test_spec_ratio"]))
+P("**Settle what causes the U-Net's damping.** One part of this recommendation has since "
+  "been carried out and is reported in Section 4.5. The dropout-free configuration that "
+  "the sweep favoured was retrained under the deployed procedure and put through the "
+  "scenario screen. It passes the screen, with separation growing from %+.3f to %+.3f "
+  "W/m², but it is less accurate than the deployed model, %.2f W/m² against %.2f: the "
+  "sweep's apparent gain came from a superseded learning rate and from keeping the "
+  "checkpoint that scored best on the withheld record. What remains open is the cause of "
+  "the spectral damping. The sweep's baseline carries the same dropout rate as the "
+  "deployed model yet shows an excess of fine-scale power (%.2f) rather than a deficit, "
+  "so it never reproduced the failure it was built to explain, and Section 4.5 withdraws "
+  "the earlier attribution. Establishing the mechanism needs a sweep whose baseline "
+  "reproduces the deployed model's spectra."
+  % (sdv5.loc["U-Net, dropout 0", "sep_near_term"],
+     sdv5.loc["U-Net, dropout 0", "sep_long_term"],
+     udv5.loc["U-Net, dropout 0 (variant)", "RMSE_zw"],
+     udv5.loc["U-Net, dropout 0.3 (deployed)", "RMSE_zw"],
+     uo.loc["baseline", "test_spec_ratio"]))
 P("**Extend the suitability analysis with infrastructure and demographic scenarios.** "
   "The present analysis can say how the resource changes at fixed sites. Answering where "
   "future sites should be requires projections of the transmission network and population "
