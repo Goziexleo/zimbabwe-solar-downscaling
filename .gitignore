@@ -18,3 +18,7 @@ brief/viva-brief-print.html
 brief/viva-brief.pdf
 brief/CR_Madukwe_Interview_Complete.md
 brief/CR_Madukwe_Interview_Deck.pptx
+
+# working backups
+*.bak
+*_BACKUP_*.docx

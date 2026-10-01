@@ -154,7 +154,10 @@ def fig_schemes(suit):
 
 def fig_periods(suit):
     lat, lon = suit.lat.values, suit.lon.values
-    per = [("present", "Present (SARAH)"),
+    # The present panel must be the ERA5-basis one. Plotting the SARAH layer
+    # beside ERA5-basis futures put two measurement systems in one row and made
+    # the near-term panels read as a decline; the SARAH layer is Figures 4.7-4.8.
+    per = [("present_era5_basis", "Present (ERA5 basis)"),
            ("ssp245_near_term_2026_2050", "SSP2-4.5 near"),
            ("ssp245_long_term_2076_2100", "SSP2-4.5 long"),
            ("ssp585_near_term_2026_2050", "SSP5-8.5 near"),
@@ -166,13 +169,8 @@ def fig_periods(suit):
                   vmin=.3, vmax=.8)
         _frame(ax, lat, lon, n)
     fig.colorbar(im, ax=axes[0].tolist(), fraction=.02).set_label("SI", size=8)
+    # The explanation belongs in the caption, not inside the axes.
     axes[1][0].axis("off")
-    axes[1][0].text(.5, .5, "Change is taken against the\nERA5-basis present, not\n"
-                    "against SARAH — so the\ndifference stays inside one\n"
-                    "measurement system.\n\nOnly the GHI layer varies by\n"
-                    "period: infrastructure and\npopulation are frozen at\n"
-                    "present values.",
-                    ha="center", va="center", fontsize=8.2, color=DEEP)
     for ax, (k, n) in zip(axes[1][1:], per[1:]):
         im = show(ax, suit["dsi_" + k].values, lat, lon, mask=ex, cmap="RdYlBu_r",
                   vmin=-.15, vmax=.15)

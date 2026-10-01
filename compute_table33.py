@@ -29,6 +29,8 @@ import pandas as pd
 import xarray as xr
 
 from ml_dataset_common import evaluation_baselines, skill_score
+from zimbabwe_mask import describe as mask_describe
+from zimbabwe_mask import zimbabwe_mask
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 FIELDS = os.path.join(ROOT, "data/processed/evaluation/validation_spatial_fields.nc")
@@ -44,7 +46,15 @@ MODELS = [
 ]
 
 
-def metrics(pred, truth, clim_rmse):
+def metrics(pred, truth, clim_rmse, mask=None):
+    """Metrics over the full analysis box, or over Zimbabwe when a mask is given.
+
+    42.8 per cent of the box lies in Zambia, Botswana, Mozambique and South
+    Africa, so an unmasked figure is not a result about Zimbabwe however it is
+    labelled. Both are computed; the masked ones carry a _zw suffix.
+    """
+    if mask is not None:
+        pred, truth = pred[:, mask], truth[:, mask]
     err = pred - truth
     rmse = float(np.sqrt((err ** 2).mean()))
     mae = float(np.abs(err).mean())
@@ -70,21 +80,41 @@ def main():
     rmse_of = lambda a: float(np.sqrt(((a - truth) ** 2).mean()))
     clim_rmse, interp_rmse, delta_rmse = rmse_of(clim), rmse_of(interp), rmse_of(delta)
 
+    mask = zimbabwe_mask(truth.shape)
+    clim_rmse_zw = float(np.sqrt(((clim[:, mask] - truth[:, mask]) ** 2).mean()))
+
     rows = []
     for label, var in MODELS:
-        m = metrics(ds_f[var].values, truth, clim_rmse)
+        pred = ds_f[var].values
+        m = metrics(pred, truth, clim_rmse)
+        m.update({k + "_zw": v for k, v in
+                  metrics(pred, truth, clim_rmse_zw, mask=mask).items()})
         m["model"] = label
         rows.append(m)
 
-    df = pd.DataFrame(rows)[
-        ["model", "RMSE", "MAE", "Pearson R", "MBE", "SS vs climatology", "R2"]
-    ].sort_values("RMSE")
+    cols = ["RMSE", "MAE", "Pearson R", "MBE", "SS vs climatology", "R2"]
+    df = pd.DataFrame(rows)
+    # The skill reference belongs in the file, not in a chapter as a literal.
+    # Chapter 4 previously carried "19.08 W m-2" typed into the caption.
+    df["climatology_rmse"] = clim_rmse
+    df["climatology_rmse_zw"] = clim_rmse_zw
+    df = df[["model"] + cols + [c + "_zw" for c in cols]
+            + ["climatology_rmse", "climatology_rmse_zw"]].sort_values("RMSE_zw")
     df.to_csv(OUT_CSV, index=False)
 
     print("=" * 92)
-    print(" TABLE 3.3 — validation 2011-2024 (W m-2)")
+    print(" TABLE 3.3 - validation 2011-2024 (W m-2)")
+    print(" mask: " + mask_describe())
     print("=" * 92)
-    print(df.to_string(index=False, float_format=lambda x: f"{x:.4f}"))
+    print(" full analysis box:")
+    print(df[["model"] + cols].to_string(index=False, float_format=lambda x: f"{x:.4f}"))
+    print("\n over Zimbabwe (the figures the prose should quote):")
+    print(df[["model"] + [c + "_zw" for c in cols]].to_string(
+        index=False, float_format=lambda x: f"{x:.4f}"))
+    print("\n change from masking:")
+    for r in df.itertuples():
+        print("   %-14s RMSE %7.4f -> %7.4f (%+.4f)   MBE %+7.4f -> %+7.4f"
+              % (r.model, r.RMSE, r.RMSE_zw, r.RMSE_zw - r.RMSE, r.MBE, r.MBE_zw))
     print("=" * 92)
     print(f"\nSkill reference (admissible):")
     print(f"  climatology, 1985-2010 training record  RMSE {clim_rmse:8.4f}")

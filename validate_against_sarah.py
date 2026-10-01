@@ -50,6 +50,8 @@ def bias(a, b, m):
 
 
 def main():
+    from zimbabwe_mask import describe as mask_describe
+    from zimbabwe_mask import zimbabwe_mask
     ds = xr.open_dataset(FIELDS)
     times = pd.DatetimeIndex(ds.time.values)
     truth = ds["ghi_true"].values
@@ -72,6 +74,13 @@ def main():
           % (len(times), truth[0].size, both.sum(), both.size,
              100 * both.sum() / both.size))
 
+    # Restricted to Zimbabwe as well. Two fifths of the analysis box is in
+    # neighbouring countries, and a satellite comparison described as a check
+    # over Zimbabwe should be one.
+    mask = zimbabwe_mask(truth.shape)
+    both_zw = both & mask[None, :, :]
+    print("mask: %s -> %d usable values inside" % (mask_describe(), both_zw.sum()))
+
     rows = []
     for name, var in MODELS:
         if var not in ds:
@@ -82,13 +91,21 @@ def main():
             rmse_vs_era5=rmse(p, truth, both),
             rmse_vs_sarah=rmse(p, sarah, both),
             bias_vs_era5=bias(p, truth, both),
-            bias_vs_sarah=bias(p, sarah, both)))
+            bias_vs_sarah=bias(p, sarah, both),
+            rmse_vs_era5_zw=rmse(p, truth, both_zw),
+            rmse_vs_sarah_zw=rmse(p, sarah, both_zw),
+            bias_vs_era5_zw=bias(p, truth, both_zw),
+            bias_vs_sarah_zw=bias(p, sarah, both_zw)))
 
     ref = dict(model="ERA5 target itself",
                rmse_vs_era5=0.0,
                rmse_vs_sarah=rmse(truth, sarah, both),
                bias_vs_era5=0.0,
-               bias_vs_sarah=bias(truth, sarah, both))
+               bias_vs_sarah=bias(truth, sarah, both),
+               rmse_vs_era5_zw=0.0,
+               rmse_vs_sarah_zw=rmse(truth, sarah, both_zw),
+               bias_vs_era5_zw=0.0,
+               bias_vs_sarah_zw=bias(truth, sarah, both_zw))
     rows.append(ref)
 
     df = pd.DataFrame(rows)

@@ -167,8 +167,14 @@ whose limits, are recorded in `PROJECT_STATUS.md` §7.18.
 | Path | Contents |
 |---|---|
 | `*.py` | analysis scripts, one stage each |
+| `zimbabwe_mask.py` | the national mask every "over Zimbabwe" metric uses |
+| `compute_baselines.py` | linear, ridge, climatology and interpolation baselines |
+| `compute_projection_baselines.py` | the quantile-mapped operational baseline, and the driver-consistency check |
+| `compute_robust_set_geography.py` | provinces and true areas of the robust set |
 | `build_chapter4.py`, `build_chapter5.py` | generate the results chapters |
-| `build_thesis.py` | assembles the full dissertation with front matter |
+| `splice_results_chapters.py` | swaps those chapters into the dissertation, preserving citation fields |
+| `normalise_tables.py` | puts every table on one format |
+| `build_thesis.py` | assembles a full dissertation from scratch (see the warning below) |
 | `check_*.py` | document consistency guards |
 | `tests/` | pytest invariants |
 | `brief/` | viva brief and slide deck, generated from `brief/viva-brief.html` |
@@ -177,6 +183,11 @@ whose limits, are recorded in `PROJECT_STATUS.md` §7.18.
 | `PROJECT_STATUS.md` | authoritative record of results, defects and limitations |
 
 `data/`, `figures/` and `logs/` are generated and not tracked.
+
+**`build_thesis.py` rebuilds the whole document and will destroy the citation
+fields inserted by hand into the merged file.** Once reference management has
+begun, update the results chapters with `splice_results_chapters.py`, which
+replaces only Chapters 4 and 5 and checks the field count before and after.
 
 ## A limitation worth stating here
 
@@ -192,9 +203,17 @@ target. The data is held for it; the work is not done.
 
 Prose in the dissertation was edited for clarity and grammar with the assistance of a
 large language model (Claude, Anthropic), which was also used to draft analysis code
-from specifications and to diagnose defects in it. No research question, method
-choice, interpretation or reported number originates from the tool. Appendix B of the
-dissertation states this in full.
+from specifications, to diagnose defects in it, and to summarise literature. No
+research question, method choice, interpretation or reported number originates from
+the tool. Appendix B of the dissertation states this in full.
+
+The literature summaries proved to be the weak point. An audit against the sources
+themselves, recorded in `CITATION_AUDIT.md`, found several attributions that the
+cited papers do not support — among them the claim that Buster et al. (2024) used
+ERA5 as a training target, when it used ERA5 as the low-resolution input and NSRDB
+and WTK as targets. Those passages have been rewritten. Anyone reusing this work
+should treat every citation as needing independent verification, and the audit
+file records which have had it.
 
 ## Citation
 

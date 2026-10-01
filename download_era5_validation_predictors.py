@@ -39,7 +39,7 @@ def main() -> None:
                     "month": [f"{month:02d}" for month in range(1, 13)],
                     "day": [f"{day:02d}" for day in range(1, 32)],
                     "time": [f"{hour:02d}:00" for hour in range(24)],
-                    "area": [-15, 25, -22, 33],
+                    "area": [-15, 25, -22.5, 33.5],
                 },
                 str(output_path),
             )

@@ -207,11 +207,22 @@ margin over both networks: XGBoost − CNN -0.841 [-1.090, -0.353] and XGBoost �
 -1.471 [-1.893, -1.022]. **The deployment is unaffected** — it turned on scenario
 discrimination, and the Random Forest still fails that screen.
 
-**σ_arch fell from 35.40% to 26.56%** of long-term variance, with σ_DS at 67.79%.
+**σ_arch is 68.04%** of long-term variance, with σ_DS at 7.11%.
 Improving two of the four members narrowed the spread between architectures, which is
 exactly what that term measures — the mirror image of what the §6.13 correction did to it.
-Chapter 5's methodological point stands: architecture choice still dominates GCM choice
-(5.10%) by a factor of about five.
+Chapter 5's methodological point stands and is now much stronger: architecture choice
+dominates GCM choice (21.64%) by a factor of about 3.1.
+
+**Corrected after the examiner's critique (1 Oct 2026).** Two errors were fixed here.
+σ_DS carried the MONTHLY validation RMSE (9.24 W m-2) into a budget whose other terms are
+spreads of 25-year mean changes; random monthly error largely averages out of a 300-month
+mean, so the term is now the part that survives it (1.47 W m-2, from a systematic 1.41 and
+N_eff 223 of 300). And σ_arch spanned all four architectures including the Random Forest,
+which the §4.4 screen disqualifies — a member cannot be both inadmissible and a measure of
+the uncertainty in choosing between members. The shares are also now computed over the
+3,291 cells inside Zimbabwe rather than all 5,751 in the analysis box. Long-term σ_DS fell
+from 67.79% to 7.11% and σ_arch rose from 26.56% to 68.04%, which does not weaken the
+thesis: it removes an artefact that was suppressing its own central result.
 
 **Table 4.3 is unaffected, and this was verified against the completed rerun rather than
 argued.** It prints only the Random Forest and XGBoost columns, and neither model was
@@ -780,15 +791,15 @@ which is what made the mismatch confusing.
 
 | Model | Period | σ_GCM | σ_SSP | σ_arch | σ_DS | σ_total | % var DS | % var arch |
 |---|---|---|---|---|---|---|---|---|
-| **XGB (deployed)** | Near-term | 1.92 | 0.43 | 2.34 | 9.24 | 9.74 | 90.10% | 5.79% |
-| **XGB (deployed)** | Mid-term | 2.20 | 0.48 | 3.90 | 9.24 | 10.28 | 80.81% | 14.41% |
-| **XGB (deployed)** | Long-term | 2.54 | 0.83 | 5.79 | 9.24 | 11.23 | 67.79% | **26.56%** |
-| U-Net | Near-term | 2.03 | 0.56 | 3.30 | 11.03 | 11.70 | 88.95% | 7.97% |
-| U-Net | Mid-term | 3.20 | 1.02 | 5.09 | 11.03 | 12.57 | 77.05% | 16.44% |
-| U-Net | Long-term | 4.00 | 2.99 | 7.12 | 11.03 | 13.86 | 63.34% | **26.40%** |
-| RF | Near-term | 1.24 | 0.26 | 2.34 | 10.30 | 10.64 | 93.73% | 4.85% |
-| RF | Mid-term | 1.42 | 0.18 | 3.90 | 10.30 | 11.11 | 86.00% | 12.35% |
-| RF | Long-term | 1.58 | 0.29 | 5.88 | 10.30 | 11.97 | 74.08% | **24.12%** |
+| **XGB (deployed)** | Near-term | 1.74 | 0.49 | 2.14 | 1.47 | 3.16 | 21.59% | 45.80% |
+| **XGB (deployed)** | Mid-term | 2.09 | 0.55 | 3.11 | 1.47 | 4.06 | 13.09% | 58.64% |
+| **XGB (deployed)** | Long-term | 2.56 | 0.99 | 4.54 | 1.47 | 5.50 | 7.11% | **68.04%** |
+| U-Net | Near-term | 1.64 | 0.55 | 2.14 | 3.68 | 4.59 | 64.12% | 21.68% |
+| U-Net | Mid-term | 2.33 | 0.92 | 3.11 | 3.68 | 5.42 | 45.92% | 32.79% |
+| U-Net | Long-term | 3.01 | 1.73 | 4.54 | 3.68 | 6.79 | 29.26% | **44.65%** |
+| RF | Near-term | 1.10 | 0.28 | 2.14 | 0.80 | 2.55 | 9.73% | 70.28% |
+| RF | Mid-term | 1.31 | 0.20 | 3.11 | 0.80 | 3.47 | 5.26% | 80.21% |
+| RF | Long-term | 1.55 | 0.28 | 4.54 | 0.80 | 4.87 | 2.67% | **86.85%** |
 
 The Random Forest rows are retained because §3.8.4 deployed it until the bootstrap (§7.10) and the
 scenario test (§7.11) reversed that choice; keeping them makes the reversal auditable.

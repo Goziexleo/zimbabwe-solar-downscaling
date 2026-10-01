@@ -47,7 +47,13 @@ for var in variables:
                     'month': [f'{m:02d}' for m in range(1, 13)],     
                     'day': [f'{d:02d}' for d in range(1, 32)],       
                     'time': [f'{h:02d}:00' for h in range(0, 24)],   
-                    'area': [-15, 25, -22, 33],  # Zimbabwe bounding box
+                    'area': [-15, 25, -22.5, 33.5],
+  # Zimbabwe bounding box, extended south and east of the national
+                    # boundary. The original [-15, 25, -22, 33] stopped AT 22 S,
+                    # which truncates the country: Beitbridge is at 22.217 S and
+                    # about 51 cells of Zimbabwe fell outside the grid. Changing
+                    # this requires re-running the whole pipeline, not just the
+                    # download - see RUNBOOK_DOMAIN_FIX.md.
                 },
                 output_filename
             )

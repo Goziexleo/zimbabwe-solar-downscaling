@@ -28,8 +28,14 @@ per = pd.read_csv(os.path.join(EVAL, "suitability_by_period.csv")).set_index("pe
 scr = pd.read_csv(os.path.join(EVAL, "scenario_discrimination.csv")).set_index("model")
 uo = pd.read_csv(os.path.join(EVAL, "unet_optimisation.csv")).set_index("variant")
 spv5 = pd.read_csv(os.path.join(EVAL, "sarah_product_validation.csv")).set_index("model")
+bas5 = pd.read_csv(os.path.join(EVAL, "baselines.csv")).set_index("baseline")
+bvm5 = pd.read_csv(os.path.join(EVAL, "baseline_vs_models.csv")).set_index("model")
+pbl5 = pd.read_csv(os.path.join(EVAL, "projection_baselines.csv"))
 leaky5 = pd.read_csv(os.path.join(ROOT, "data/processed/models/_pre_honest_selection", "table_3_3.csv")).set_index("model")
-_order = list(t33["RMSE"].sort_values().index)
+# Over Zimbabwe, like every headline metric in Chapter 4. The full-box columns
+# are used only where a current figure is set against an archived snapshot that
+# exists on the full box alone.
+_order = list(t33["RMSE_zw"].sort_values().index)
 _ORD = {1: "lowest", 2: "second-lowest", 3: "third-lowest", 4: "highest"}
 def rank(m):
     """Ordinal position on aggregate RMSE, so the prose cannot outlive the table."""
@@ -104,12 +110,15 @@ P("This chapter answers the four research questions set out in Section 1.7, stat
 H("5.2 Answers to the Research Questions")
 
 H("5.2.1 RQ1: downscaling accuracy and the comparison between architectures", 3)
-P("Four architectures were trained on identical inputs and evaluated on a withheld "
-  "fourteen-year record. All four exceed the accuracy thresholds set in Section 3.7.1. "
+P("Four architectures were trained on the same predictor set and evaluated on the same "
+  "withheld fourteen-year record, though not under identical conditions: Sections 3.6.5 "
+  "to 3.6.8 record differences in static-input resolution, coordinate channels, sampling "
+  "and target formulation between the two networks, so this is a comparison of particular "
+  "configurations rather than of architectures in the abstract. All four exceed the accuracy thresholds set in Section 3.7.1. "
   "The deployed pixel-wise XGBoost ensemble (Chen and Guestrin, 2016) reaches %.2f W m-2 against an ERA5-derived "
   "target, a skill score of %.4f relative to a training-period climatology, and a "
   "correlation of %.4f. The spread between best and worst is %.2f W m-2."
-  % (t33.loc["XGBoost", "RMSE"], t33.loc["XGBoost", "SS vs climatology"], t33.loc["XGBoost", "Pearson R"], t33["RMSE"].max() - t33["RMSE"].min()))
+  % (t33.loc["XGBoost", "RMSE_zw"], t33.loc["XGBoost", "SS vs climatology_zw"], t33.loc["XGBoost", "Pearson R_zw"], t33["RMSE_zw"].max() - t33["RMSE_zw"].min()))
 P("The comparison between architectures is answered with more care than the question "
   "invites. Resampling establishes that XGBoost is better than the Random Forest on "
   "aggregate error, that the Random Forest is better on mean bias and on the spatial "
@@ -120,6 +129,24 @@ P("The comparison between architectures is answered with more care than the ques
   "those three has already changed once under a correction that did not touch the "
   "evidence separating them. Only XGBoost is established as better than all three others "
   "on that axis." % rank("Random Forest"))
+P("The more consequential comparison is not among the four. A per-cell ordinary least "
+  "squares regression, fitted on the same predictors over the same period against the "
+  "same target, reaches %.2f W m-2, below every architecture in Table 4.1. Its margin "
+  "over the deployed XGBoost is %+.3f W m-2 with an interval of %+.3f to %+.3f that "
+  "spans zero, so the two are indistinguishable; its margins over the CNN, the U-Net and "
+  "the Random Forest are established. The premise on which Chapter 1 justified machine "
+  "learning, that the predictor-predictand relationship is too nonlinear for linear "
+  "methods, therefore does not hold on this target. Section 4.2.1 gives the reason, and "
+  "it is the same one RQ2 arrives at independently: a target that carries %.4f per cent "
+  "of its variance below the coarse scale is close to a linear function of its own "
+  "coarse predictors, leaving little nonlinear structure to recover. The honest answer "
+  "to RQ1 is that the architectures can be ranked against each other, that the ranking "
+  "is partly established, and that none of them earns its complexity against a linear "
+  "model on this target."
+  % (bas5.loc["Linear regression (OLS)", "RMSE_zw"],
+     bvm5.loc["XGBoost", "diff_vs_linear"], bvm5.loc["XGBoost", "ci_lo"],
+     bvm5.loc["XGBoost", "ci_hi"],
+     info.loc["GHI target (time-mean)", "pct_variance_below_0.25deg"]))
 P("Two qualifications belong with that answer, and both concern how the comparison was "
   "produced rather than what it found. The convolutional models originally selected "
   "their saved weights and their hyperparameters on the evaluation record. Both were "
@@ -133,7 +160,7 @@ P("Two qualifications belong with that answer, and both concern how the comparis
   "Neither fact overturns the deployment, for the reason given under RQ3, but together "
   "they mean this study compares particular configurations, selected in a particular "
   "way, rather than architectures in the abstract."
-  % (t33.loc["CNN", "RMSE"], leaky5.loc["CNN", "RMSE"], t33.loc["U-Net", "RMSE"], leaky5.loc["U-Net", "RMSE"], uo.loc["drop_0", "test_rmse"]))
+  % (t33.loc["CNN", "RMSE"], leaky5.loc["CNN", "RMSE"], t33.loc["U-Net", "RMSE"], leaky5.loc["U-Net", "RMSE"], uo.loc["drop_0", "test_rmse"]))  # full box both sides: the archived snapshot has no masked columns
 P("Against traditional baselines the answer is unambiguous only for the admissible one. "
   "All four models beat a per-cell, per-calendar-month climatology. Scores against "
   "interpolation of the coarse irradiance field are not skill, because that field is a "
@@ -175,13 +202,39 @@ P("All six projections give an increase in surface irradiance over Zimbabwe, fro
 P("The uncertainty attached to those projections carries a result the question did not "
   "anticipate. At the long-term horizon the choice of downscaling architecture accounts "
   "for %.1f per cent of projection variance, against %.1f per cent for the choice of "
-  "global climate model and under one per cent for the emission scenario. A "
-  "single-architecture study would have reported zero architecture uncertainty and been "
-  "wrong by that margin, whichever architecture it had chosen."
-  % (u.loc["long_term_2076_2100", "pct_var_arch"], u.loc["long_term_2076_2100", "pct_var_gcm"]))
+  "global climate model, %.1f per cent for the downscaling error and %.1f per cent for "
+  "the emission scenario. A single-architecture study would have reported zero "
+  "architecture uncertainty and been wrong by that margin, whichever architecture it had "
+  "chosen."
+  % (u.loc["long_term_2076_2100", "pct_var_arch"], u.loc["long_term_2076_2100", "pct_var_gcm"],
+     u.loc["long_term_2076_2100", "pct_var_ds"], u.loc["long_term_2076_2100", "pct_var_ssp"]))
+P("Two checks qualify the magnitudes. Measured against each chain's own historical run "
+  "rather than against ERA5, which removes the model's historical bias from the "
+  "comparison, the long-term SSP5-8.5 increase is %+.2f W m-2. The operational "
+  "alternative of bias-correcting each GCM's own irradiance and interpolating it, the "
+  "approach behind NEX-GDDP-CMIP6, gives %+.2f W m-2 for the same case, and across all "
+  "eighteen combinations the downscaled change exceeds the baseline's by a median factor "
+  "of %.2f. No future observation exists to decide between them, so the comparison "
+  "establishes the sensitivity of the answer to method rather than the accuracy of "
+  "either."
+  % (pbl5[(pbl5.scenario == "ssp585") & (pbl5.horizon == "long_term_2076_2100")].ml_change_own_history.mean(),
+     pbl5[(pbl5.scenario == "ssp585") & (pbl5.horizon == "long_term_2076_2100")].qdm_change_own_history.mean(),
+     pbl5.ratio_ml_to_qdm.median()))
+P("The second check is less comfortable. The downscaled change agrees in sign with its "
+  "driver's own bias-corrected irradiance change in %.0f per cent of the eighteen "
+  "combinations, and every disagreement belongs to MPI-ESM1-2-HR, whose own radiation "
+  "declines under SSP5-8.5 where the downscaled field rises. The cause is structural: "
+  "that model's cloud cover falls and its temperature rises, and a mapping learned from "
+  "the present-day record reads both as brightening, while the GCM's own radiation "
+  "scheme is never consulted because irradiance is excluded from the predictor set. It "
+  "is also the only one of the three models whose climate sensitivity lies inside the "
+  "IPCC AR6 likely range. The direction of change reported here should therefore be read "
+  "as conditional on the perfect-prognosis assumption holding, which for one of three "
+  "drivers it demonstrably does not."
+  % (100 * pbl5.same_sign.mean()))
 P("The deployment decision followed from a test that no accuracy metric could perform. "
   "The Random Forest, %s on aggregate error and better than the deployed model on "
-  "two of five tested axes, inverts the scenario signal it would be required to project: "
+  "two of five tested axes, loses the scenario signal it would be required to project: "
   "its separation between pathways shrinks with lead time rather than growing, and only "
   "%.1f per cent of cells order the two pathways correctly. The mechanism is tree "
   "extrapolation (Breiman, 2001), and the failure is categorical rather than a matter "
@@ -263,9 +316,9 @@ P("The limitations are stated in full in Section 4.9 and summarised here. The pr
   "at 0.1 degrees. The suitability index carries no propagated uncertainty. And the "
   "future suitability maps hold infrastructure and population constant, which makes them "
   "statements about the resource at today's viable sites rather than about tomorrow's."
-  % (spv5.loc["ERA5 target itself", "rmse_vs_sarah"],
-     max(spv5.loc[m, "rmse_vs_era5"] for m in ("XGBoost", "Random Forest", "CNN", "U-Net"))
-     - min(spv5.loc[m, "rmse_vs_era5"] for m in ("XGBoost", "Random Forest", "CNN", "U-Net"))))
+  % (spv5.loc["ERA5 target itself", "rmse_vs_sarah_zw"],
+     max(spv5.loc[m, "rmse_vs_era5_zw"] for m in ("XGBoost", "Random Forest", "CNN", "U-Net"))
+     - min(spv5.loc[m, "rmse_vs_era5_zw"] for m in ("XGBoost", "Random Forest", "CNN", "U-Net"))))
 
 H("5.5 Recommendations for Policy and Practice")
 P("**Grid extension opens more suitable land than resource refinement.** This follows "

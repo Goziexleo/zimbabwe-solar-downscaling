@@ -2,12 +2,26 @@
 correlation, normalised std ratio, centered RMSE of the time-mean
 climatological pattern) plus per-pixel time-mean bias and RMSE maps, for
 each of the 4 finalized models against the true reference field.
+
+Every statistic is computed twice: over the full 71 x 81 analysis box, and over
+the 3,291 cells inside Zimbabwe. The box extends well into Zambia, Botswana,
+Mozambique and South Africa, so a spatial correlation computed across it is
+partly a correlation over other countries, which is not what Section 3.7.2
+claims to report. The masked columns carry a _zw suffix and are the ones the
+prose should quote.
+
+The maps written to spatial_verification_maps.nc are left unmasked, because a
+map should show what the model did everywhere it was run; the national boundary
+belongs on the figure as a drawn border, not as missing data.
 """
 
 import os
 import numpy as np
 import xarray as xr
 import pandas as pd
+
+from zimbabwe_mask import describe as mask_describe
+from zimbabwe_mask import zimbabwe_mask
 
 INPUT_PATH = os.path.abspath("./data/processed/evaluation/validation_spatial_fields.nc")
 OUTPUT_PATH = os.path.abspath("./data/processed/evaluation/spatial_verification_maps.nc")
@@ -27,6 +41,20 @@ models = {
 ref_mean_map = ref.mean(axis=0)
 ref_std_spatial = ref_mean_map.std()
 
+MASK = zimbabwe_mask(ref.shape)
+ref_std_zw = ref_mean_map[MASK].std()
+
+
+def taylor(model_mean_map, ref_map, ref_std, sel=None):
+    """Spatial-pattern statistics, over every cell or over a selection."""
+    m = model_mean_map[sel] if sel is not None else model_mean_map.ravel()
+    r = ref_map[sel] if sel is not None else ref_map.ravel()
+    corr = float(np.corrcoef(m, r)[0, 1])
+    sd = float(m.std())
+    ratio = sd / ref_std if ref_std > 0 else np.nan
+    crmse = float(np.sqrt(sd ** 2 + ref_std ** 2 - 2 * sd * ref_std * corr))
+    return corr, ratio, crmse
+
 rows = []
 bias_maps = {}
 rmse_maps = {}
@@ -36,11 +64,10 @@ for name, arr in models.items():
 
     # --- Taylor diagram stats, computed on the spatial pattern of the
     #     time-mean climatology (Section 3.7.2) ---
-    flat_m, flat_r = model_mean_map.flatten(), ref_mean_map.flatten()
-    spatial_corr = np.corrcoef(flat_m, flat_r)[0, 1]
-    std_model = model_mean_map.std()
-    std_ratio = std_model / ref_std_spatial if ref_std_spatial > 0 else np.nan
-    crmse = np.sqrt(std_model**2 + ref_std_spatial**2 - 2 * std_model * ref_std_spatial * spatial_corr)
+    spatial_corr, std_ratio, crmse = taylor(
+        model_mean_map, ref_mean_map, ref_std_spatial)
+    corr_zw, ratio_zw, crmse_zw = taylor(
+        model_mean_map, ref_mean_map, ref_std_zw, sel=MASK)
 
     # --- Bias & RMSE maps: full temporal comparison at every pixel ---
     bias_map = model_mean_map - ref_mean_map
@@ -56,6 +83,11 @@ for name, arr in models.items():
         "centered_rmse": crmse,
         "domain_mean_bias": bias_map.mean(),
         "domain_mean_rmse": rmse_map.mean(),
+        "spatial_correlation_zw": corr_zw,
+        "std_ratio_zw": ratio_zw,
+        "centered_rmse_zw": crmse_zw,
+        "domain_mean_bias_zw": bias_map[MASK].mean(),
+        "domain_mean_rmse_zw": rmse_map[MASK].mean(),
     })
 
 df = pd.DataFrame(rows)
@@ -64,9 +96,17 @@ df.to_csv(TAYLOR_CSV_PATH, index=False)
 
 print("=" * 100)
 print(" TAYLOR DIAGRAM STATISTICS (Section 3.7.2) - time-mean climatological pattern vs. reference")
-print(" Reference spatial std (true GHI time-mean map): {:.4f} W m-2".format(ref_std_spatial))
+print(" Reference spatial std (true GHI time-mean map): {:.4f} W m-2 full box,"
+      " {:.4f} over Zimbabwe".format(ref_std_spatial, ref_std_zw))
+print(" mask: " + mask_describe())
 print("=" * 100)
-print(df.to_string(index=False, float_format=lambda x: f"{x:.4f}"))
+_full = ["model", "spatial_correlation", "std_ratio", "centered_rmse",
+         "domain_mean_bias", "domain_mean_rmse"]
+print(" full analysis box:")
+print(df[_full].to_string(index=False, float_format=lambda x: f"{x:.4f}"))
+print("\n over Zimbabwe (the figures the prose should quote):")
+print(df[["model"] + [c + "_zw" for c in _full[1:]]].to_string(
+    index=False, float_format=lambda x: f"{x:.4f}"))
 print("=" * 100)
 
 safe_names = {
