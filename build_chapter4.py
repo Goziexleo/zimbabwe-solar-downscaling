@@ -186,10 +186,10 @@ H("4.2 Downscaling Performance on the Withheld Record")
 P("All four architectures were evaluated on the withheld 2011 to 2024 period, 168 "
   "monthly fields at 0.1 degree resolution, against the ERA5-derived target (Hersbach et al., 2020). Table 4.1 "
   "reports the aggregate metrics. All four exceed the correlation threshold of 0.90 set "
-  "in Section 3.7.1 and all four hold mean bias below 5 W m-2.")
+  "in Section 3.7.1 and all four hold mean bias below 5 W/m².")
 _BASE_ROWS = ["Linear regression (OLS)", "Linear regression (ridge)",
               "Climatology (training record)", "Bilinear interpolation"]
-TBL(["Model", "RMSE (W m-2)", "MAE", "Pearson R", "MBE", "Skill vs climatology", "R2"],
+TBL(["Model", "RMSE (W/m²)", "MAE", "Pearson R", "MBE", "Skill vs climatology", "R2"],
     [[m, "%.2f" % R(m, "RMSE"), "%.2f" % R(m, "MAE"), "%.4f" % R(m, "Pearson R"), "%+.2f" % R(m, "MBE"), "%.4f" % R(m, "SS vs climatology"), "%.4f" % R(m, "R2")]
      for m in MODEL_ORDER]
     # Baselines belong in the same table as the models they are meant to beat.
@@ -201,16 +201,16 @@ TBL(["Model", "RMSE (W m-2)", "MAE", "Pearson R", "MBE", "Skill vs climatology",
        for b in _BASE_ROWS],
     "Table 4.1. Validation metrics on the withheld 2011–2024 record over "
     "Zimbabwe, ordered by aggregate error. Skill is measured against the training-period "
-    "climatology, whose RMSE on this period is %.2f W m-2. Cells outside the national "
+    "climatology, whose RMSE on this period is %.2f W/m². Cells outside the national "
     "boundary are excluded; the analysis box extends into four neighbouring countries and "
     "is 42.8 per cent larger than the country. The lower block gives the references the "
     "architectures are meant to improve on, computed on identical inputs. Bilinear "
     "interpolation is a circularity diagnostic rather than a skill reference, for the "
     "reason given in Section 3.7.3."
     % t33["climatology_rmse_zw"].iloc[0])
-P("The pixel-wise XGBoost ensemble attains the lowest aggregate error at %.2f W m-2, "
+P("The pixel-wise XGBoost ensemble attains the lowest aggregate error at %.2f W/m², "
   "a skill score of %.4f against climatology, and a Pearson correlation of %.4f. The "
-  "spread across architectures is %.2f W m-2 between best and worst, and Section 4.3 "
+  "spread across architectures is %.2f W/m² between best and worst, and Section 4.3 "
   "addresses which part of that spread is statistically established."
   % (R("XGBoost", "RMSE"), R("XGBoost", "SS vs climatology"), R("XGBoost", "Pearson R"), t33["RMSE"].max() - t33["RMSE"].min()))
 
@@ -223,9 +223,9 @@ P("Chapter 1 justified machine learning on the ground that classical statistical
   "exactly the predictors the tree and network models receive, over the same training "
   "period, against the same clear-sky-index target, and converted to irradiance through "
   "the same clear-sky climatology.")
-P("The linear model attains %.2f W m-2, which is lower than every architecture in "
+P("The linear model attains %.2f W/m², which is lower than every architecture in "
   "Table 4.1, including the deployed XGBoost at %.2f. Resampling whole calendar years, "
-  "as in Section 4.3, the margin over XGBoost is %+.3f W m-2 with a 95 per cent interval "
+  "as in Section 4.3, the margin over XGBoost is %+.3f W/m² with a 95 per cent interval "
   "of %+.3f to %+.3f, which spans zero: the two are indistinguishable. The margins over "
   "the other three are established. Against the CNN it is %+.3f (%+.3f to %+.3f), "
   "against the U-Net %+.3f (%+.3f to %+.3f), and against the Random Forest %+.3f "
@@ -265,15 +265,15 @@ P("The figures in Table 4.1 are comparable across all four models, which require
 P("Two separate corrections were applied to the neural models, and they pull in opposite "
   "directions, so both are quantified rather than netted off. The first removed the "
   "checkpoint selection: weights had been saved on the evaluation record, and choosing "
-  "them honestly instead cost the CNN %.2f W m-2 and the U-Net %.2f, taking them from "
+  "them honestly instead cost the CNN %.2f W/m² and the U-Net %.2f, taking them from "
   "%.2f and %.2f to %.2f and %.2f. The second removed the same defect from the "
   "hyperparameters, which had been chosen by a grid scored on that record; re-running the "
-  "grid inside the training period (Section 3.6.7) recovered %.2f W m-2 for the CNN and "
+  "grid inside the training period (Section 3.6.7) recovered %.2f W/m² for the CNN and "
   "%.2f for the U-Net, giving the %.2f and %.2f reported here. The two pixel-wise models "
   "are unchanged to four decimal places throughout, as they must be, having not been "
   "refitted."
   % (honest_ckpt.loc["CNN", "RMSE"] - leaky.loc["CNN", "RMSE"], honest_ckpt.loc["U-Net", "RMSE"] - leaky.loc["U-Net", "RMSE"], leaky.loc["CNN", "RMSE"], leaky.loc["U-Net", "RMSE"], honest_ckpt.loc["CNN", "RMSE"], honest_ckpt.loc["U-Net", "RMSE"], honest_ckpt.loc["CNN", "RMSE"] - RB("CNN", "RMSE"), honest_ckpt.loc["U-Net", "RMSE"] - RB("U-Net", "RMSE"), RB("CNN", "RMSE"), RB("U-Net", "RMSE")))
-P("The net effect is the informative part. The CNN ends at %.2f W m-2 against the %.2f it "
+P("The net effect is the informative part. The CNN ends at %.2f W/m² against the %.2f it "
   "reported when both its checkpoint and its hyperparameters were chosen on the evaluation "
   "record: an honest procedure reproduces the leaked result almost exactly, and the "
   "apparent accuracy was not being bought by the leakage so much as by a configuration the "
@@ -305,7 +305,7 @@ P("Because every figure above rests on a single 1985–2010 / 2011–2024 split,
   "rolling-origin evaluation was run across four expanding training windows, each "
   "evaluated on the block immediately following it so that every fold remains a strictly "
   "forward-in-time test. XGBoost returns the lower error in all four folds, by margins "
-  "of %s W m-2. The ranking between the two pixel-wise models is therefore not an "
+  "of %s W/m². The ranking between the two pixel-wise models is therefore not an "
   "artefact of where the single split was placed."
   % " and ".join("%.2f" % (_rf.loc[f, "RMSE"] - _xg.loc[f, "RMSE"]) for f in folds))
 TBL(["Fold", "Random Forest RMSE", "XGBoost RMSE", "Difference"], [[f, "%.2f" % _rf.loc[f, "RMSE"], "%.2f" % _xg.loc[f, "RMSE"], "%+.2f" % (_rf.loc[f, "RMSE"] - _xg.loc[f, "RMSE"])] for f in folds], "Table 4.3. Rolling-origin evaluation across four expanding windows. Each fold's "
@@ -336,9 +336,9 @@ v_r, lo_r, hi_r, _ = pair("Random Forest", "XGBoost", "RMSE")
 v_m, lo_m, hi_m, _ = pair("Random Forest", "XGBoost", "|MBE|")
 v_c, lo_c, hi_c, _ = pair("Random Forest", "XGBoost", "centred RMSE")
 P("The result is mixed and is reported as such. XGBoost is established as better on "
-  "aggregate error, by %+.3f W m-2 with an interval of %+.3f to %+.3f that excludes "
+  "aggregate error, by %+.3f W/m² with an interval of %+.3f to %+.3f that excludes "
   "zero. But the Random Forest is established as better on two other axes: mean bias "
-  "magnitude by %.3f W m-2 and centred RMSE by %.3f, both with intervals excluding zero. "
+  "magnitude by %.3f W/m² and centred RMSE by %.3f, both with intervals excluding zero. "
   "Spatial correlation and the standard-deviation ratio cannot be distinguished."
   % (v_r, lo_r, hi_r, abs(v_m), abs(v_c)))
 P("This matters because Section 3.8.4 originally deployed the Random Forest on a "
@@ -351,12 +351,12 @@ P("This matters because Section 3.8.4 originally deployed the Random Forest on a
 xc = pair("XGBoost", "CNN", "RMSE"); xu = pair("XGBoost", "U-Net", "RMSE")
 P("The Random Forest's second place on aggregate error is not established against the "
   "neural models, and should not be reported as a ranking. Its difference from the U-Net "
-  "is %+.3f W m-2 with an interval of %+.3f to %+.3f, and from the CNN %+.3f with %+.3f "
+  "is %+.3f W/m² with an interval of %+.3f to %+.3f, and from the CNN %+.3f with %+.3f "
   "to %+.3f; both intervals contain zero. The order in Table 4.1 changed when the neural "
   "models were retrained, but the evidence separating those three did not."
   % (pair("Random Forest", "U-Net", "RMSE")[0], pair("Random Forest", "U-Net", "RMSE")[1], pair("Random Forest", "U-Net", "RMSE")[2], pair("Random Forest", "CNN", "RMSE")[0], pair("Random Forest", "CNN", "RMSE")[1], pair("Random Forest", "CNN", "RMSE")[2]))
 P("Against the convolutional models the aggregate comparison is unambiguous: XGBoost is "
-  "lower by %.3f W m-2 against the CNN and %.3f against the U-Net, both intervals "
+  "lower by %.3f W/m² against the CNN and %.3f against the U-Net, both intervals "
   "excluding zero." % (abs(xc[0]), abs(xu[0])))
 
 H("4.4 Model Selection and the Scenario-Discrimination Screen")
@@ -378,7 +378,7 @@ def _grows(r):
 
 
 TBL(["Model", "Near-term", "Mid-term", "Long-term", "Grows?", "Cells ordered correctly"], [[m, "%+.3f" % scr.loc[m, "sep_near_term"], "%+.3f" % scr.loc[m, "sep_mid_term"], "%+.3f" % scr.loc[m, "sep_long_term"], _grows(scr.loc[m]), "%.1f%%" % scr.loc[m, "pct_ordered_long_term"]]
-     for m in ("Random Forest", "XGBoost", "CNN", "U-Net")], "Table 4.5. Scenario separation, SSP5-8.5 minus SSP2-4.5, in W m-2 by horizon.")
+     for m in ("Random Forest", "XGBoost", "CNN", "U-Net")], "Table 4.5. Scenario separation, SSP5-8.5 minus SSP2-4.5, in W/m² by horizon.")
 P("The Random Forest fails. Its separation shrinks as forcing grows, the opposite of the "
   "physical expectation, collapsing towards zero rather than reversing, and only "
   "%.1f per cent of cells order the two pathways correctly. The mechanism is tree "
@@ -442,7 +442,7 @@ P("The cause was investigated with a controlled sweep fitting on 1985 to 2004 an
   "selecting on 2005 to 2010, varying one setting at a time. The clearest result concerns "
   "accuracy rather than spectra: removing the spatial dropout that the deployed "
   "configuration applies at a rate of %.1f improves held-out error from %.2f to %.2f "
-  "W m-2, spatial correlation from %.3f to %.3f, and centred error from %.2f to %.2f. "
+  "W/m², spatial correlation from %.3f to %.3f, and centred error from %.2f to %.2f. "
   "Dropout at this rate costs the U-Net a substantial amount of accuracy."
   % (uo.loc["baseline", "cfg_dropout"], uo.loc["baseline", "test_rmse"], uo.loc["drop_0", "test_rmse"], uo.loc["baseline", "test_spatial_r"], uo.loc["drop_0", "test_spatial_r"], uo.loc["baseline", "test_centred_rmse"], uo.loc["drop_0", "test_centred_rmse"]))
 P("The sweep does not, however, identify the cause of the damping reported above, and an "
@@ -493,8 +493,8 @@ P("Every result reported so far is measured against ERA5, which is also the reco
   "degrees, finer than the analysis grid, covering 1985 to 2024. All 479 usable monthly "
   "fields were regridded to the 0.1 degree grid and compared against the ERA5-derived "
   "field over the same months.")
-P("The ERA5-derived field sits %.2f W m-2 below SARAH in the domain mean, a difference "
-  "of %.1f per cent, with a root-mean-square difference of 13.37 W m-2 and a "
+P("The ERA5-derived field sits %.2f W/m² below SARAH in the domain mean, a difference "
+  "of %.1f per cent, with a root-mean-square difference of 13.37 W/m² and a "
   "spatial-mean correlation of 0.9800. The offset is not constant through the year. The "
   "ratio of ERA5 to SARAH runs between %.3f and %.3f from January to July, rises through "
   "the late dry season, and crosses above unity in October and November, reaching %.3f. "
@@ -513,20 +513,20 @@ H("4.6.1 Why the product is not scored against SARAH", 3)
 P("The SARAH record is held for the whole study period, so the natural question is why "
   "the downscaled product is not simply validated against it and the ERA5 target set "
   "aside. The question was answered by computing it rather than by argument. Scored over "
-  "the same 168 withheld months and the same cells, the deployed model returns %.2f W m-2 "
+  "the same 168 withheld months and the same cells, the deployed model returns %.2f W/m² "
   "against SARAH where it returns %.2f against the ERA5-derived target, and the other "
   "three architectures land between %.2f and %.2f."
   % (spv.loc["XGBoost", "rmse_vs_sarah_zw"], spv.loc["XGBoost", "rmse_vs_era5_zw"], min(spv.loc[m, "rmse_vs_sarah_zw"] for m in ("Random Forest", "CNN", "U-Net")), max(spv.loc[m, "rmse_vs_sarah_zw"] for m in ("Random Forest", "CNN", "U-Net"))))
 P("Those numbers are not a validation, and the reason is visible in the same table. The "
-  "ERA5 target itself sits %.2f W m-2 from SARAH, and the bilinear baseline, which "
-  "reproduces that target to %.2f W m-2 and therefore contains no downscaling at all, "
+  "ERA5 target itself sits %.2f W/m² from SARAH, and the bilinear baseline, which "
+  "reproduces that target to %.2f W/m² and therefore contains no downscaling at all, "
   "scores %.2f against SARAH. The entire spread across the four architectures is %.2f W "
   "m-2. A score against SARAH is therefore dominated by the choice of reference, not by "
   "the quality of the model: it separates the models by %.2f while the reference "
   "disagreement it also contains is %.1f times larger, and it cannot distinguish a "
   "trained model from an interpolation that adds nothing."
   % (spv.loc["ERA5 target itself", "rmse_vs_sarah_zw"], spv.loc["Baseline (bilinear)", "rmse_vs_era5_zw"], spv.loc["Baseline (bilinear)", "rmse_vs_sarah_zw"], _sp_spread, _sp_spread, spv.loc["ERA5 target itself", "rmse_vs_sarah_zw"] / _sp_spread))
-P("The mean bias makes the same point more sharply. ERA5 runs %.2f W m-2 below SARAH over "
+P("The mean bias makes the same point more sharply. ERA5 runs %.2f W/m² below SARAH over "
   "these months, and every model inherits most of that offset, from %.2f to %.2f. "
   "XGBoost's %.2f against SARAH is in fact marginally lower than the %.2f of the target "
   "it was trained to reproduce, because its small positive bias against ERA5 partially "
@@ -548,11 +548,11 @@ P("What follows is not that an observational validation is unnecessary, but that
 H("4.7 Projected Irradiance to 2100 and Its Uncertainty")
 base = lay.ghi_present_era5.values
 proj = {v.replace("ghi_", ""): lay[v].values for v in lay.data_vars if v.startswith("ghi_ssp")}
-TBL(["Scenario and horizon", "Mean change (W m-2)", "Percent", "Range across domain"], [[k.replace("_", " "), "%+.2f" % (proj[k] - base).mean(), "%+.2f%%" % (100 * (proj[k] - base).mean() / base.mean()), "%+.2f to %+.2f" % ((proj[k] - base).min(), (proj[k] - base).max())]
+TBL(["Scenario and horizon", "Mean change (W/m²)", "Percent", "Range across domain"], [[k.replace("_", " "), "%+.2f" % (proj[k] - base).mean(), "%+.2f%%" % (100 * (proj[k] - base).mean() / base.mean()), "%+.2f to %+.2f" % ((proj[k] - base).min(), (proj[k] - base).max())]
      for k in sorted(proj)], "Table 4.7. Projected change in annual-mean GHI from the deployed XGBoost ensemble, "
     "relative to the ERA5-derived present, across three GCMs.")
 P("All six projections give an increase in surface irradiance over Zimbabwe, ranging "
-  "from %+.2f W m-2 in the near term under SSP2-4.5 to %+.2f W m-2 in the long term "
+  "from %+.2f W/m² in the near term under SSP2-4.5 to %+.2f W/m² in the long term "
   "under SSP5-8.5, or roughly %.1f to %.1f per cent. The increase is larger under the "
   "higher forcing pathway at every horizon, and grows with lead time under both, which "
   "is the behaviour the screen in Section 4.4 required. The mechanism is visible in the "
@@ -581,7 +581,7 @@ P("The uncertainty budget carries the more consequential result. At every horizo
      max(u["pct_var_ssp"]) + 0.5))
 P("Two choices in constructing that budget deserve stating, because an earlier version of "
   "this section got the first of them wrong. The downscaling term is the part of the "
-  "validation error that survives a twenty-five-year mean, %.2f W m-2, not the monthly "
+  "validation error that survives a twenty-five-year mean, %.2f W/m², not the monthly "
   "validation RMSE of %.2f. The two differ by a factor of six because random "
   "month-to-month error largely averages out of a three-hundred-month mean while "
   "systematic error does not, and quoting the monthly figure inflated this term to "
@@ -611,7 +611,7 @@ P("Two checks the projections were not previously subjected to are reported here
   "whether the downscaled change keeps the sign and size of the change in the driver it "
   "came from. Both are measured against each chain's own historical run rather than "
   "against ERA5, which removes the model's historical bias from the comparison.")
-TBL(["Scenario and horizon", "Downscaled (W m-2)", "QDM baseline (W m-2)", "Ratio"],
+TBL(["Scenario and horizon", "Downscaled (W/m²)", "QDM baseline (W/m²)", "Ratio"],
     [["%s %s" % (r.scenario, r.horizon.split("_")[0]),
       "%+.2f" % r.ml, "%+.2f" % r.qdm, "%.2f" % (r.ml / r.qdm) if r.qdm != 0 else "—"]
      # Chronological, not alphabetical: a groupby sorts "long, mid, near".
@@ -626,8 +626,8 @@ TBL(["Scenario and horizon", "Downscaled (W m-2)", "QDM baseline (W m-2)", "Rati
 P("The downscaled changes are consistently larger than the baseline's, by a median "
   "factor of %.2f across the eighteen GCM, scenario and horizon combinations. Measured "
   "against its own history rather than against ERA5, the long-term SSP5-8.5 increase is "
-  "%+.2f W m-2 rather than the %+.2f W m-2 of Table 4.7, so the figure reported there is "
-  "the more conservative of the two. The baseline gives %+.2f W m-2 for the same case. "
+  "%+.2f W/m² rather than the %+.2f W/m² of Table 4.7, so the figure reported there is "
+  "the more conservative of the two. The baseline gives %+.2f W/m² for the same case. "
   "Nothing here establishes which is closer to the truth, because there is no future "
   "observation to score them against; what it establishes is that the choice of method "
   "moves the answer by about a factor of two, which is the same conclusion the variance "
@@ -639,7 +639,7 @@ P("The downscaled changes are consistently larger than the baseline's, by a medi
 P("The sign check is less comfortable and is reported because it is inconvenient. The "
   "downscaled change agrees in sign with its driver's own bias-corrected rsds change in "
   "%.0f per cent of the eighteen combinations. All %s disagreements belong to "
-  "MPI-ESM1-2-HR, whose own radiation declines under SSP5-8.5 by %.2f W m-2 at the "
+  "MPI-ESM1-2-HR, whose own radiation declines under SSP5-8.5 by %.2f W/m² at the "
   "mid-term horizon while the downscaled field rises by %.2f. The mechanism is the one "
   "Section 2.5 anticipated for perfect-prognosis designs. That model's cloud fraction "
   "falls and its temperature rises, and the mapping learned from the present-day record "
@@ -722,19 +722,19 @@ P("Section 3.9.3 previously printed the distance decay as Score = e^(-d/d_ref) w
   "the function as written, on the grounds that a site 10 km from an existing "
   "transmission line is routinely connectable for utility-scale development and should "
   "not be scored as though it were remote. The figures reported here use that reading.")
-TBL(["Criterion", "Robust set mean", "All assessed cells", "Ratio"], [["Irradiance (W m-2)", "%.2f" % lay.ghi_present_sarah.values[rob].mean(), "%.2f" % lay.ghi_present_sarah.values[keep].mean(), "%.2f" % (lay.ghi_present_sarah.values[rob].mean() / lay.ghi_present_sarah.values[keep].mean())], ["Slope (degrees)", "%.2f" % lay.slope.values[rob].mean(), "%.2f" % lay.slope.values[keep].mean(), "%.2f" % (lay.slope.values[rob].mean() / lay.slope.values[keep].mean())], ["Land cover score", "%.2f" % lay.landcover_score.values[rob].mean(), "%.2f" % lay.landcover_score.values[keep].mean(), "%.2f" % (lay.landcover_score.values[rob].mean() / lay.landcover_score.values[keep].mean())], ["Distance to roads (km)", "%.2f" % lay.dist_roads.values[rob].mean(), "%.2f" % lay.dist_roads.values[keep].mean(), "%.2f" % (lay.dist_roads.values[rob].mean() / lay.dist_roads.values[keep].mean())], ["Distance to grid (km)", "%.2f" % lay.dist_grid.values[rob].mean(), "%.2f" % lay.dist_grid.values[keep].mean(), "%.2f" % (lay.dist_grid.values[rob].mean() / lay.dist_grid.values[keep].mean())], ["Distance to settlements (km)", "%.2f" % lay.dist_settlements.values[rob].mean(), "%.2f" % lay.dist_settlements.values[keep].mean(), "%.2f" % (lay.dist_settlements.values[rob].mean() / lay.dist_settlements.values[keep].mean())]], "Table 4.10. Mean criterion values on the robust set against all assessed cells. The "
+TBL(["Criterion", "Robust set mean", "All assessed cells", "Ratio"], [["Irradiance (W/m²)", "%.2f" % lay.ghi_present_sarah.values[rob].mean(), "%.2f" % lay.ghi_present_sarah.values[keep].mean(), "%.2f" % (lay.ghi_present_sarah.values[rob].mean() / lay.ghi_present_sarah.values[keep].mean())], ["Slope (degrees)", "%.2f" % lay.slope.values[rob].mean(), "%.2f" % lay.slope.values[keep].mean(), "%.2f" % (lay.slope.values[rob].mean() / lay.slope.values[keep].mean())], ["Land cover score", "%.2f" % lay.landcover_score.values[rob].mean(), "%.2f" % lay.landcover_score.values[keep].mean(), "%.2f" % (lay.landcover_score.values[rob].mean() / lay.landcover_score.values[keep].mean())], ["Distance to roads (km)", "%.2f" % lay.dist_roads.values[rob].mean(), "%.2f" % lay.dist_roads.values[keep].mean(), "%.2f" % (lay.dist_roads.values[rob].mean() / lay.dist_roads.values[keep].mean())], ["Distance to grid (km)", "%.2f" % lay.dist_grid.values[rob].mean(), "%.2f" % lay.dist_grid.values[keep].mean(), "%.2f" % (lay.dist_grid.values[rob].mean() / lay.dist_grid.values[keep].mean())], ["Distance to settlements (km)", "%.2f" % lay.dist_settlements.values[rob].mean(), "%.2f" % lay.dist_settlements.values[keep].mean(), "%.2f" % (lay.dist_settlements.values[rob].mean() / lay.dist_settlements.values[keep].mean())]], "Table 4.10. Mean criterion values on the robust set against all assessed cells. The "
     "final column is the ratio; values far from 1.00 identify the criteria that "
     "distinguish the robust set.")
 P("Table 4.10 makes the character of the robust set clear, and the result is not the "
   "obvious one. **These are not the sunniest places in Zimbabwe.** Their mean irradiance "
-  "is %.2f W m-2 against %.2f for the assessed domain as a whole, a difference of %.1f "
+  "is %.2f W/m² against %.2f for the assessed domain as a whole, a difference of %.1f "
   "per cent. What distinguishes them is infrastructure: they lie a mean of %.2f km from "
   "the transmission network against %.2f km for the domain, a factor of %.1f, and %.2f "
   "km from a road against %.2f km."
   % (lay.ghi_present_sarah.values[rob].mean(), lay.ghi_present_sarah.values[keep].mean(), 100 * (lay.ghi_present_sarah.values[rob].mean() / lay.ghi_present_sarah.values[keep].mean() - 1), lay.dist_grid.values[rob].mean(), lay.dist_grid.values[keep].mean(), lay.dist_grid.values[keep].mean() / lay.dist_grid.values[rob].mean(), lay.dist_roads.values[rob].mean(), lay.dist_roads.values[keep].mean()))
 P("This has a straightforward explanation and a substantive implication. Irradiance over "
   "Zimbabwe varies within a narrow band, the assessed cells span roughly 214 to 258 "
-  "W m-2, so after standardisation the irradiance criterion cannot separate sites "
+  "W/m², so after standardisation the irradiance criterion cannot separate sites "
   "strongly no matter how heavily it is weighted. Distance to the grid varies over two "
   "orders of magnitude and enters through a decay function, so it separates sites "
   "decisively under every weighting. Robustness to weighting is therefore achieved by "
@@ -790,7 +790,7 @@ H("4.8.2 Suitability under the projected climate", 3)
 # change figures quoted in the prose are taken against the latter.
 _LBL = {"present": "present (SARAH layer)",
         "present_era5_basis": "present (ERA5 basis, comparison row)"}
-TBL(["Period", "Mean GHI (W m-2)", "Mean SI", "Very high", "High"], [[_LBL.get(p, p.replace("_", " ")), "%.2f" % per.loc[p, "mean_ghi"], "%.4f" % per.loc[p, "mean_si"], int(per.loc[p, "very_high"]), int(per.loc[p, "high"])]
+TBL(["Period", "Mean GHI (W/m²)", "Mean SI", "Very high", "High"], [[_LBL.get(p, p.replace("_", " ")), "%.2f" % per.loc[p, "mean_ghi"], "%.4f" % per.loc[p, "mean_si"], int(per.loc[p, "very_high"]), int(per.loc[p, "high"])]
      for p in ["present", "present_era5_basis", "ssp245_near_term_2026_2050", "ssp245_mid_term_2051_2075", "ssp245_long_term_2076_2100", "ssp585_near_term_2026_2050", "ssp585_mid_term_2051_2075", "ssp585_long_term_2076_2100"]], "Table 4.11. Suitability by period under the primary weights. All periods are "
     "standardised on the present-day range so the tiers remain comparable. The "
     "projections are compared against the ERA5-basis present row, not the SARAH "
@@ -850,14 +850,14 @@ P("**The evaluation is not independent of the training data.** Training and vali
 P("**The learning task is constrained by its own construction.** The coarse irradiance "
   "field was excluded from the predictors because it is a copy of the field the target is "
   "derived from, which made the task a genuine inference from atmospheric state. That "
-  "exclusion cost accuracy: with the field retained the same model reaches 5.54 W m-2 "
+  "exclusion cost accuracy: with the field retained the same model reaches 5.54 W/m² "
   "against %.2f without it. The excluded skill was circular, and removing it was correct, "
   "but the reported performance is the lower figure." % R("XGBoost", "RMSE"))
 P("**The intermediate clear-sky index is not a physical clear-sky index.** Its "
   "denominator averages thirteen daytime hours while the irradiance it normalises is a "
   "24-hour monthly mean, so the ratio runs a factor of 1.724 below a true clear-sky "
   "index. The normalisation is an exact inverse and cancels from the reconstructed "
-  "product to within 1.14 × 10⁻¹³ W m-2, so no reported result depends on it, but the "
+  "product to within 1.14 × 10⁻¹³ W/m², so no reported result depends on it, but the "
   "absolute level of the intermediate should not be read as a fraction of clear-sky "
   "irradiance.")
 P("**Two exclusion criteria do not bind at this resolution.** The slope exclusion removes "
@@ -878,7 +878,7 @@ P("**The future suitability maps hold infrastructure and population constant.** 
 P("**Model selection on the evaluation record, identified and corrected.** The CNN and "
   "U-Net previously saved the checkpoint scoring best on the withheld period. Both have "
   "been retrained with the epoch count chosen on an inner split of the training data, "
-  "which raised their errors by 0.92 and 0.95 W m-2 respectively. The figures reported "
+  "which raised their errors by 0.92 and 0.95 W/m² respectively. The figures reported "
   "here are the corrected ones. The limitation is recorded because the earlier figures "
   "appear in superseded versions of this work and because the episode bears on how the "
   "architecture comparison should be read: it compares particular configurations, "

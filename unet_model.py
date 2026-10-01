@@ -7,12 +7,18 @@ never drift apart between training and inference.
 
 import numpy as np
 import torch
+import os
 import torch.nn as nn
 import torch.nn.functional as F
 
 PAD_MULTIPLE = 32  # 4 encoder pools + 1 bottleneck pool = 2^5
 SCHEMA_VERSION = 5
-DROPOUT_P = 0.3
+
+# Deployed value. Overridable so the dropout-free configuration found by
+# optimise_unet.py can be trained and put through the Section 4.4 scenario
+# screen, which the sweep alone cannot do: the sweep reports accuracy on the
+# inner split, and accuracy was never what selected the deployed model.
+DROPOUT_P = float(os.environ.get("UNET_DROPOUT", "0.3"))
 
 
 def next_multiple(n, m):

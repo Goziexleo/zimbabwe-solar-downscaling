@@ -135,6 +135,11 @@ def main():
         raise SystemExit("REFUSED: the range carries a section break")
 
     # The one citation field in the range, kept so it can be put back.
+    #
+    # NOTE: this carries the OLD paragraph across verbatim, field and prose
+    # together, so any wording the generator changed in that paragraph is lost.
+    # The paragraph is reported below; check it after every splice, or fix the
+    # text in the document afterwards.
     keeper = None
     for e in segment:
         if "ZOTERO_ITEM" in e.xml and e.tag.endswith("}p"):

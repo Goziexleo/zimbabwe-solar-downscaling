@@ -77,14 +77,14 @@ def numbers():
 
 def paragraphs(n):
     return [
-        "Zimbabwe's renewable energy targets require siting decisions at a finer spatial "
-        "scale than general circulation models supply, which resolve surface solar "
-        "radiation at grid spacings of roughly 100 to 250 km. This study trains four "
-        "machine learning architectures to map atmospheric predictors onto an "
-        "ERA5-derived clear-sky-index target at 0.1 degrees over Zimbabwe under a "
-        "perfect-prognosis design, applies them to bias-corrected CMIP6 predictors to "
-        "2100, and carries the resulting fields into a multi-criteria suitability "
-        "assessment for utility-scale photovoltaic development.",
+        "Zimbabwe's renewable energy targets require siting decisions at a finer scale "
+        "than general circulation models supply, which resolve surface solar radiation "
+        "at roughly 100 to 250 km. This study trains four machine learning "
+        "architectures to map atmospheric predictors onto an ERA5-derived "
+        "clear-sky-index target at 0.1 degrees over Zimbabwe under a perfect-prognosis "
+        "design, applies them to bias-corrected CMIP6 predictors to 2100, and carries "
+        "the fields into a multi-criteria suitability assessment for utility-scale "
+        "photovoltaics.",
 
         "On a withheld 2011 to 2024 record masked to the national boundary, a pixel-wise "
         "gradient-boosted ensemble attains the lowest error of the four at %.2f W/m² and a "
@@ -96,11 +96,11 @@ def paragraphs(n):
         "learning models earns its complexity on this target."
         % (n["xgb"], n["ss"], n["cnn"], n["unet"], n["rf"], n["ols"]),
 
-        "A round-trip spectral test accounts for that result. The training target retains "
-        "%.3f per cent of its time-mean variance below the 0.25 degree resolution of its "
-        "own source, so the product is a physically consistent regridding carrying a "
-        "projected climate signal rather than a resolution gain, and a field that smooth "
-        "is close to a linear function of its coarse predictors." % n["pv"],
+        "A round-trip spectral test accounts for this. The target retains %.3f per cent "
+        "of its time-mean variance below the 0.25 degree resolution of its own source, "
+        "so the product is a physically consistent regridding carrying a projected "
+        "climate signal rather than a resolution gain, and a field that smooth is close "
+        "to a linear function of its coarse predictors." % n["pv"],
 
         "Projected annual-mean irradiance rises by %.1f W/m² under SSP5-8.5 by 2076 to 2100 "
         "against each model's own historical run, where bias-correcting and interpolating "
@@ -113,14 +113,15 @@ def paragraphs(n):
 
         "The suitability analysis combines irradiance with six biophysical and "
         "infrastructural criteria. Its defensible output is not the five-tier map but the "
-        "%d of %d assessed cells that stay highly suitable under every weighting tested, "
+        "%s of %s assessed cells that stay highly suitable under every weighting tested, "
         "%.1f per cent of cells changing tier under at least one. Those cells are "
         "distinguished by transmission access rather than by irradiance, whose standard "
         "deviation is %.0f W/m² within a %.0f to %.0f W/m² range. Validation is "
         "out-of-sample in time but uses ERA5 as both training target and reference; "
         "refitting against a satellite retrieval is identified as the first priority for "
         "further work."
-        % (n["robust"], n["assessed"], n["tier"], n["gsd"], n["glo"], n["ghi"]),
+        % ("{:,}".format(n["robust"]), "{:,}".format(n["assessed"]),
+           n["tier"], n["gsd"], n["glo"], n["ghi"]),
 
         "Keywords: perfect prognosis; statistical downscaling; CMIP6; clear-sky index; "
         "solar irradiance; machine learning; uncertainty decomposition; multi-criteria "

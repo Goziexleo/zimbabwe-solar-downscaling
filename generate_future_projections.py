@@ -15,7 +15,8 @@ train_path = os.path.abspath("./data/processed/ml_ready/ml_training_dataset.nc")
 topo_path = os.path.abspath("./data/processed/topography/zimbabwe_topographic_features_0.1deg.nc")
 finegrid_clearsky_path = os.path.abspath("./data/processed/era5/csi_finegrid/clearsky_ghi_finegrid_climatology.nc")
 cmip6_dir = os.path.abspath("./data/processed/cmip6_bias_corrected")
-output_dir = os.path.abspath("./data/processed/projections")
+output_dir = os.environ.get("UNET_PROJECTIONS_OUTPUT_DIR",
+                            os.path.abspath("./data/processed/projections"))
 os.makedirs(output_dir, exist_ok=True)
 
 gcms = ["CNRM-CM6-1", "MPI-ESM1-2-HR", "ACCESS-CM2"]
