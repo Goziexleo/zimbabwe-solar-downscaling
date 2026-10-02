@@ -1,5 +1,6 @@
 """Download the four ERA5 predictors needed for the 2011--2024 validation split."""
 
+import os
 from pathlib import Path
 import time
 
@@ -8,7 +9,11 @@ import cdsapi
 
 START_YEAR = 2011
 END_YEAR = 2024
-OUTPUT_DIR = Path("./data/raw/era5/predictors/validation")
+# Staged separately when re-downloading over a changed bounding box: the loop
+# below skips files that already exist, so a wider request would be silently
+# ignored if it wrote to the same directory.
+OUTPUT_DIR = Path(os.environ.get("ERA5_VAL_RAW_DIR",
+                                 "./data/raw/era5/predictors/validation"))
 VARIABLES = (
     "total_cloud_cover",
     "2m_temperature",

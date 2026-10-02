@@ -17,7 +17,10 @@ variables = [
     '2m_dewpoint_temperature'
 ]
 
-output_dir = './data/raw/era5/predictors'
+output_dir = os.environ.get('ERA5_RAW_DIR', './data/raw/era5/predictors')
+# Staged separately when re-downloading over a changed bounding box: the
+# loop below skips files that already exist, so a wider request would be
+# silently ignored if it wrote to the same directory.
 os.makedirs(output_dir, exist_ok=True)
 
 for var in variables:
