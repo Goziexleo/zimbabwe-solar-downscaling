@@ -109,20 +109,25 @@ assert abs(_probe - turbidity[0, 0, 0]) < 1e-9, (
 print(f"  Turbidity January {turbidity[:, :, 0].min():.2f}-{turbidity[:, :, 0].max():.2f}, "
       f"July {turbidity[:, :, 6].min():.2f}-{turbidity[:, :, 6].max():.2f}")
 
-# NOTE ON THE TIME BASE. These thirteen samples span 06:00 to 18:00 and the mean
-# below divides by thirteen, so clearsky_ghi is a DAYTIME mean: about 502.7 W/m2
-# over the domain. The target it becomes the denominator of is a 24-HOUR mean,
-# ERA5 daily accumulations over 86,400 s, about 237.3 W/m2. The two conventions
-# differ by a factor of almost exactly two, which is why the resulting clear-sky
-# index averages 0.476 where a consistent ratio gives 0.944, and why its maximum
-# of 0.6323 cannot reach the 1.1 quality-control bound - that check cannot bind
-# as written, so its passing is not evidence about ERA5.
+# TIME BASE. The denominator must be on the same basis as the numerator it
+# divides. The target is a 24-HOUR mean - ERA5 daily accumulations over 86,400 s -
+# so the clear-sky ceiling is integrated over the whole day, not over daylight.
 #
-# Accuracy is not affected: this is a per-cell, per-month constant, csi_to_ghi
-# inverts it exactly, and every reported metric is computed in irradiance units.
-# Putting it on a 24-hour basis WOULD change which values the clip truncates, so
-# it requires refitting the models. See RUNBOOK_DOMAIN_FIX.md.
-daytime_hours = np.linspace(6.0, 18.0, 13)
+# The previous version sampled thirteen points from 06:00 to 18:00 and divided by
+# thirteen, which gave a DAYTIME mean of about 502.7 W/m2 against a target mean of
+# 237.3. Two consequences followed. The ratio called a clear-sky index averaged
+# 0.476 where a consistent one gives about 0.94, and the 1.1 quality-control clip
+# in Section 3.4.3 could never bind, so its passing was not evidence about ERA5.
+#
+# The timestamps are also naive, which pvlib reads as UTC. Zimbabwe is UTC+2, so
+# that window was 08:00 to 20:00 local - shifted two hours off the solar day.
+# Integrating the full 24 hours removes that error as well, because a whole-day
+# mean does not depend on where the window is placed.
+#
+# Half-hourly rather than hourly: the diurnal curve is smooth but peaked, and 48
+# samples put the trapezoidal error well below a watt.
+SAMPLES_PER_DAY = int(os.environ.get("CLEARSKY_SAMPLES_PER_DAY", "48"))
+daytime_hours = np.arange(SAMPLES_PER_DAY) * (24.0 / SAMPLES_PER_DAY)
 monthly_clearsky = np.zeros((12, n_lat, n_lon))
 
 for month in range(1, 13):
@@ -161,7 +166,7 @@ ds_out = xr.Dataset(
 )
 ds_out["clearsky_ghi"].attrs["units"] = "W m-2"
 ds_out["clearsky_ghi"].attrs["description"] = (
-    "Daytime-averaged (06-18h local) monthly-climatological clear-sky GHI "
+    "24-hour-mean monthly-climatological clear-sky GHI "
     "(PVLIB Ineichen model) at the 0.1 deg fine target grid, Section 3.5.4. "
     "Station altitude is the per-cell SRTM elevation and Linke turbidity is "
     "the per-cell, per-month PVLIB climatology."
