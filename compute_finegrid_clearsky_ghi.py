@@ -109,6 +109,19 @@ assert abs(_probe - turbidity[0, 0, 0]) < 1e-9, (
 print(f"  Turbidity January {turbidity[:, :, 0].min():.2f}-{turbidity[:, :, 0].max():.2f}, "
       f"July {turbidity[:, :, 6].min():.2f}-{turbidity[:, :, 6].max():.2f}")
 
+# NOTE ON THE TIME BASE. These thirteen samples span 06:00 to 18:00 and the mean
+# below divides by thirteen, so clearsky_ghi is a DAYTIME mean: about 502.7 W/m2
+# over the domain. The target it becomes the denominator of is a 24-HOUR mean,
+# ERA5 daily accumulations over 86,400 s, about 237.3 W/m2. The two conventions
+# differ by a factor of almost exactly two, which is why the resulting clear-sky
+# index averages 0.476 where a consistent ratio gives 0.944, and why its maximum
+# of 0.6323 cannot reach the 1.1 quality-control bound - that check cannot bind
+# as written, so its passing is not evidence about ERA5.
+#
+# Accuracy is not affected: this is a per-cell, per-month constant, csi_to_ghi
+# inverts it exactly, and every reported metric is computed in irradiance units.
+# Putting it on a 24-hour basis WOULD change which values the clip truncates, so
+# it requires refitting the models. See RUNBOOK_DOMAIN_FIX.md.
 daytime_hours = np.linspace(6.0, 18.0, 13)
 monthly_clearsky = np.zeros((12, n_lat, n_lon))
 

@@ -1,4 +1,9 @@
-# Extending the domain to cover all of Zimbabwe
+# Two fixes that need a full pipeline rerun
+
+Both items below invalidate the trained models, so they should be done together
+if they are done at all.
+
+# 1. Extending the domain to cover all of Zimbabwe
 
 ## The problem
 
@@ -66,3 +71,32 @@ it excludes roughly 51 cells of southern Zimbabwe including Beitbridge, and note
 that every "over Zimbabwe" figure is therefore over 98.5 per cent of the country.
 An examiner who checks the coordinates will find this; it reads very differently
 as a disclosed limitation than as an unnoticed error.
+
+
+# 2. Putting the clear-sky denominator on a 24-hour basis
+
+`compute_finegrid_clearsky_ghi.py` averages the PVLIB ceiling over thirteen
+samples from 06:00 to 18:00, giving a **daytime** mean of about 502.7 W/m². The
+target it divides is a **24-hour** mean of about 237.3 W/m². The clear-sky index
+therefore averages 0.476 where a consistent ratio gives 0.944.
+
+Accuracy is unaffected — it is a per-cell, per-month constant, `csi_to_ghi`
+inverts it exactly, and every metric is computed in irradiance units after
+conversion. What it does invalidate is the quality-control claim in Section 3.4.3:
+the index maxes at 0.6323, so the 1.1 clip cannot bind, and "exactly zero flagged
+values" says nothing about ERA5. On a consistent basis the maximum is 1.265 and
+the clip **would** bind.
+
+Section 3.4.3 now discloses this. To fix it rather than disclose it:
+
+1. Change the averaging in `compute_finegrid_clearsky_ghi.py` to a 24-hour basis —
+   either integrate over the full day with night set to zero, or scale the daytime
+   mean by the daylight fraction per cell and month. The second is cruder; the
+   first is right.
+2. Rebuild the CSI target and the ML-ready datasets. The 1.1 clip will now truncate
+   a small number of values, which is the point.
+3. Retrain all four architectures, re-project, re-aggregate, and re-run the
+   evaluation chain. Expect the headline metrics to move little, because the
+   transform was monotonic, but the clipped values will shift slightly.
+4. `./finalise_dissertation.sh`, then remove the disclosure paragraph from
+   Section 3.4.3.
