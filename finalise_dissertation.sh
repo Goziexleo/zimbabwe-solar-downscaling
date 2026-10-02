@@ -39,7 +39,10 @@ D = os.path.expanduser("~/Library/CloudStorage/OneDrive-Personal(2)/UNI ZIM/"
                        "PROJECT CHAPTERS/CR_Madukwe_Dissertation.docx")
 d = docx.Document(D); x = d.element.xml
 txt = " ".join(p.text for p in d.paragraphs)
-bad = {"'inverts'": len(re.findall(r"\binverts\b", txt)),
+# Narrowly the false claim about the scenario signal, not every use of the word:
+# "the conversion back to irradiance inverts it exactly" is correct.
+bad = {"false 'inverts' claim": len(re.findall(
+           r"inverts (?:the scenario|outright)", txt)),
        "W m-2": len(re.findall(r"W m-2", txt)),
        "km2": len(re.findall(r"km2", txt)),
        "bare 2386": len(re.findall(r"\b2386\b", txt)),
