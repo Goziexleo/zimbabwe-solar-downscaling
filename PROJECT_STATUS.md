@@ -207,7 +207,7 @@ margin over both networks: XGBoost − CNN -0.841 [-1.090, -0.353] and XGBoost �
 -1.471 [-1.893, -1.022]. **The deployment is unaffected** — it turned on scenario
 discrimination, and the Random Forest still fails that screen.
 
-**σ_arch is 68.04%** of long-term variance, with σ_DS at 7.11%.
+**σ_arch is 59.39%** of long-term variance, with σ_DS at 9.08%.
 Improving two of the four members narrowed the spread between architectures, which is
 exactly what that term measures — the mirror image of what the §6.13 correction did to it.
 Chapter 5's methodological point stands and is now much stronger: architecture choice
@@ -450,14 +450,14 @@ Individual intervals overlap heavily — but that is the wrong comparison. Becau
 
 | Comparison | ΔRMSE | 95% CI (percentile) | Verdict |
 |---|---|---|---|
-| Random Forest − XGBoost | +1.058 | [+0.530, +1.671] | **distinguishable** |
+| Random Forest − XGBoost | +1.187 | [+0.600, +1.908] | **distinguishable** |
 | CNN − XGBoost | +0.900 | [+0.561, +1.228] | **distinguishable** |
 | U-Net − XGBoost | +0.866 | [+0.412, +1.281] | **distinguishable** |
 | CNN − Random Forest | −0.158 | [−0.907, +0.508] | not distinguishable |
 | Random Forest − U-Net | +0.193 | [−0.519, +0.970] | not distinguishable |
 | CNN − U-Net | +0.035 | [−0.287, +0.388] | not distinguishable |
 
-**XGBoost's aggregate advantage is real**: its RMSE deficit against all three others excludes zero. The comparison §3.8.4 turned on — Random Forest against XGBoost, +1.058 W m⁻² — survives at [+0.530, +1.671].
+**XGBoost's aggregate advantage is real**: its RMSE deficit against all three others excludes zero. The comparison §3.8.4 turned on — Random Forest against XGBoost, +1.183 W m⁻² — survives at [+0.530, +1.671].
 
 **Two consequences worth stating.** First, the deployment argument could no longer be carried on aggregate grounds: RF would have to be preferred *despite* a statistically distinguishable deficit, so the spatial-fidelity case had to carry that weight explicitly — and the next subsection shows it cannot. Second, **RF, CNN and U-Net are not distinguishable from one another on RMSE** — BCa: RF−CNN +0.155 [−0.447, +1.007], RF−U-Net +0.191 [−0.439, +1.110], CNN−U-Net +0.035 [−0.258, +0.417], all spanning zero — the ordering among those three is noise at this sample size, and any narrative ranking them should say so.
 
@@ -734,10 +734,10 @@ A 150-cell subsampled CV search picked configurations for both tree models that 
 
 | Model | RMSE | MAE | Pearson R | MBE | SS vs climatology | R² |
 |---|---|---|---|---|---|---|
-| **XGBoost (deployed)** | **9.24** | **6.85** | **0.9707** | +1.20 | **0.5155** | **0.9410** |
-| CNN | 10.08 | 7.77 | 0.9670 | +2.77 | 0.4715 | 0.9297 |
-| Random Forest | 10.30 | 7.73 | 0.9636 | +0.25 | 0.4601 | 0.9267 |
-| U-Net | 10.71 | 8.01 | 0.9603 | +1.45 | 0.4384 | 0.9207 |
+| **XGBoost (deployed)** | **9.03** | **6.64** | **0.9721** | +1.42 | **0.5264** | **0.9436** |
+| CNN | 10.04 | 7.51 | 0.9667 | +2.11 | 0.4738 | 0.9304 |
+| Random Forest | 10.22 | 7.65 | 0.9639 | +0.22 | 0.4644 | 0.9278 |
+| U-Net | 12.73 | 9.47 | 0.9447 | +1.63 | 0.3329 | 0.8881 |
 
 Regenerate with `compute_table33.py` — a single canonical script scoring every model against
 identical references, so the table cannot drift between scripts and needs no retraining.
@@ -838,7 +838,7 @@ across possible futures.
 
 | Long-term minus near-term, domain-mean GHI | SSP2-4.5 | SSP5-8.5 |
 |---|---|---|
-| **XGBoost (deployed)** | +4.08 W m⁻² | +4.77 W m⁻² |
+| **XGBoost (deployed)** | **9.03** | **6.64** | **0.9721** | +1.42 | **0.5264** | **0.9436** |
 | Random Forest | +1.65 W m⁻² | +1.35 W m⁻² |
 | U-Net | +5.43 W m⁻² | +8.99 W m⁻² |
 | CNN | +8.31 W m⁻² | +16.56 W m⁻² |

@@ -36,9 +36,13 @@ import sys
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 EVAL = os.path.join(ROOT, "data/processed/evaluation")
+# The merged dissertation, not the standalone chapter. Once reference management
+# began, every edit went into the merged file and the chapter sources stopped
+# being updated; a guard pointed at CR_Madukwe_Chapter3_Final.docx was therefore
+# checking a document nobody writes to, and would pass while the thesis drifted.
 DEFAULT = os.path.expanduser(
     "~/Library/CloudStorage/OneDrive-Personal(2)/UNI ZIM/PROJECT CHAPTERS/"
-    "CR_Madukwe_Chapter3_Final.docx")
+    "CR_Madukwe_Dissertation.docx")
 CHAPTER = os.environ.get("CHAPTER3_PATH", DEFAULT)
 
 # Why the guard skipped, set by load(). A guard that skips silently is worse
