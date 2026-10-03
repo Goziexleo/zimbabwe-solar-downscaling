@@ -10,28 +10,34 @@ cd "$(dirname "$0")"
 PY=/opt/anaconda3/envs/climate_stack/bin/python
 export KMP_DUPLICATE_LIB_OK=TRUE
 
-echo "=== 1/7 regenerate the results chapters ==="
+echo "=== 1/8 regenerate the results chapters ==="
 $PY build_chapter4.py >/dev/null
 $PY build_chapter5.py >/dev/null
 
-echo "=== 2/7 splice them into the dissertation ==="
+echo "=== 2/8 splice them into the dissertation ==="
 $PY splice_results_chapters.py | grep -vE '^\s*$' | tail -4
 
-echo "=== 3/7 presentation: spacing, alignment, units, metadata ==="
+# The abstract is read from the CSVs too, and must be regenerated here. Leaving
+# it out is how it froze at a superseded run while every chapter moved on, and an
+# examiner found five different figures for one quantity.
+echo "=== 3/8 abstract, from the CSVs ==="
+$PY rewrite_abstract.py | tail -2
+
+echo "=== 4/8 presentation: spacing, alignment, units, metadata ==="
 $PY fix_presentation.py | tail -3
 
-echo "=== 4/7 factual corrections (idempotent) ==="
+echo "=== 5/8 factual corrections (idempotent) ==="
 $PY fix_facts.py | tail -1
 
 # Lists BEFORE table formatting: the abbreviations list is itself a table, so
 # formatting first leaves it in the generator's style.
-echo "=== 5/7 front-matter lists ==="
+echo "=== 6/8 front-matter lists ==="
 $PY add_front_matter_lists.py | tail -2
 
-echo "=== 6/7 table formatting ==="
+echo "=== 7/8 table formatting ==="
 $PY normalise_tables.py | tail -2
 
-echo "=== 7/7 verify ==="
+echo "=== 8/8 verify ==="
 $PY - <<'PYEOF'
 import os, re, docx
 from docx.oxml.ns import qn

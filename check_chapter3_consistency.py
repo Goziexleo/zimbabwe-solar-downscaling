@@ -96,15 +96,19 @@ def canonical_anchors():
     t33 = os.path.join(EVAL, "table_3_3.csv")
     if os.path.exists(t33):
         df = pd.read_csv(t33).set_index("model")
-        a.append(("deployed XGBoost RMSE", "%.2f" % df.loc["XGBoost", "RMSE"]))
-        a.append(("Random Forest RMSE", "%.2f" % df.loc["Random Forest", "RMSE"]))
+        # Over Zimbabwe, the basis Chapter 4 reports. The full-box column exists
+        # for comparison with archived runs, not for the prose: quoting one basis
+        # in Chapter 3 and the other in Chapter 4 gave an examiner five different
+        # figures for the same quantity.
+        a.append(("deployed XGBoost RMSE", "%.2f" % df.loc["XGBoost", "RMSE_zw"]))
+        a.append(("Random Forest RMSE", "%.2f" % df.loc["Random Forest", "RMSE_zw"]))
 
     tay = os.path.join(EVAL, "taylor_diagram_stats.csv")
     if os.path.exists(tay):
         df = pd.read_csv(tay).set_index("model")
         for m in ["Random Forest", "XGBoost", "CNN", "U-Net"]:
             if m in df.index:
-                a.append(("%s centred RMSE" % m, "%.3f" % df.loc[m, "centered_rmse"]))
+                a.append(("%s centred RMSE" % m, "%.3f" % df.loc[m, "centered_rmse_zw"]))
 
     bca = os.path.join(EVAL, "bca_intervals.csv")
     if os.path.exists(bca):

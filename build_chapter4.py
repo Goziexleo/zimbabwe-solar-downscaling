@@ -341,15 +341,16 @@ v_m, lo_m, hi_m, _ = pair("Random Forest", "XGBoost", "|MBE|")
 v_c, lo_c, hi_c, _ = pair("Random Forest", "XGBoost", "centred RMSE")
 P("The result is mixed and is reported as such. XGBoost is established as better on "
   "aggregate error, by %+.3f W/m² with an interval of %+.3f to %+.3f that excludes "
-  "zero. But the Random Forest is established as better on two other axes: mean bias "
-  "magnitude by %.3f W/m² and centred RMSE by %.3f, both with intervals excluding zero. "
-  "Spatial correlation and the standard-deviation ratio cannot be distinguished."
-  % (v_r, lo_r, hi_r, abs(v_m), abs(v_c)))
+  "zero. The Random Forest is established as better on one axis, mean bias magnitude, by "
+  "%.3f W/m². Its centred-error advantage of %.3f W/m² does not survive resampling, at "
+  "%+.3f to %+.3f, and neither spatial correlation nor the standard-deviation ratio can "
+  "be distinguished."
+  % (v_r, lo_r, hi_r, abs(v_m), abs(v_c), lo_c, hi_c))
 P("This matters because Section 3.8.4 originally deployed the Random Forest on a "
   "composite criterion combining systematic offset with spatial error structure. That "
-  "criterion survives resampling on both of its legs. The Random Forest does reproduce "
-  "the historical field better in level and in the spatial structure of its error, and "
-  "the analysis concedes this in full rather than dismissing it. The reason XGBoost is "
+  "criterion survives resampling on one of its two legs. The Random Forest does reproduce "
+  "the historical field better in level, and the analysis concedes that in full rather "
+  "than dismissing it; the spatial-structure leg no longer clears its interval. The reason XGBoost is "
   "nonetheless deployed has nothing to do with historical fidelity, and is given in "
   "Section 4.4.")
 xc = pair("XGBoost", "CNN", "RMSE"); xu = pair("XGBoost", "U-Net", "RMSE")
@@ -694,11 +695,11 @@ H("4.8 Solar Energy Suitability")
 P("The suitability analysis of Section 3.9 combines the irradiance layer with six "
   "biophysical and infrastructural criteria under the primary weighting scheme of "
   "Table 3.5, after a binary exclusion "
-  "mask. No consistency ratio is quoted here. Section 3.9.4 records that the pairwise "
-  "comparison matrix was completed by the researcher in consultation with the "
-  "supervisors, but that matrix is not held in the project archive, and a ratio "
-  "recomputed from a matrix reconstructed to reproduce Table 3.5's weights would measure "
-  "the reconstruction rather than the elicitation. The question a consistency ratio is "
+  "mask. No consistency ratio is quoted here. Section 3.9.4 records that no pairwise "
+  "comparison matrix was elicited or retained: the weights of Table 3.5 follow the "
+  "ordinal logic of the Analytic Hierarchy Process without being its output. A ratio "
+  "recomputed from a matrix reconstructed to reproduce those weights would measure the "
+  "reconstruction rather than any elicitation. The question a consistency ratio is "
   "meant to answer, whether the ranking can be relied upon given the weights, is "
   "addressed directly, and far less favourably, in Section 4.8.1. "
   "Of the 5,751 cells in the analysis box, 2,460 fall "
@@ -881,7 +882,7 @@ P("**The learning task is constrained by its own construction.** The coarse irra
   "but the reported performance is the lower figure." % R("XGBoost", "RMSE"))
 P("**The intermediate clear-sky index is not a physical clear-sky index.** Its "
   "denominator averages thirteen daytime hours while the irradiance it normalises is a "
-  "24-hour monthly mean, so the ratio runs a factor of 1.724 below a true clear-sky "
+  "24-hour monthly mean, so the ratio ran about a factor of two below a true clear-sky "
   "index. The normalisation is an exact inverse and cancels from the reconstructed "
   "product to within 1.14 × 10⁻¹³ W/m², so no reported result depends on it, but the "
   "absolute level of the intermediate should not be read as a fraction of clear-sky "
@@ -919,15 +920,18 @@ P("**The suitability output carries no uncertainty estimate on the index itself.
   "analysis actually produces.")
 
 H("4.10 Synthesis")
-P("Four architectures were trained on identical inputs and evaluated on a withheld "
-  "fourteen-year record. All four clear the accuracy thresholds set in Chapter 3, and the "
-  "differences between them are small in absolute terms and only partly established: "
-  "XGBoost is better on aggregate error, the Random Forest better on mean bias and "
-  "centred error, and the two cannot be separated on spatial correlation. Selection was "
-  "not decided on any of those axes. It was decided by a test that no validation metric "
-  "could perform, in which the Random Forest was found to lose the scenario signal it "
-  "would be required to project, for a mechanical reason traceable to how regression "
-  "trees behave outside their training range.")
+P("Four architectures were trained on the same predictor set and evaluated on a withheld "
+  "fourteen-year record, though not under identical conditions: Sections 3.6.5 to 3.6.8 "
+  "record differences in static-input resolution, coordinate channels, sampling and "
+  "target formulation between the two networks. All four clear the accuracy thresholds "
+  "set in Chapter 3, and the differences between them are only partly established: "
+  "XGBoost is better on aggregate error, the Random Forest better on mean bias, and the "
+  "two cannot be separated on centred error or on spatial correlation. XGBoost is also "
+  "the most accurate of the four, so accuracy alone selects it; what the "
+  "scenario-discrimination screen added was the removal of the Random Forest, which the "
+  "accuracy criterion had never chosen and which loses the scenario signal it would be "
+  "required to project, for a mechanical reason traceable to how regression trees behave "
+  "outside their training range.")
 P("The projections give an increase in surface irradiance over Zimbabwe of %.1f to %.1f "
   "per cent by 2100 depending on pathway, and the resource is not the constraint on "
   "solar development in any case. The suitability analysis identifies %d locations, "
@@ -946,36 +950,9 @@ P("The methodological contribution is therefore narrower and firmer than a singl
   "assessed cells in ten proved movable."
   % (u.loc["long_term_2076_2100", "pct_var_arch"], u.loc["long_term_2076_2100", "pct_var_gcm"]))
 
-doc.add_page_break()
-doc.add_heading("Note on this draft", level=2)
-P("This chapter is generated by build_chapter4.py from the evaluation CSVs, so that no "
-  "figure in the prose can drift from the analysis that produced it. Edit the generator "
-  "rather than this document.")
-P("Citations are plain author-year text and must be converted to live Zotero fields in "
-  "Word. Most cite works already in the Chapter 2 and Chapter 3 bibliographies and need "
-  "only re-citing. THREE ARE NOT YET IN THE LIBRARY and must be added before the "
-  "reference list is regenerated:")
-for _ref in [
-    "Cohen, J. (1960). A coefficient of agreement for nominal scales. Educational and "
-    "Psychological Measurement 20(1), 37–46. Cited in Section 4.8.1 for kappa. "
-    "doi:10.1177/001316446002000104", "Efron, B. (1987). Better bootstrap confidence intervals. Journal of the American "
-    "Statistical Association 82(397), 171–185. The BCa interval of Section 4.3. "
-    "doi:10.1080/01621459.1987.10478410", "Dozier, J. and Frew, J. (1990). Rapid calculation of terrain parameters for "
-    "radiation modeling from digital elevation data. IEEE TGRS 28(5), 963–969. "
-    "Already cited as plain text in Chapter 3 and still missing from the library. "
-    "doi:10.1109/36.58986",
-]:
-    _p = doc.add_paragraph(_ref, style="List Bullet")
-    _p.runs[0].font.size = Pt(11)
-P("Saaty (1980) is no longer on that list. This chapter does not cite it: the weights "
-  "of Table 3.5 are presented as the primary weighting scheme, not as the output of the "
-  "Analytic Hierarchy Process, because Section 3.9.4 records that no pairwise comparison "
-  "matrix was elicited or retained. Chapter 3 Section 3.9.4 still names the AHP once, as "
-  "the source of the ordinal logic the weights follow. Add Saaty only if you choose to "
-  "cite it there; nothing in either chapter requires it.")
-P("Figures are inserted from the figures directory by this generator. Regenerating the "
-  "figures and rebuilding this chapter keeps them in step; pasting them by hand would "
-  "not.")
+# The author-facing note that used to sit here - how the chapter is generated,
+# which citations still needed adding - was drafting scaffolding. It read to an
+# examiner as an unreviewed machine assembly, so it is not emitted.
 
 os.makedirs(os.path.dirname(OUT), exist_ok=True)
 doc.save(OUT)

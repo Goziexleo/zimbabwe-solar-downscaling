@@ -30,6 +30,8 @@ uo = pd.read_csv(os.path.join(EVAL, "unet_optimisation.csv")).set_index("variant
 udv5 = pd.read_csv(os.path.join(EVAL, "unet_dropout_variant.csv")).set_index("model")
 sdv5 = pd.read_csv(os.path.join(EVAL, "scenario_discrimination_variants.csv")).set_index("model")
 spv5 = pd.read_csv(os.path.join(EVAL, "sarah_product_validation.csv")).set_index("model")
+# True area from each cell's own latitude, not a nominal 121 km2 cell.
+geo5 = pd.read_csv(os.path.join(EVAL, "robust_set_geography.csv"))
 bas5 = pd.read_csv(os.path.join(EVAL, "baselines.csv")).set_index("baseline")
 bvm5 = pd.read_csv(os.path.join(EVAL, "baseline_vs_models.csv")).set_index("model")
 pbl5 = pd.read_csv(os.path.join(EVAL, "projection_baselines.csv"))
@@ -123,14 +125,12 @@ P("Four architectures were trained on the same predictor set and evaluated on th
   % (t33.loc["XGBoost", "RMSE_zw"], t33.loc["XGBoost", "SS vs climatology_zw"], t33.loc["XGBoost", "Pearson R_zw"], t33["RMSE_zw"].max() - t33["RMSE_zw"].min()))
 P("The comparison between architectures is answered with more care than the question "
   "invites. Resampling establishes that XGBoost is better than the Random Forest on "
-  "aggregate error, that the Random Forest is better on mean bias and on the spatial "
-  "structure of its error, and that the two cannot be separated on spatial correlation. "
+  "aggregate error, that the Random Forest is better on mean bias, and that the two "
+  "cannot be separated on the spatial structure of the error or on spatial correlation. "
   "The answer is a split decision, not a ranking. The Random Forest returns the %s "
-  "aggregate error, behind the CNN, but its separation from either neural model is not "
-  "established: both differences carry intervals containing zero, and the ordering among "
-  "those three has already changed once under a correction that did not touch the "
-  "evidence separating them. Only XGBoost is established as better than all three others "
-  "on that axis." % rank("Random Forest"))
+  "aggregate error. It cannot be separated from the CNN, whose interval contains zero, "
+  "but it is established better than the U-Net. Only XGBoost is established as better "
+  "than all three others on that axis." % rank("Random Forest"))
 P("The more consequential comparison is not among the four. A per-cell ordinary least "
   "squares regression, fitted on the same predictors over the same period against the "
   "same target, reaches %.2f W/m², below every architecture in Table 4.1. Its margin "
@@ -243,7 +243,8 @@ P("The deployment decision followed from a test that no accuracy metric could pe
   "extrapolation (Breiman, 2001), and the failure is categorical rather than a matter "
   "of degree. This is "
   "why the improved U-Net configuration identified after the fact does not reopen the "
-  "decision on accuracy alone: it has not been put through that screen."
+  "decision on accuracy alone: Section 4.5 reports that it passes the screen but is less "
+  "accurate than the deployed configuration under the same training procedure."
   % (rank("Random Forest").replace("-lowest", ""), scr.loc["Random Forest", "pct_ordered_long_term"]))
 
 H("5.2.4 RQ4: where suitability is highest", 3)
@@ -253,7 +254,7 @@ P("Of %d assessed locations, **%d, %.1f per cent, approximately %s km², are cla
   "change tier under at least one defensible reweighting and equal weighting agrees with "
   "the primary classification no better than chance. A classification that movable is not "
   "a planning product without that qualification attached."
-  % (n_keep, n_rob, 100*n_rob/n_keep, format(n_rob*121, ","), 100*sens/n_keep))
+  % (n_keep, n_rob, 100*n_rob/n_keep, "{:,.0f}".format(geo5["area_km2"].sum()), 100*sens/n_keep))
 P("**The robust locations are not the sunniest places in Zimbabwe.** Their mean "
   "irradiance exceeds the assessed domain's by %.1f per cent. What distinguishes them is "
   "proximity to the transmission network: %.2f km against %.2f km, a factor of %.1f. "
@@ -278,10 +279,13 @@ H("5.3 Contributions")
 P("**A quantified architecture-uncertainty term for solar downscaling.** The study's "
   "firmest methodological contribution is the finding that the choice of downscaling "
   "architecture accounts for %.1f per cent of long-term projection variance, several "
-  "times the contribution of the global climate model. The estimate rose when two of the "
-  "four members were retrained under honest selection, which is the expected direction: "
-  "removing inflated accuracy from two architectures widens the spread between them, and "
-  "that spread is what the term measures. Downscaling studies conventionally "
+  "times the contribution of the global climate model. The term is sensitive to how it "
+  "is constructed, and Section 4.7 reports that sensitivity rather than a single figure: "
+  "the share depends more on whether the downscaling error is taken as a monthly or a "
+  "systematic quantity than on which architectures are counted. A comparable result for "
+  "temperature and precipitation is reported by Lafferty and Sriver (2023); what is new "
+  "here is the quantity for surface solar radiation, and the finding that it exceeds the "
+  "inter-model spread. Downscaling studies conventionally "
   "report GCM and scenario spread while fitting a single architecture (Vandal et al., 2017; Lin et al., 2023), while comparative studies such as Hernanz et al. (2023) and Rampal et al. (2024) rank architectures without propagating the choice into a projection uncertainty, which silently "
   "sets the largest of the three terms to zero."
   % u.loc["long_term_2076_2100", "pct_var_arch"])
@@ -300,9 +304,11 @@ P("**A suitability analysis reported against its own weighting assumptions.** Th
   "set, rather than the tier map, is the output. The finding that robustness is conferred "
   "by grid proximity rather than by solar resource is a substantive planning result and "
   "not a methodological aside.")
-P("**Applied outputs for Zimbabwe.** A 0.1 degree monthly irradiance climatology for "
-  "1985 to 2024, projections to 2100 under two pathways with a four-component uncertainty "
-  "budget, and a suitability assessment with an explicit robust subset.")
+P("**Applied outputs for Zimbabwe.** Projections of monthly irradiance to 2100 at 0.1 "
+  "degrees under two pathways, with a four-component uncertainty budget, and a "
+  "suitability assessment with an explicit robust subset. No downscaled present-period "
+  "climatology was produced: Section 3.9.1 records that the present-day suitability layer "
+  "is the SARAH satellite record rather than a product of this chain.")
 
 H("5.4 Limitations")
 P("The limitations are stated in full in Section 4.9 and summarised here. The product "
@@ -353,14 +359,14 @@ P("**Retrain against SARAH.** This is the highest-value next step and the only r
   "(2024) take for high-resolution solar resource data. It would convert the negative answer "
   "to RQ2 into a testable positive one and would simultaneously supply the independent "
   "validation the study currently lacks.")
-P("**Extend honest selection to the hyperparameters as well as the epoch count.** The "
-  "checkpoint-selection defect in the neural models has been corrected, and the epoch "
-  "count is now chosen on an inner split. The remaining hyperparameters, learning rate, "
-  "gradient-penalty weight, dropout, architecture width, were fixed by a grid search "
-  "reported in Section 3.6.7, and the sweep described above shows at least one of them, "
-  "dropout, to be costly on held-out accuracy. A search conducted entirely within the "
-  "training period, "
-  "over all of them jointly, is the natural completion of that correction.")
+P("**Search the remaining hyperparameters jointly, inside the training period.** The "
+  "checkpoint-selection defect in the neural models has been corrected, the epoch count "
+  "is chosen on an inner split, and Section 3.6.7 reports a learning-rate and "
+  "penalty-weight search conducted entirely within the training record. What has not "
+  "been done is a joint search over learning rate, gradient-penalty weight, dropout and "
+  "architecture width together; the one-at-a-time sweep of Section 4.5 cannot see "
+  "interactions between them, and the dropout result it appeared to show did not survive "
+  "an honest retrain.")
 P("**Settle what causes the U-Net's damping.** One part of this recommendation has since "
   "been carried out and is reported in Section 4.5. The dropout-free configuration that "
   "the sweep favoured was retrained under the deployed procedure and put through the "
@@ -395,13 +401,14 @@ H("5.7 Concluding Remarks")
 P("The study set out to downscale CMIP6 solar irradiance for Zimbabwe and to convert the "
   "result into a suitability assessment. It does both, and the more useful part of what "
   "it learned is about the limits of each step.")
-P("The downscaling works in time and not in space: the fields carry real temporal skill "
-  "against a climatology and essentially no information below their input resolution. The "
-  "model selection turned not on accuracy but on a capability no accuracy metric tests, "
-  "and the model that would have been chosen on accuracy alone is unusable for "
-  "projection. The projection uncertainty is dominated not by the climate models but by "
-  "the downscaling method, which is a term most studies of this kind do not report "
-  "because they fit only one. And the suitability analysis, pressed on its own "
+P("The downscaling works in time and not in space, and no better than a linear "
+  "regression on the same predictors: the fields carry real temporal skill against a "
+  "climatology and essentially no information below their input resolution. Accuracy "
+  "alone selects the deployed model; what the scenario screen added was the removal of "
+  "the Random Forest, which accuracy had never chosen and which cannot separate the "
+  "emission pathways it would be asked to project. The projection uncertainty is "
+  "dominated not by the climate models but by the choice of downscaling architecture, a "
+  "term most studies of this kind do not report because they fit only one. And the suitability analysis, pressed on its own "
   "assumptions, reduces from a map of Zimbabwe to %d locations, distinguished not by "
   "sunlight but by their distance from an existing power line."
   % n_rob)
@@ -410,14 +417,7 @@ P("Each of those is a narrower statement than the question that prompted it. Sta
   "intended to inform capital allocation in a country with constrained generation "
   "capacity, that trade is the right one to make.")
 
-doc.add_page_break()
-doc.add_heading("Note on this draft", level=2)
-P("Generated by build_chapter5.py from the same evaluation CSVs as Chapter 4, so that no "
-  "figure quoted in the conclusions can drift from the results chapter. Edit the "
-  "generator rather than this document. Citations are plain author-year text and must be "
-  "converted to live Zotero fields; all of those used here are already in the Chapter 2 "
-  "and Chapter 3 bibliographies. The four additions listed at the end of Chapter 4 apply "
-  "to that chapter, not this one.")
+# Same drafting note as Chapter 4's, removed for the same reason.
 
 os.makedirs(os.path.dirname(OUT), exist_ok=True)
 doc.save(OUT)
