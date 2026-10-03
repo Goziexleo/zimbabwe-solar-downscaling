@@ -50,7 +50,7 @@ UNIVERSITY = "UNIVERSITY OF ZIMBABWE"
 SUPERVISOR = "Prof E. Mashonjowa"
 COORDINATOR = "Prof T.D. Mushore"
 DATE = "October 2026"
-REPO = "https://github.com/<your-username>/zimbabwe-solar-downscaling"
+REPO = "https://github.com/goziexleo/zimbabwe-solar-downscaling"
 
 FILES = [
     "CR_Madukwe_Chapter 1_corrected.docx",
