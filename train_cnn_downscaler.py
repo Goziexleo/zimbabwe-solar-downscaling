@@ -1,4 +1,5 @@
 import os
+import random
 import numpy as np
 import xarray as xr
 import torch
@@ -25,6 +26,16 @@ model_path = os.environ.get("CNN_MODEL_PATH", os.path.join(model_output_dir, "cn
 # the pre-HPO values - and the deployed settings were supplied only as
 # command-line environment overrides, so a plain rerun silently reproduced a
 # different model from the one reported in Table 3.3.
+# Seeded, for the same reason as the U-Net: an unseeded training script cannot
+# support Appendix A's claim that the analysis regenerates, and run-to-run drift
+# is indistinguishable from a real effect when a target is changed.
+SEED = int(os.environ.get("CNN_SEED", "42"))
+random.seed(SEED)
+np.random.seed(SEED)
+torch.manual_seed(SEED)
+if hasattr(torch, "mps") and torch.backends.mps.is_available():
+    torch.mps.manual_seed(SEED)
+
 LEARNING_RATE = float(os.environ.get("CNN_LEARNING_RATE", "0.001"))
 LAMBDA_GP = float(os.environ.get("CNN_LAMBDA_GP", "0.001"))
 BATCH_SIZE = int(os.environ.get("CNN_BATCH_SIZE", "16"))

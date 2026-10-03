@@ -6,6 +6,7 @@ import torch
 import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader, Sampler
 import torch.optim as optim
+import random
 import warnings
 
 from oni_utils import classify_enso_phase
@@ -49,6 +50,18 @@ target_var = "clear_sky_index"  # lives on the fine (fine_lat, fine_lon) target 
 # was supplied only as a command-line environment override, so a plain rerun
 # silently reproduced a different model from the one reported in Table 3.3.
 BATCH_SIZE = int(os.environ.get("UNET_BATCH_SIZE", "16"))
+# Seeded. This script had no seed at all, so two runs on identical data could
+# differ by several W/m2 - which is how a rerun once produced a U-Net at 13.41
+# against the 9.95 of the run before it, on a target whose normalised moments
+# were unchanged. An unseeded training script also sits badly with Appendix A's
+# claim that the analysis can be regenerated.
+SEED = int(os.environ.get("UNET_SEED", "42"))
+random.seed(SEED)
+np.random.seed(SEED)
+torch.manual_seed(SEED)
+if hasattr(torch, "mps") and torch.backends.mps.is_available():
+    torch.mps.manual_seed(SEED)
+
 EPOCHS = int(os.environ.get("EPOCHS", "100"))
 EARLY_STOP_PATIENCE = int(os.environ.get("UNET_EARLY_STOP_PATIENCE", "20"))
 LEARNING_RATE = float(os.environ.get("UNET_LEARNING_RATE", "1e-3"))

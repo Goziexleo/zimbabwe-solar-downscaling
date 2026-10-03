@@ -6,7 +6,20 @@ The prose claims have been corrected. The citation **fields** are yours, because
 inserting and deleting them is a Zotero operation. Work through
 `CITATION_AUDIT.md`; the short version:
 
-**Add to your Zotero library**
+**Import `reference_additions.ris` first.** Zotero: File → Import → choose the
+file. It carries 37 entries — 27 resolved against the CrossRef API (title,
+journal, volume, pages and DOI come from CrossRef, not from me) and 10
+hand-entered datasets and software, each flagged in the note field as needing a
+check. That takes the list from 23 to 60, the floor an examiner expects. See
+`reference_additions_report.md` for what resolved and why each is needed.
+
+Four title searches returned a plausible but wrong paper and were resolved by DOI
+instead: Efron's *Rejoinder* rather than the article, a tuning note rather than
+the MPI-ESM description, and unrelated work entirely for O'Neill and Wu. That is
+the same failure the citation audit found in the existing list, so treat any
+reference you add by hand the same way.
+
+**Also add to your Zotero library**
 
 | Item | Why |
 |---|---|
@@ -87,6 +100,10 @@ and spacing, which is why it is one script and not six commands.
 - **Abstract length: 412 words.** Most regulations cap at 250–350. Check the MCSM
   rule; tell me the number and I will cut to it. Paragraph three compresses most
   easily.
-- **The domain.** The grid stops at 22.0 S and Zimbabwe does not.
-  `RUNBOOK_DOMAIN_FIX.md` gives both paths: the full rerun, or the wording to
-  disclose it. This is the largest outstanding item.
+- **The domain is now disclosed, not corrected.** Section 3.2.1 states the true
+  extent and Section 4.9 records the cost: 50 cells inside the boundary but south
+  of the grid edge, 5,725 km2, 1.47 per cent of the country, including
+  Beitbridge. Figure 3.1 shows the box against the border. The re-download was
+  started and stopped at 21 files of 160 - the CDS queue was running at about 45
+  minutes a file, which projects to several days. `RUNBOOK_DOMAIN_FIX.md` has the
+  procedure if you ever want to run it.
