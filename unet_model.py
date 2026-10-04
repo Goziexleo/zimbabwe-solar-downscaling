@@ -14,11 +14,15 @@ import torch.nn.functional as F
 PAD_MULTIPLE = 32  # 4 encoder pools + 1 bottleneck pool = 2^5
 SCHEMA_VERSION = 5
 
-# Deployed value. Overridable so the dropout-free configuration found by
-# optimise_unet.py can be trained and put through the Section 4.4 scenario
-# screen, which the sweep alone cannot do: the sweep reports accuracy on the
-# inner split, and accuracy was never what selected the deployed model.
-DROPOUT_P = float(os.environ.get("UNET_DROPOUT", "0.3"))
+# Deployed value, now zero. The sweep in optimise_unet.py found dropout costly,
+# and Section 4.5 confirmed it under the deployed procedure: fitted at the same
+# learning rate, under the same two-phase selection and the same seed, the
+# dropout-free configuration scores 8.62 W/m2 over Zimbabwe against 11.66 with
+# dropout at 0.3, is better on the inner split that selects, and passes the
+# Section 4.4 scenario screen. Retraining the old configuration reproduces it
+# bit for bit, so that gap is the setting and not the draw. Overridable, so the
+# 0.3 configuration can still be measured as the comparison Section 4.5 reports.
+DROPOUT_P = float(os.environ.get("UNET_DROPOUT", "0.0"))
 
 
 def next_multiple(n, m):

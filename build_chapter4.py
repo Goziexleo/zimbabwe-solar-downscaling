@@ -41,7 +41,6 @@ scr = pd.read_csv(os.path.join(EVAL, "scenario_discrimination.csv")).set_index("
 agr = pd.read_csv(os.path.join(EVAL, "architecture_agreement.csv"))
 uo = pd.read_csv(os.path.join(EVAL, "unet_optimisation.csv")).set_index("variant")
 udv = pd.read_csv(os.path.join(EVAL, "unet_dropout_variant.csv")).set_index("model")
-sdv = pd.read_csv(os.path.join(EVAL, "scenario_discrimination_variants.csv")).set_index("model")
 geo = pd.read_csv(os.path.join(EVAL, "robust_set_geography.csv"))
 mc = pd.read_csv(os.path.join(EVAL, "robustness_monte_carlo.csv")).set_index("frequency_threshold")
 bas = pd.read_csv(os.path.join(EVAL, "baselines.csv")).set_index("baseline")
@@ -84,6 +83,23 @@ def pair(a, b, metric):
         return -r.iloc[0].plug_in, -r.iloc[0].bca_hi, -r.iloc[0].bca_lo, bool(r.iloc[0].bca_spans_zero)
     r = r.iloc[0]
     return r.plug_in, r.bca_lo, r.bca_hi, bool(r.bca_spans_zero)
+
+# The prose quotes magnitudes, so these wrap pair() and drop the sign
+# bookkeeping: _ab is the point estimate, _lo and _hi the interval ends ordered
+# low to high after taking absolute values.
+def _ab(a, b, metric):
+    return abs(pair(a, b, metric)[0])
+
+
+def _lo(a, b, metric):
+    r = pair(a, b, metric)
+    return min(abs(r[1]), abs(r[2]))
+
+
+def _hi(a, b, metric):
+    r = pair(a, b, metric)
+    return max(abs(r[1]), abs(r[2]))
+
 
 rob = sui.robustly_suitable.values.astype(bool)
 # "Retained" means not excluded by the mask, which is NOT the same as "not in
@@ -231,17 +247,22 @@ P("Chapter 1 justified machine learning on the ground that classical statistical
   "exactly the predictors the tree and network models receive, over the same training "
   "period, against the same clear-sky-index target, and converted to irradiance through "
   "the same clear-sky climatology.")
-P("The linear model attains %.2f W/m², which is lower than every architecture in "
-  "Table 4.1, including the deployed XGBoost at %.2f. Resampling whole calendar years, "
-  "as in Section 4.3, the margin over XGBoost is %+.3f W/m² with a 95 per cent interval "
-  "of %+.3f to %+.3f, which spans zero: the two are indistinguishable. The margins over "
-  "the other three are established. Against the CNN it is %+.3f (%+.3f to %+.3f), "
-  "against the U-Net %+.3f (%+.3f to %+.3f), and against the Random Forest %+.3f "
-  "(%+.3f to %+.3f), none of which include zero."
-  % (bas.loc[_OLS, "RMSE_zw"], R("XGBoost", "RMSE"),
-     bvm.loc["XGBoost", "diff_vs_linear"], bvm.loc["XGBoost", "ci_lo"], bvm.loc["XGBoost", "ci_hi"],
+P("The linear model attains %.2f W/m\u00b2. Three of the four architectures in Table 4.1 "
+  "sit above it; one, the U-Net, sits below. Resampling whole calendar years as in "
+  "Section 4.3, neither of the two closest is separable from it: the margin over the "
+  "deployed XGBoost is %+.3f W/m\u00b2 with a 95 per cent interval of %+.3f to %+.3f, and "
+  "over the U-Net %+.3f (%+.3f to %+.3f), both spanning zero. The remaining two margins "
+  "are established, %+.3f (%+.3f to %+.3f) against the CNN and %+.3f (%+.3f to %+.3f) "
+  "against the Random Forest. What survives all four comparisons is the finding none of "
+  "them escapes: no architecture in this study is established better than a per-cell "
+  "straight line fitted to the same predictors over the same period. Two are "
+  "indistinguishable from it and two are measurably worse."
+  % (bas.loc[_OLS, "RMSE_zw"],
+     bvm.loc["XGBoost", "diff_vs_linear"], bvm.loc["XGBoost", "ci_lo"],
+     bvm.loc["XGBoost", "ci_hi"],
+     bvm.loc["U-Net", "diff_vs_linear"], bvm.loc["U-Net", "ci_lo"],
+     bvm.loc["U-Net", "ci_hi"],
      bvm.loc["CNN", "diff_vs_linear"], bvm.loc["CNN", "ci_lo"], bvm.loc["CNN", "ci_hi"],
-     bvm.loc["U-Net", "diff_vs_linear"], bvm.loc["U-Net", "ci_lo"], bvm.loc["U-Net", "ci_hi"],
      bvm.loc["Random Forest", "diff_vs_linear"], bvm.loc["Random Forest", "ci_lo"],
      bvm.loc["Random Forest", "ci_hi"]))
 P("The premise does not hold on this target, and the reason is the subject of Section "
@@ -418,9 +439,34 @@ P("This test is used as a screen and not as a ranking, and the distinction is es
   "read precision into an unvalidated quantity, and treating the CNN's %.1f per cent as "
   "better than XGBoost's %.1f per cent would be the same error. Among the models that "
   "pass the screen, selection therefore falls back to validated historical performance, "
-  "where XGBoost has the lowest aggregate error with intervals excluding zero and wins "
-  "all four rolling-origin folds. XGBoost is deployed on that basis."
-  % (scr.loc["CNN", "pct_ordered_long_term"], scr.loc["XGBoost", "pct_ordered_long_term"]))
+  "and there the lowest aggregate error belongs to the U-Net, %.2f W/m\u00b2 against "
+  "XGBoost's %.2f. That is not sufficient to deploy it, and the standard applied is the "
+  "one already applied to the Random Forest. The margin is not established: its "
+  "bias-corrected interval runs %+.3f to %+.3f and spans zero. The axes on which the two "
+  "models are separable split three to one, and they split against the U-Net. XGBoost is "
+  "established better on centred RMSE by %.3f (%.3f to %.3f), on spatial correlation by "
+  "%.4f (%.4f to %.4f) and on the standard-deviation ratio by %.4f (%.4f to %.4f); the "
+  "U-Net is established better on mean bias, by %.3f (%.3f to %.3f). A bias is also the "
+  "one discrepancy of the four that a downstream correction can remove. Section 4.5 adds "
+  "the consideration that settles it: the U-Net is the only architecture whose field is "
+  "spectrally damped, retaining %.3f of the truth's power beyond wavenumber 11 where "
+  "XGBoost retains %.3f. XGBoost is deployed on that basis, and it is recorded as a "
+  "trade between tested quantities rather than as dominance. The ordering is in any case "
+  "basis-dependent: over the full analysis box, on which the U-Net\'s advantage reverses, "
+  "XGBoost leads by %.3f W/m\u00b2."
+  % (scr.loc["CNN", "pct_ordered_long_term"], scr.loc["XGBoost", "pct_ordered_long_term"],
+     RB("U-Net", "RMSE_zw"), RB("XGBoost", "RMSE_zw"),
+     pair("U-Net", "XGBoost", "RMSE")[1], pair("U-Net", "XGBoost", "RMSE")[2],
+     _ab("XGBoost", "U-Net", "centred RMSE"), _lo("XGBoost", "U-Net", "centred RMSE"),
+     _hi("XGBoost", "U-Net", "centred RMSE"),
+     _ab("XGBoost", "U-Net", "spatial R"), _lo("XGBoost", "U-Net", "spatial R"),
+     _hi("XGBoost", "U-Net", "spatial R"),
+     _ab("XGBoost", "U-Net", "std ratio dev"), _lo("XGBoost", "U-Net", "std ratio dev"),
+     _hi("XGBoost", "U-Net", "std ratio dev"),
+     _ab("XGBoost", "U-Net", "MBE"), _lo("XGBoost", "U-Net", "MBE"),
+     _hi("XGBoost", "U-Net", "MBE"),
+     cut.loc["U-Net", "k>=11"], cut.loc["XGBoost", "k>=11"],
+     t33.loc["U-Net", "RMSE"] - t33.loc["XGBoost", "RMSE"]))
 P("The wider point is that a model can satisfy every validation metric in Table 4.1 and "
   "still be unfit for the purpose the product serves. The Random Forest is second on "
   "aggregate error, better than the deployed model on two of five tested axes, and "
@@ -463,45 +509,41 @@ P("The cause was investigated with a controlled sweep fitting on 1985 to 2004 an
   "W/m², spatial correlation from %.3f to %.3f, and centred error from %.2f to %.2f. "
   "Dropout at this rate appears to cost the U-Net a substantial amount of accuracy."
   % (uo.loc["baseline", "cfg_dropout"], uo.loc["baseline", "test_rmse"], uo.loc["drop_0", "test_rmse"], uo.loc["baseline", "test_spatial_r"], uo.loc["drop_0", "test_spatial_r"], uo.loc["baseline", "test_centred_rmse"], uo.loc["drop_0", "test_centred_rmse"]))
-P("That appearance survives the honest procedure, which was not the expected result and "
-  "is reported as it came out. Fitted exactly as the deployed U-Net is, at the deployed "
-  "learning rate, under the same two-phase selection in which the epoch count is chosen "
-  "on an inner split and the model refitted on the full training record, and under the "
-  "same random seed, the dropout-free configuration scores %.2f W/m\u00b2 over Zimbabwe "
-  "against the deployed model's %.2f. It is better by %.2f. For a model with a stochastic "
-  "fit the obvious objection is that the gap is the draw rather than the setting, and it "
-  "is answered directly: retraining the deployed configuration from the committed script "
-  "reproduces it to within 10\u207b\u2074 W/m\u00b2, weight for weight and at the same "
-  "selected epoch, so the difference is the dropout rate. Nor does the result depend on "
-  "the withheld record, because the dropout-free configuration is also the better of the "
-  "two on the inner split that did the selecting, at a mean squared error of %.4f against "
-  "%.4f."
-  % (udv.loc["U-Net, dropout 0 (variant)", "RMSE_zw"],
-     udv.loc["U-Net, dropout 0.3 (deployed)", "RMSE_zw"],
-     udv.loc["U-Net, dropout 0.3 (deployed)", "RMSE_zw"]
-     - udv.loc["U-Net, dropout 0 (variant)", "RMSE_zw"],
+P("That appearance survives the honest procedure, which was not the expected result, and "
+  "it has been acted on: the U-Net reported throughout this chapter carries no dropout. "
+  "Fitted at the same learning rate, under the same two-phase selection in which the "
+  "epoch count is chosen on an inner split and the model refitted on the full training "
+  "record, and under the same random seed, the dropout-free configuration scores %.2f "
+  "W/m\u00b2 over Zimbabwe against %.2f for the 0.3 configuration it replaced, a gain of "
+  "%.2f. For a model with a stochastic fit the obvious objection is that the gap is the "
+  "draw rather than the setting, and it is answered directly: retraining the 0.3 "
+  "configuration from the committed script reproduces the superseded model to within "
+  "10\u207b\u2074 W/m\u00b2, weight for weight and at the same selected epoch, so the "
+  "difference is the dropout rate. Nor does it depend on the withheld record, because the "
+  "dropout-free configuration is also the better of the two on the inner split that did "
+  "the selecting, at a mean squared error of %.4f against %.4f."
+  % (udv.loc["U-Net, dropout 0 (adopted)", "RMSE_zw"],
+     udv.loc["U-Net, dropout 0.3 (variant)", "RMSE_zw"],
+     udv.loc["U-Net, dropout 0.3 (variant)", "RMSE_zw"]
+     - udv.loc["U-Net, dropout 0 (adopted)", "RMSE_zw"],
      0.08889, 0.12041))
-P("The same configuration was also put through the scenario-discrimination screen of "
-  "Section 4.4, which Chapter 5 previously had to leave open. It passes: separation of "
-  "%+.3f, %+.3f and %+.3f W/m\u00b2 across the three horizons, positive throughout and "
-  "growing monotonically. The consequence is uncomfortable and is stated rather than "
-  "buried. A dropout-free U-Net is more accurate over Zimbabwe than every entry in Table "
-  "4.1, the deployed XGBoost included at %.2f W/m\u00b2, and it is admissible for "
-  "projection on the same screen the deployed ensemble had to pass. The configuration "
-  "this study deployed is therefore not the best configuration it found. Everything from "
-  "Section 4.6 onwards is nevertheless reported on the XGBoost chain and is not restated "
-  "on a U-Net basis, because redeploying would require the projection, uncertainty and "
-  "suitability chains to be regenerated and checked end to end, which this submission "
-  "could not accommodate; reporting a model selection the downstream results do not "
-  "actually rest on would be worse than reporting the discrepancy. Section 4.9 records it "
-  "as a limitation and Section 5.6 as the first task of a continuation. One thing it does "
-  "not change is the answer to RQ2. The accuracy gain is pointwise, and the sweep that "
-  "first found it also found the dropout-free field spectrally damped, so it buys lower "
-  "error at each cell rather than structure the coarse field did not already carry."
-  % (sdv.loc["U-Net, dropout 0", "sep_near_term"],
-     sdv.loc["U-Net, dropout 0", "sep_mid_term"],
-     sdv.loc["U-Net, dropout 0", "sep_long_term"],
-     t33.loc["XGBoost", "RMSE_zw"]))
+P("Two things follow, and the second is why the deployment did not change with the "
+  "configuration. The U-Net now holds the lowest aggregate error in Table 4.1, below the "
+  "deployed XGBoost at %.2f W/m\u00b2, and it passes the scenario screen of Section 4.4 "
+  "with separation of %+.3f, %+.3f and %+.3f W/m\u00b2 across the three horizons. But "
+  "Section 4.4 also records that the error margin is not established while XGBoost's "
+  "advantage on the spatial axes is, and the spectra above are the reason to accept that "
+  "verdict rather than argue with it. Removing dropout reduced the damping and did not "
+  "remove it: the ratio still falls monotonically with the cut, from %.2f at wavenumber 3 "
+  "to %.3f at 11 and %.3f at 20, and the U-Net remains the only architecture of the four "
+  "whose field is damped at all. The accuracy it gains is pointwise. It buys lower error "
+  "at each cell, not structure the coarse field did not already carry, which is why the "
+  "answer to RQ2 is unchanged and why a model that reproduces the spatial pattern better "
+  "is preferred for a product whose output is a map."
+  % (t33.loc["XGBoost", "RMSE_zw"],
+     scr.loc["U-Net", "sep_near_term"], scr.loc["U-Net", "sep_mid_term"],
+     scr.loc["U-Net", "sep_long_term"],
+     cut.loc["U-Net", "k>=3"], cut.loc["U-Net", "k>=11"], cut.loc["U-Net", "k>=20"]))
 P("The sweep does not, however, identify the cause of the damping reported above. The "
   "difficulty is that the "
   "sweep's own baseline does not reproduce the damping it was built to explain. That "
@@ -989,15 +1031,17 @@ P("**The suitability layer scores irradiance, not deliverable energy.** Module o
 P("**The future suitability maps hold infrastructure and population constant.** They "
   "describe how the resource changes at present-day sites, not where future sites will "
   "be.")
-P("**The deployed configuration is not the most accurate one found.** Section 4.5 "
-  "establishes that a dropout-free U-Net scores %.2f W/m\u00b2 over Zimbabwe against the "
-  "deployed XGBoost's %.2f, is better than the deployed U-Net on the inner split that "
-  "selects, and passes the scenario screen. It was identified too late in the work for "
-  "the projection, uncertainty and suitability chains to be rebuilt on it. Those chains, "
-  "and every result from Section 4.6 onwards, therefore rest on the XGBoost model, and "
-  "the gap between what the evidence favours and what the product uses is left visible "
-  "rather than closed by restating the selection."
-  % (udv.loc["U-Net, dropout 0 (variant)", "RMSE_zw"], t33.loc["XGBoost", "RMSE_zw"]))
+P("**The deployed model does not have the lowest validation error.** The U-Net, in the "
+  "dropout-free configuration adopted in Section 4.5, scores %.2f W/m\u00b2 over "
+  "Zimbabwe against the deployed XGBoost's %.2f. A reader ranking Table 4.1 on "
+  "aggregate error alone would deploy the other model, and the reason this study does "
+  "not is set out in Section 4.4: that margin is not established under resampling, "
+  "XGBoost is established better on three structural axes against the U-Net's one, and "
+  "the U-Net is the only architecture whose field is spectrally damped. The selection "
+  "therefore rests on the axes resampling establishes rather than on the headline "
+  "figure, which is the same standard that set the Random Forest aside, but it does "
+  "mean the deployed model is not the one a single-metric comparison would choose."
+  % (t33.loc["U-Net", "RMSE_zw"], t33.loc["XGBoost", "RMSE_zw"]))
 P("**Model selection on the evaluation record, identified and corrected.** The CNN and "
   "U-Net previously saved the checkpoint scoring best on the withheld period. Both have "
   "been retrained with the epoch count chosen on an inner split of the training data, "

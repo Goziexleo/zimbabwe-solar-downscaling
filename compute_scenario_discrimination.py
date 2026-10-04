@@ -46,7 +46,9 @@ MME = {
 # every other four-member quantity are unchanged by a configuration that the
 # honest selection procedure did not choose.
 VARIANTS = {
-    "U-Net, dropout 0": "mme_aggregations_unet_drop0",
+    # The dropout-free configuration is now the U-Net itself, so this entry
+    # would restate the deployed U-Net row under a second name. Section 4.5
+    # reads the U-Net's screen result from the main table instead.
 }
 OUT_VARIANTS = os.path.join(PROC, "evaluation/scenario_discrimination_variants.csv")
 

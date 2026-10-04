@@ -99,18 +99,24 @@ def main():
     # two sets of numbers for one comparison: a reader differencing the table
     # could not reproduce the interval beside it.
     _m = zimbabwe_mask(ds_f["ghi_true"].values.shape)
-    truth = ds_f["ghi_true"].values[:, _m]
+    truth_full = ds_f["ghi_true"].values
+    truth = truth_full[:, _m]
     times = pd.DatetimeIndex(ds_val.time.values)
     years = times.year.values
     uniq_years = np.unique(years)
-    _, clim, _ = evaluation_baselines(ds_val, truth, ds_val.time.values, ds_cs)
+    # evaluation_baselines works on the full grid - it assigns a (71, 81)
+    # monthly climatology by broadcasting - so it is given the unmasked field
+    # and its climatology is masked afterwards. Passing the masked truth in
+    # raised a broadcast error, which is how this script came to be broken.
+    _, clim_full, _ = evaluation_baselines(ds_val, truth_full, ds_val.time.values, ds_cs)
+    clim = clim_full[:, _m]
 
     preds = {label: ds_f[var].values[:, _m] for label, var in MODELS}
     # index of the months belonging to each year, so a replicate is assembled
     # by concatenating whole years
     year_idx = {y: np.where(years == y)[0] for y in uniq_years}
 
-    print(f"{len(uniq_years)} years, {len(times)} months, {truth.shape[1] * truth.shape[2]} cells")
+    print(f"{len(uniq_years)} years, {len(times)} months, {truth.shape[1]} cells")
     print(f"Resampling {N_BOOT} times over whole years (paired across models)...")
 
     rng = np.random.default_rng(SEED)

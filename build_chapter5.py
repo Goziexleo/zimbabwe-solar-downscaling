@@ -28,7 +28,8 @@ per = pd.read_csv(os.path.join(EVAL, "suitability_by_period.csv")).set_index("pe
 scr = pd.read_csv(os.path.join(EVAL, "scenario_discrimination.csv")).set_index("model")
 uo = pd.read_csv(os.path.join(EVAL, "unet_optimisation.csv")).set_index("variant")
 udv5 = pd.read_csv(os.path.join(EVAL, "unet_dropout_variant.csv")).set_index("model")
-sdv5 = pd.read_csv(os.path.join(EVAL, "scenario_discrimination_variants.csv")).set_index("model")
+cut5 = pd.read_csv(os.path.join(EVAL, "effective_resolution_cut_sensitivity.csv")
+                   ).set_index("field")
 spv5 = pd.read_csv(os.path.join(EVAL, "sarah_product_validation.csv")).set_index("model")
 # True area from each cell's own latitude, not a nominal 121 km2 cell.
 geo5 = pd.read_csv(os.path.join(EVAL, "robust_set_geography.csv"))
@@ -157,14 +158,14 @@ P("Two qualifications belong with that answer, and both concern how the comparis
   "corrections pull opposite ways, and Section 4.2 separates them; the net is that the "
   "CNN moves %.2f W/m² from where it stood under full leakage and the U-Net %.2f the "
   "other way, both measured between archived runs on the full analysis box. "
-  "Separately, a controlled sweep shows the U-Net reaches %.2f W/m² under honest "
-  "selection once its dropout setting is removed, and Section 4.5 reports that this "
-  "improvement does survive an honest retrain: the dropout-free configuration is the "
-  "most accurate model measured over Zimbabwe in this study. Neither fact overturns "
-  "the deployment, because the projection, uncertainty and suitability chains all rest "
-  "on the XGBoost model and were not regenerated on a U-Net basis, but together "
-  "they mean this study compares particular configurations, selected in a particular "
-  "way, rather than architectures in the abstract."
+  "Separately, a controlled sweep showed the U-Net reaches %.2f W/m² under honest "
+  "selection once its dropout setting is removed. That survived an honest retrain and "
+  "the configuration was adopted, so the U-Net reported here carries no dropout and "
+  "holds the lowest aggregate error of the four. It is not the deployed model, for "
+  "the reasons Section 4.4 gives: the margin is not established under resampling, "
+  "XGBoost is established better on three structural axes, and the U-Net alone damps "
+  "the spectrum. Together these mean the study compares particular configurations, "
+  "selected in a particular way, rather than architectures in the abstract."
   % (abs(t33.loc["CNN", "RMSE"] - leaky5.loc["CNN", "RMSE"]),
      abs(t33.loc["U-Net", "RMSE"] - leaky5.loc["U-Net", "RMSE"]),
      uo.loc["drop_0", "test_rmse"]))  # full box both sides: the archived snapshot has no masked columns
@@ -395,24 +396,21 @@ P("**Search the remaining hyperparameters jointly, inside the training period.**
   "architecture width together; the one-at-a-time sweep of Section 4.5 cannot see "
   "interactions between them, and its dropout result, which did survive an honest "
   "retrain, is reason to think the joint search would find more.")
-P("**Settle what causes the U-Net's damping.** One part of this recommendation has since "
-  "been carried out and is reported in Section 4.5. The dropout-free configuration that "
-  "the sweep favoured was retrained under the deployed procedure and put through the "
-  "scenario screen. It passes the screen, with separation growing from %+.3f to %+.3f "
-  "W/m², and it is more accurate than the deployed model, %.2f W/m² against %.2f, so "
-  "the configuration that should be deployed on this evidence is not the one that was. "
-  "Redeploying it is the first task of a continuation, and it is a substantial one: the "
-  "projections, the uncertainty budget and the suitability maps would all have to be "
-  "regenerated and rechecked. What remains open is the cause of "
-  "the spectral damping. The sweep's baseline carries the same dropout rate as the "
-  "deployed model yet shows an excess of fine-scale power (%.2f) rather than a deficit, "
-  "so it never reproduced the failure it was built to explain, and Section 4.5 withdraws "
-  "the earlier attribution. Establishing the mechanism needs a sweep whose baseline "
-  "reproduces the deployed model's spectra."
-  % (sdv5.loc["U-Net, dropout 0", "sep_near_term"],
-     sdv5.loc["U-Net, dropout 0", "sep_long_term"],
-     udv5.loc["U-Net, dropout 0 (variant)", "RMSE_zw"],
-     udv5.loc["U-Net, dropout 0.3 (deployed)", "RMSE_zw"],
+P("**Settle what causes the U-Net's damping.** Part of this recommendation has been "
+  "carried out and is reported in Section 4.5. The dropout-free configuration the sweep "
+  "favoured was retrained under the deployed procedure, passed the scenario screen and "
+  "was adopted, taking the U-Net from %.2f to %.2f W/m\u00b2 over Zimbabwe. It did not "
+  "settle the damping. Removing dropout reduced it without removing it, the ratio still "
+  "falling monotonically with the cut to %.3f beyond wavenumber 20, and the sweep that "
+  "pointed at dropout cannot establish the mechanism because its own baseline showed an "
+  "excess of fine-scale power (%.2f) rather than a deficit, so it never reproduced the "
+  "failure it was built to explain. Establishing the cause needs a sweep whose baseline "
+  "reproduces the deployed spectra, and it matters beyond the U-Net: damping is what "
+  "stands between a statistical downscaling of this kind and a product that resolves "
+  "anything its input does not already contain."
+  % (udv5.loc["U-Net, dropout 0.3 (variant)", "RMSE_zw"],
+     udv5.loc["U-Net, dropout 0 (adopted)", "RMSE_zw"],
+     cut5.loc["U-Net", "k>=20"],
      uo.loc["baseline", "test_spec_ratio"]))
 P("**Extend the suitability analysis with infrastructure and demographic scenarios.** "
   "The present analysis can say how the resource changes at fixed sites. Answering where "

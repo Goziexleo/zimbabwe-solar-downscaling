@@ -207,11 +207,11 @@ margin over both networks: XGBoost − CNN -0.841 [-1.090, -0.353] and XGBoost �
 -1.471 [-1.893, -1.022]. **The deployment is unaffected** — it turned on scenario
 discrimination, and the Random Forest still fails that screen.
 
-**σ_arch is 59.39%** of long-term variance, with σ_DS at 9.08%.
+**σ_arch is 61.03%** of long-term variance, with σ_DS at 8.71%.
 Improving two of the four members narrowed the spread between architectures, which is
 exactly what that term measures — the mirror image of what the §6.13 correction did to it.
 Chapter 5's methodological point stands and is now much stronger: architecture choice
-dominates GCM choice (21.64%) by a factor of about 3.1.
+dominates GCM choice (26.33%) by a factor of about 2.3.
 
 **Corrected after the examiner's critique (1 Oct 2026).** Two errors were fixed here.
 σ_DS carried the MONTHLY validation RMSE (9.24 W m-2) into a budget whose other terms are
@@ -732,12 +732,14 @@ A 150-cell subsampled CV search picked configurations for both tree models that 
 
 ### Table 3.3 — validation 2011–2024 (W m⁻²)
 
+Ordered by full-box RMSE, the columns shown. **The XGBoost−U-Net ranking depends on the basis**: XGBoost leads by 0.016 W m⁻² over the full analysis box and the U-Net leads by 0.292 over Zimbabwe, which is the basis Chapter 4 reports. Neither margin is established. §12r gives the reason the U-Net is not deployed.
+
 | Model | RMSE | MAE | Pearson R | MBE | SS vs climatology | R² |
 |---|---|---|---|---|---|---|
 | **XGBoost (deployed)** | **9.03** | **6.64** | **0.9721** | +1.42 | **0.5264** | **0.9436** |
+| U-Net | 9.05 | 6.79 | 0.9722 | +0.22 | 0.5256 | 0.9434 |
 | CNN | 10.04 | 7.51 | 0.9667 | +2.11 | 0.4738 | 0.9304 |
 | Random Forest | 10.22 | 7.65 | 0.9639 | +0.22 | 0.4644 | 0.9278 |
-| U-Net | 12.73 | 9.47 | 0.9447 | +1.63 | 0.3329 | 0.8881 |
 
 Regenerate with `compute_table33.py` — a single canonical script scoring every model against
 identical references, so the table cannot drift between scripts and needs no retraining.
@@ -876,7 +878,7 @@ state only because four architectures were carried through to projection rather 
    **Grant the whole criterion, and answer it on relevance rather than size.** The Random Forest reproduces the historical field better in both its level and its spatial error structure. It still cannot produce the deliverable, which is a projection to 2100, because it inverts the scenario signal (§7.11) — a **categorical disqualification, not a magnitude trade**. Resist the shortcut of comparing 0.171 against +1.058 and calling it six times smaller: that treats a centred error on a climatological field as commensurable with a space-time aggregate, which is exactly what the composite criterion denied and what §7.14 and §8 warn against elsewhere. Secondarily, and with both quantities named as different kinds: 0.171 W m⁻² of centred error against +1.058 [+0.598, +1.768] of space-time aggregate error, plus four losses from four rolling-origin folds (§7.9).
 2. **RF cannot separate the emission scenarios (§7.11).** Its SSP5-8.5 minus SSP2-4.5 separation *shrinks* with lead time (+0.465 → +0.307 → +0.167), it inverts on the long-term change signal, and only 71.7% of cells order the pathways correctly, against XGBoost's 96.7%. The mechanism is tree extrapolation: temperature leaves the 1985–2010 training range 4.95% of the time under SSP5-8.5 against 0.79% under SSP2-4.5, and a tree's prediction saturates outside the range it was fitted on.
 
-3. **The ranking is not an artefact of the chosen split (§7.9).** This is the consequence of the rolling-origin result, and it belongs here rather than only in §7. The entire deployment argument rests on a comparison measured over one 1985–2010 / 2011–2024 division of the record. A rolling-origin design, refitting on an expanding window and testing on the block immediately after it, puts XGBoost ahead in **all four** forward-in-time folds by margins of 0.89 to 2.26 W m⁻². The preference is therefore a property of the models rather than of the validation period, and no fold reverses it. The negative form matters more than the positive one: had the ranking flipped between folds, *any* selection rule — the original single-metric one included — would have been arbitrating noise, and the honest conclusion would have been that the four models are not separable at this sample size. That is precisely the conclusion §7.10 forces for RF against CNN against U-Net, whose RMSE differences are not distinguishable. It is not the conclusion for XGBoost, which is separable from all three and stays separable in every fold.
+3. **The ranking is not an artefact of the chosen split (§7.9).** This is the consequence of the rolling-origin result, and it belongs here rather than only in §7. The entire deployment argument rests on a comparison measured over one 1985–2010 / 2011–2024 division of the record. A rolling-origin design, refitting on an expanding window and testing on the block immediately after it, puts XGBoost ahead in **all four** forward-in-time folds by margins of 0.89 to 2.26 W m⁻². The preference is therefore a property of the models rather than of the validation period, and no fold reverses it. The negative form matters more than the positive one: had the ranking flipped between folds, *any* selection rule — the original single-metric one included — would have been arbitrating noise, and the honest conclusion would have been that the four models are not separable at this sample size. That is precisely the conclusion §7.10 forces for RF against CNN against U-Net, whose RMSE differences are not distinguishable. It was not, at the time, the conclusion for XGBoost, which was separable from all three. **That no longer holds for the U-Net**: once the dropout-free configuration was adopted (§12r) the XGBoost−U-Net RMSE difference became +0.292 W m⁻² with a BCa interval of [−0.074, +0.616], which spans zero. XGBoost remains separable from the CNN and the Random Forest, and the rolling-origin folds cover only XGBoost and the Random Forest, so they speak to that pair alone.
 
 **The scorecard, stated as a scorecard rather than a clean sweep.** XGBoost is beaten on two tested axes — mean bias by 0.953 W m⁻² and centred RMSE by 0.171, both established under BCa — and it beats all three rivals on aggregate RMSE with BCa intervals excluding zero, wins all four rolling-origin folds, and is one of only three models that pass the scenario screen. It also carries one unestablished soft spot: the largest spatial-variance damping in the Taylor table, std-ratio deviation 0.0392, though every pairwise BCa interval on that metric spans zero. An earlier version of this section claimed no model was established to beat XGBoost on any axis; that was an absolute claim requiring only one counterexample, and §7.10 now supplies it. Deploying XGBoost still **returns the study to §3.8.1's original pre-registered criterion** — lowest validation RMSE — which removes the post-hoc criterion change (A10) as an attack surface rather than defending it.
 
@@ -1955,6 +1957,73 @@ actually supports. Gutowski et al. (2016) and Teichmann et al. (2021) were added
 `reference_additions.ris` (now 39 entries) so the resolution figures can be cited, which
 needs a Zotero insertion only the author can make. §5.3 and §5.6 now also state what this
 work can and cannot claim against that archive, and that the benchmark was not run.
+
+---
+
+## 12r. The dropout-free U-Net is adopted; the deployment is not changed
+
+Asked to redeploy the dropout-free U-Net, I promoted it, regenerated the whole evaluation
+and projection layer on it, and then stopped at the product chain, because the diagnostics
+did not support the switch. The configuration change is kept; the deployment is not.
+
+**The configuration change.** `unet_model.py` now defaults `DROPOUT_P` to 0.0 and the
+deployed checkpoint is the dropout-free one (epoch 22, inner MSE 0.08889, against 7 and
+0.12041 for the 0.3 configuration). Regenerated from it: validation fields, Table 3.3,
+spatial verification, feature importance, bootstrap and BCa intervals, power spectra and
+effective resolution, information content, baselines, SARAH validation, the U-Net's
+projections and ensemble, the scenario screen, the uncertainty budget, the operational
+baseline and all figures. The U-Net improves from 11.66 to **8.62 W m⁻²** over Zimbabwe.
+
+**Why the deployment did not follow.** All on the Zimbabwe basis:
+
+| axis | XGBoost − U-Net | BCa interval | established |
+|---|---|---|---|
+| RMSE | +0.292 | [−0.074, +0.616] | **no** |
+| centred RMSE | −1.531 | [−1.659, −1.451] | yes, XGBoost better |
+| spatial correlation | +0.034 | [+0.025, +0.045] | yes, XGBoost better |
+| std-ratio deviation | −0.068 | [−0.093, −0.045] | yes, XGBoost better |
+| mean bias | +0.715 | [+0.319, +1.055] | yes, U-Net better |
+
+A fourth result arrived late and points the same way: **the ranking depends on the basis.** Over the full analysis box XGBoost leads by 0.016 W m⁻² (9.035 against 9.050); over Zimbabwe the U-Net leads by 0.292. An advantage that exists on one domain and reverses on the other, with neither margin established, is not a basis for changing a deployment.
+
+The headline win is **not established**; the structural axes split three to one against
+the U-Net; and a bias is the one discrepancy of the five a downstream correction removes.
+Deploying on the lowest RMSE would also apply one rule to the U-Net and the opposite to
+the Random Forest in the same chapter, which is the §7.10 standard and the first thing an
+examiner would test.
+
+**Removing dropout did not fix the damping.** Effective resolution puts the U-Net at
+**0.17×** the truth's power beyond k=10, still the only architecture flagged DAMPED, where
+XGBoost is 1.02×, the Random Forest 0.98× and bilinear 0.99×. Across cuts the ratio falls
+monotonically from 1.07 at k≥3 to 0.0096 at k≥20. RQ2's negative answer is a U-Net
+property, and a product whose output is a map should not rest on the one architecture that
+cannot reproduce the map's structure.
+
+**What the adoption changed in the text.** §4.2.1's linear-baseline result softens and is
+restated: the U-Net now sits *below* the per-cell OLS, two architectures are
+indistinguishable from it (XGBoost +0.110, U-Net −0.182, both spanning zero) and two are
+measurably worse. The claim that survives is now stated in the form that matters — **no
+architecture in this study is established better than a straight line on this target.**
+§4.4 carries the deployment argument above, §4.5 inverts (the adopted configuration is
+dropout-free, so the variant is the 0.3 setting and what is measured is what dropout
+cost), §4.9 states plainly that the deployed model does not hold the lowest validation
+error, and the abstract names the U-Net as most accurate and says why XGBoost is deployed
+anyway.
+
+**A defect found on the way.** `compute_bootstrap_ci.py` had been broken since e3b757a
+this morning: that commit masked `truth` to Zimbabwe but still passed it to
+`evaluation_baselines`, which assigns a (71, 81) climatology by broadcasting, so the script
+raised a shape error and `bootstrap_ci.csv` was a stale pre-masking artefact. The chapters
+read `bca_intervals.csv`, so nothing published was affected. Fixed by passing the full grid
+and masking the returned climatology; the RF−XGBoost RMSE difference is **1.224**.
+
+`scenario_discrimination_variants.csv` is no longer written: with dropout-free deployed,
+its only row restated the deployed U-Net under a second name.
+
+**Reversibility.** `data/_backup_pre_unet_redeploy/` holds the prior evaluation directory,
+MME aggregations, suitability outputs, the 0.3 checkpoint and the dissertation as it stood
+at b365df4. The 0.3 checkpoint is also kept at
+`data/processed/models/unet/unet_csi_downscaler_drop03_archived.pth`.
 
 ---
 

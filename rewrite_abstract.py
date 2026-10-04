@@ -86,15 +86,17 @@ def paragraphs(n):
         "the fields into a multi-criteria suitability assessment for utility-scale "
         "photovoltaics.",
 
-        "On a withheld 2011 to 2024 record masked to the national boundary, a pixel-wise "
-        "gradient-boosted ensemble attains the lowest error of the four at %.2f W/m² and a "
-        "skill score of %.2f against a training-period climatology, against %.2f, %.2f and "
-        "%.2f W/m² for a convolutional network, a U-Net and a pixel-wise random forest. A "
-        "per-cell linear regression on identical predictors reaches %.2f W/m²; paired "
-        "year-block bootstrap intervals leave it indistinguishable from the best "
-        "architecture and establish it ahead of the other three, so none of the machine "
-        "learning models earns its complexity on this target."
-        % (n["xgb"], n["ss"], n["cnn"], n["unet"], n["rf"], n["ols"]),
+        "On a withheld 2011 to 2024 record masked to the national boundary, a U-Net "
+        "attains the lowest error of the four at %.2f W/m², ahead of a gradient-boosted "
+        "ensemble at %.2f, a convolutional network at %.2f and a random forest at %.2f. "
+        "The ensemble is deployed nonetheless, at a skill score of %.2f against "
+        "climatology: its margin to the U-Net is not established under resampling, its "
+        "advantage on three structural axes is, and the U-Net alone damps the spectrum. A "
+        "per-cell linear regression on identical predictors reaches %.2f W/m², "
+        "indistinguishable from both leaders under a paired year-block bootstrap and "
+        "established ahead of the other two, so no model here is established better than "
+        "a straight line."
+        % (n["unet"], n["xgb"], n["cnn"], n["rf"], n["ss"], n["ols"]),
 
         "A round-trip spectral test accounts for this. The target retains %.3f per cent "
         "of its time-mean variance below the 0.25 degree resolution of its own source, "
