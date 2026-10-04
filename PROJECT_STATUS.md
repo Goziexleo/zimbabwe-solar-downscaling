@@ -1630,7 +1630,7 @@ University of Zimbabwe styling (crest from the University's own site, wordmark p
 appends the consolidated references and two appendices. 648 paragraphs, 18 tables,
 11 images, **60 in-text Zotero fields intact**, ~30,750 words.
 
-- **Front matter:** title page, abstract (~600 words, every figure read from the
+- **Front matter:** title page, abstract (347 words, within the 350-word faculty limit, every figure read from the
   result CSVs so it cannot drift), acknowledgements, and a Word contents field.
 - **Page setup normalised.** The chapters arrived with three different left margins;
   every section is now A4 with a 3.5 cm binding edge, roman numerals for the front
@@ -2030,6 +2030,12 @@ at b365df4. The 0.3 checkpoint is also kept at
 ## 13. Outstanding
 
 **Open after the fifth round (§12q)**
+- **Abstract: done, 347 words against the faculty limit of 350.** The limit is 350
+  excluding keywords, confirmed by the author on 4 October 2026. `rewrite_abstract.py`
+  regenerates it from the CSVs at that length; it carries a three-word margin, so any
+  future sentence added there has to displace one. The count printed by the script
+  excludes the keyword line.
+
 - **Redeploy the dropout-free U-Net, or justify not doing so.** It is the most accurate
   model measured (8.62 against the deployed XGBoost's 8.92 W m⁻²), better on the inner
   split, and passes the scenario screen. Acting on it means regenerating the projections,

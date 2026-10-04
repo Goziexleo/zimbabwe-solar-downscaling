@@ -77,51 +77,45 @@ def numbers():
 
 def paragraphs(n):
     return [
-        "Zimbabwe's renewable energy targets require siting decisions at a finer scale "
-        "than general circulation models supply, which resolve surface solar radiation "
-        "at roughly 100 to 250 km. This study trains four machine learning "
-        "architectures to map atmospheric predictors onto an ERA5-derived "
-        "clear-sky-index target at 0.1 degrees over Zimbabwe under a perfect-prognosis "
-        "design, applies them to bias-corrected CMIP6 predictors to 2100, and carries "
-        "the fields into a multi-criteria suitability assessment for utility-scale "
+        "Zimbabwe's renewable energy targets require siting decisions finer than general "
+        "circulation models supply, which resolve surface solar radiation at 100 to 250 km. "
+        "Four machine learning architectures map atmospheric "
+        "predictors onto an ERA5-derived clear-sky-index target at 0.1 degrees under a "
+        "perfect-prognosis design, are applied to bias-corrected CMIP6 predictors to 2100 "
+        "and carried into a suitability assessment for utility-scale "
         "photovoltaics.",
 
-        "On a withheld 2011 to 2024 record masked to the national boundary, a U-Net "
-        "attains the lowest error of the four at %.2f W/m², ahead of a gradient-boosted "
-        "ensemble at %.2f, a convolutional network at %.2f and a random forest at %.2f. "
-        "The ensemble is deployed nonetheless, at a skill score of %.2f against "
-        "climatology: its margin to the U-Net is not established under resampling, its "
-        "advantage on three structural axes is, and the U-Net alone damps the spectrum. A "
-        "per-cell linear regression on identical predictors reaches %.2f W/m², "
-        "indistinguishable from both leaders under a paired year-block bootstrap and "
-        "established ahead of the other two, so no model here is established better than "
-        "a straight line."
+        "On a withheld 2011 to 2024 record over Zimbabwe, a U-Net attains the lowest "
+        "error, %.2f W/m², against a gradient-boosted ensemble at %.2f, a convolutional "
+        "network at %.2f and a random forest at %.2f. The ensemble is deployed "
+        "nonetheless, at %.2f skill against climatology: its margin to the U-Net is not "
+        "established under resampling, its advantage on three structural axes is, and the "
+        "U-Net alone damps the spectrum. A per-cell linear regression reaches %.2f W/m², "
+        "indistinguishable from both leaders and ahead of the other two, so "
+        "no model here is established better than a straight line."
         % (n["unet"], n["xgb"], n["cnn"], n["rf"], n["ss"], n["ols"]),
 
-        "A round-trip spectral test accounts for this. The target retains %.3f per cent "
-        "of its time-mean variance below the 0.25 degree resolution of its own source, "
-        "so the product is a physically consistent regridding carrying a projected "
-        "climate signal rather than a resolution gain, and a field that smooth is close "
-        "to a linear function of its coarse predictors." % n["pv"],
+        "A round-trip spectral test accounts for that: the target retains %.3f per cent of "
+        "its time-mean variance below the 0.25 degree resolution of its source. The "
+        "product is therefore a physically consistent regridding carrying a climate "
+        "signal, not a resolution gain; a field that smooth is nearly linear in its "
+        "predictors." % n["pv"],
 
-        "Projected annual-mean irradiance rises by %.1f W/m² under SSP5-8.5 by 2076 to 2100 "
-        "against each model's own historical run, where bias-correcting and interpolating "
-        "the same models' native irradiance gives %.1f W/m², and the downscaled change "
-        "reverses the sign of its driver for one of the three models. The choice of "
-        "downscaling architecture accounts for %.0f per cent of projection variance at that "
-        "horizon against %.0f per cent for the choice of global model, so a study reporting "
-        "a single architecture would understate its own uncertainty by the larger term."
+        "Projected annual-mean irradiance rises by %.1f W/m² under SSP5-8.5 by 2076 to "
+        "2100 against each model's own history, where bias-correcting the same models' "
+        "native irradiance gives %.1f, and reverses its driver's sign for one of "
+        "three models. Architecture choice accounts for %.0f per cent of projection "
+        "variance against the global model's %.0f, so a single-architecture "
+        "study understates its uncertainty by the larger term."
         % (n["ml"], n["qdm"], n["arch"], n["gcm"]),
 
-        "The suitability analysis combines irradiance with six biophysical and "
-        "infrastructural criteria. Its defensible output is not the five-tier map but the "
-        "%s of %s assessed cells that stay highly suitable under every weighting tested, "
-        "%.1f per cent of cells changing tier under at least one. Those cells are "
-        "distinguished by transmission access rather than by irradiance, whose standard "
-        "deviation is %.0f W/m² within a %.0f to %.0f W/m² range. Validation is "
-        "out-of-sample in time but uses ERA5 as both training target and reference; "
-        "refitting against a satellite retrieval is identified as the first priority for "
-        "further work."
+        "The suitability analysis adds six further criteria. Its "
+        "defensible output is not the five-tier map but the %s of %s assessed cells that "
+        "stay highly suitable under every weighting tested, %.1f per cent changing tier "
+        "under at least one. Transmission access distinguishes them, not irradiance, "
+        "whose standard deviation is %.0f W/m² in a %.0f to %.0f range. "
+        "Validation is out-of-sample in time but uses ERA5 as both target and reference; "
+        "refitting against satellite data is the first priority."
         % ("{:,}".format(n["robust"]), "{:,}".format(n["assessed"]),
            n["tier"], n["gsd"], n["glo"], n["ghi"]),
 
