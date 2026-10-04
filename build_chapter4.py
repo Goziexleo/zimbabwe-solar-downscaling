@@ -275,10 +275,11 @@ P("Two separate corrections were applied to the neural models, and they pull in 
   "%.2f and %.2f to %.2f and %.2f. The second removed the same defect from the "
   "hyperparameters, which had been chosen by a grid scored on that record; re-running the "
   "grid inside the training period (Section 3.6.7) recovered %.2f W/m² for the CNN and "
-  "%.2f for the U-Net, giving the %.2f and %.2f reported here. The two pixel-wise models "
+  "%.2f for the U-Net. All six figures in this paragraph are on the full analysis box, "
+  "the only basis on which the superseded runs exist. The two pixel-wise models "
   "are unchanged to four decimal places throughout, as they must be, having not been "
   "refitted."
-  % (honest_ckpt.loc["CNN", "RMSE"] - leaky.loc["CNN", "RMSE"], honest_ckpt.loc["U-Net", "RMSE"] - leaky.loc["U-Net", "RMSE"], leaky.loc["CNN", "RMSE"], leaky.loc["U-Net", "RMSE"], honest_ckpt.loc["CNN", "RMSE"], honest_ckpt.loc["U-Net", "RMSE"], honest_ckpt.loc["CNN", "RMSE"] - RB("CNN", "RMSE"), honest_ckpt.loc["U-Net", "RMSE"] - RB("U-Net", "RMSE"), RB("CNN", "RMSE"), RB("U-Net", "RMSE")))
+  % (honest_ckpt.loc["CNN", "RMSE"] - leaky.loc["CNN", "RMSE"], honest_ckpt.loc["U-Net", "RMSE"] - leaky.loc["U-Net", "RMSE"], leaky.loc["CNN", "RMSE"], leaky.loc["U-Net", "RMSE"], honest_ckpt.loc["CNN", "RMSE"], honest_ckpt.loc["U-Net", "RMSE"], honest_ckpt.loc["CNN", "RMSE"] - RB("CNN", "RMSE"), honest_ckpt.loc["U-Net", "RMSE"] - RB("U-Net", "RMSE")))
 # Stated as changes, not levels. The archived runs exist only on the full
 # analysis box, so quoting their absolute errors beside Table 4.1's masked
 # figures invited a reader to look for 12.73 in a table that reports 11.65.

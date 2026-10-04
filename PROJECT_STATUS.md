@@ -322,9 +322,9 @@ Ablation (XGBoost, all else constant):
 |---|---|---|---|
 | A. Lagged `rsds`, 6 predictors (original) | 22.94 | 0.817 | −0.203 |
 | B. Lag fixed, `rsds` **kept** | **5.54** | **0.9894** | 0.7096 |
-| C. Lag fixed, `rsds` **dropped** (deployed) | 9.24 | 0.9707 | 0.5155 |
+| C. Lag fixed, `rsds` **dropped** (deployed) | 9.03 | 0.9721 | 0.5264 |
 
-Skill is against the corrected 19.08 climatology, so configuration C agrees with §8 (0.5155). An earlier version used the leaky 17.98 reference and gave 0.6922 and 0.4932 — putting the same model at two different skill scores in two sections of this document.
+Skill is against the corrected 19.08 climatology, so configuration C agrees with §8 (0.5264). An earlier version used the leaky 17.98 reference and gave 0.6922 and 0.4932 — putting the same model at two different skill scores in two sections of this document.
 
 A→B is the fix alone and accounts for essentially all the improvement. B→C shows **dropping `rsds` made the models measurably worse** — it merely left them above threshold. The ~20 points of climatology skill lost (0.69 → 0.49) is precisely the circular portion. *"We removed a predictor and R improved" is the wrong causal claim* and an examiner comparing B and C would catch it.
 
