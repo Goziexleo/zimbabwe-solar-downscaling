@@ -86,9 +86,14 @@ def cv_rmse_xgb(i, j, max_depth, eta, subsample, min_child_weight):
     for start, end in folds:
         test_idx = np.arange(start, end)
         train_idx = np.setdiff1d(np.arange(n_time), test_idx)
+        # reg_alpha and reg_lambda are the deployed values from
+        # train_pixelwise_xgb.py. Without them the search was scoring a
+        # different estimator from the one deployed, which made the "deployed
+        # configuration ranks Nth" comparison incoherent.
         model = xgb.XGBRegressor(
             max_depth=max_depth, learning_rate=eta, subsample=subsample,
             min_child_weight=min_child_weight, n_estimators=200,
+            reg_alpha=0.1, reg_lambda=1.0,
             random_state=SEED, n_jobs=1,
         )
         model.fit(x[train_idx], y[train_idx])

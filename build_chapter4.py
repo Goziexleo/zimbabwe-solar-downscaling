@@ -48,6 +48,8 @@ _OLS = "Linear regression (OLS)"
 bvm = pd.read_csv(os.path.join(EVAL, "baseline_vs_models.csv")).set_index("model")
 pbl = pd.read_csv(os.path.join(EVAL, "projection_baselines.csv"))
 pvd = pd.read_csv(os.path.join(EVAL, "pv_temperature_derating.csv"))
+_cvc = pd.read_csv(os.path.join(EVAL, "pixelwise_cv_config_check.csv"))
+cvc = _cvc[_cvc.model == "XGBoost"].set_index("configuration")
 pvx = pd.read_csv(os.path.join(EVAL, "pv_yield_scenario_crossover.csv")
                   ).set_index("period")
 pve = pvd[pvd.gcm == "ensemble mean"].set_index(["scenario", "period"])
@@ -479,6 +481,18 @@ P("This test is used as a screen and not as a ranking, and the distinction is es
      _hi("XGBoost", "U-Net", "MBE"),
      cut.loc["U-Net", "k>=11"], cut.loc["XGBoost", "k>=11"],
      t33.loc["U-Net", "RMSE"] - t33.loc["XGBoost", "RMSE"]))
+P("One qualification carries over from Section 3.6.7 and belongs here, because this is "
+  "where the comparison is made. The deployed XGBoost configuration was retained in "
+  "preference to its own cross-validated alternative on the strength of a comparison on "
+  "the withheld record, which is selection on the evaluation data; and that alternative "
+  "is in fact the marginally better of the two there, at %.3f W/m\u00b2 against %.3f. "
+  "The XGBoost figure this section weighs against the U-Net is therefore not free of "
+  "that contamination, and the margin at issue, %.3f W/m\u00b2, is of the same order as "
+  "the configuration difference. It does not change the direction of the argument, which "
+  "rests on the spatial axes rather than on aggregate error, but it is a reason to read "
+  "the aggregate comparison as indecisive on its own rather than merely unestablished."
+  % (cvc.loc["cross-validated", "RMSE_zw"], cvc.loc["deployed", "RMSE_zw"],
+     abs(pair("XGBoost", "U-Net", "RMSE")[0])))
 P("The wider point is that a model can satisfy every validation metric in Table 4.1 and "
   "still be unfit for the purpose the product serves. The Random Forest is better than "
   "the deployed model on mean bias, not separable from it on either spatial axis, and "
@@ -586,8 +600,9 @@ P("One result from the same sweep points the other way and is reported because i
   "A further reason for caution is that the sweep predates the hyperparameter correction "
   "of Section 3.6.7 and was run at the superseded learning rate, so its baseline differs "
   "from the deployed model in that setting as well as in failing to reproduce the "
-  "damping. What can be said is that the deployed U-Net damps fine scales, that its "
-  "damping is robust to the wavenumber cut, and that the mechanism remains open."
+  "damping. What can be said is that the adopted U-Net damps fine scales from "
+  "wavenumber 5 upward, that the deficit deepens monotonically with the cut rather "
+  "than holding at one value, and that the mechanism remains open."
   % (uo.loc["gp_none", "test_spec_ratio"], uo.loc[["baseline", "gp_none", "gp_match", "gp_match_strong"], "test_spec_ratio"].min(), uo.loc[["baseline", "gp_none", "gp_match", "gp_match_strong"], "test_spec_ratio"].max()))
 TBL(["Field"] + [c for c in cut.columns if c.startswith("k>=")] + ["Verdict"], [[f] + ["%.2f" % cut.loc[f, c] for c in cut.columns if c.startswith("k>=")]
      + [cut.loc[f, "robust"]]
@@ -677,8 +692,7 @@ proj = {v.replace("ghi_", ""): lay[v].values[_zw] for v in lay.data_vars if v.st
 TBL(["Scenario and horizon", "Mean change (W/m²)", "Percent", "Range across domain"], [[k.replace("_", " "), "%+.2f" % (proj[k] - base).mean(), "%+.2f%%" % (100 * (proj[k] - base).mean() / base.mean()), "%+.2f to %+.2f" % ((proj[k] - base).min(), (proj[k] - base).max())]
      for k in sorted(proj)], "Table 4.7. Projected change in annual-mean GHI from the deployed XGBoost ensemble, "
     "relative to the ERA5-derived present, across three GCMs. Computed over the cells "
-    "inside the national boundary, the basis used throughout this chapter; an earlier "
-    "version of this table averaged the full analysis box and gave smaller changes.")
+    "inside the national boundary, the basis used throughout this chapter.")
 P("All six projections give an increase in surface irradiance over Zimbabwe, ranging "
   "from %+.2f W/m² in the near term under SSP2-4.5 to %+.2f W/m² in the long term "
   "under SSP5-8.5, or roughly %.1f to %.1f per cent. The increase is larger under the "
@@ -839,11 +853,19 @@ P("A second result is more interesting and is stated with the condition it depen
   "much as of the climate, so the threshold is reported rather than the single case: "
   "solving for the coefficient at which the two pathways cross gives \u2212%.5f per K in the "
   "long term and \u2212%.5f in the mid term, and no crossing in the near term for any "
-  "coefficient between \u22120.0060 and \u22120.0010. Most crystalline-silicon modules "
-  "are more negative than \u22120.0035, so the reversal holds for them, but it does not "
-  "hold for low-coefficient modules, where the two pathways instead converge. The claim "
-  "is therefore conditional: for typical modules a projection that stops at irradiance "
-  "ranks the scenarios the wrong way round for the quantity a developer is buying."
+  "coefficient between \u22120.0060 and \u22120.0010. Where that threshold falls "
+  "relative to a real module is therefore the question, and it falls inside the range "
+  "silicon devices span. The PERC-class coefficients that dominate the installed fleet "
+  "are more negative than the long-term threshold, so for those modules the reversal "
+  "holds; the smaller coefficients carried by TOPCon and heterojunction devices sit at "
+  "or above it, so for those the two pathways converge instead. The plants this "
+  "projection concerns would be built long after the present fleet is replaced, so the "
+  "comparison that decides the matter is against the coefficient of the technology "
+  "actually specified rather than against a generic crystalline-silicon value. What can "
+  "be said without that specification is narrower than the earlier draft of this "
+  "section claimed: a projection that stops at irradiance may rank the two pathways the "
+  "wrong way round for the quantity a developer is buying, and whether it does is "
+  "decided by the module."
   % (pve.loc[("ssp585", "long_term_2076_2100"), "yield_change_pct_gamma-0.0040"],
      pve.loc[("ssp245", "long_term_2076_2100"), "yield_change_pct_gamma-0.0040"],
      abs(pvx.loc["long_term_2076_2100", "gamma_crossover"]),

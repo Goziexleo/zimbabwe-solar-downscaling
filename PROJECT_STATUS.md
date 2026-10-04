@@ -2116,6 +2116,75 @@ copy of the document with "is second on aggregate error" added fails the guard w
 
 ---
 
+## 12t. Fifth critique: the pixel-wise defaults, and four regressions my own fix exposed
+
+Score 65/100, up from 59. Every critical and severe item of the previous round was
+accepted, and the examiner independently recomputed both γ crossing thresholds from the
+table and reproduced them. Two things cost the round.
+
+**The pixel-wise defaults were selected on the withheld record, and the reason given was
+false.** Section 3.6.7 said the cross-validated configurations "performed marginally worse
+on the full 5,751-cell validation set", so the defaults were retained. Choosing between
+configurations by their score on the evaluation period is the defect this thesis corrects
+at length for the neural models. The comparison had also never been reported, so it was
+run: `compute_pixelwise_cv_config_check.py` fits both configurations of both models on the
+training period and scores them on the validation period, Zimbabwe basis, training and
+scoring in one pass per cell so nothing is persisted.
+
+| model | deployed | cross-validated | |
+|---|---|---|---|
+| XGBoost | 8.915 | **8.880** | CV better by 0.036 |
+| Random Forest | 10.134 | **9.656** | CV better by 0.477 |
+
+Both deployed configurations reproduce their Table 4.1 rows exactly, which validates the
+check. **The claim reverses in both cases**, marginally for XGBoost and materially for the
+Random Forest. Section 3.6.7 now states the measured numbers, concedes the
+selection-on-test defect instead of presenting it as a methodological caveat, and says the
+defaults are retained only because refitting the deployed XGBoost cascades through the
+projection, uncertainty and suitability chains. Section 4.4 carries the consequence where
+it bites: the XGBoost figure weighed against the U-Net is not free of that contamination,
+and the margin at issue is of the same order as the configuration difference, so the
+aggregate comparison is indecisive on its own rather than merely unestablished.
+
+**A second defect found while measuring it.** The deployed XGBoost carries `reg_alpha=0.1`
+and `reg_lambda=1.0`, hardcoded and not env-overridable, and `hpo_pixelwise.py` omitted
+both. The grid search was therefore scoring a different estimator from the one deployed,
+which made "the deployed configuration ranks Nth" incoherent. Both now use the deployed
+form, the search was re-run, and the deployed configuration ranks 7 of 25. The
+discrepancy surfaced as a 0.1 W/m² gap between the check and Table 4.1 and would not have
+been visible any other way.
+
+**Four regressions, and the cause was my own fix.** Repairing the splice last round let the
+generators' wording reach the document for the first time in two rounds, which exposed
+stale text in `build_chapter4.py` and `build_chapter5.py` that the old splice had been
+masking: "categorical rather than a matter of degree", "two of five tested axes" in two
+places, and "damping is robust to the wavenumber cut". The Table 4.5 list entry was also
+truncated to "Scenario separation, SSP5-8." by the first-sentence rule I added, because the
+full stop inside "SSP5-8.5" looked like a sentence end; the regex now requires whitespace
+or end-of-caption after the stop. The revision-history clause I had put in the Table 4.7
+caption is deleted. All six phrases are now in the RETIRED list.
+
+**The yield claim's module premise was pointing the wrong way.** The text said most
+crystalline-silicon modules are more negative than −0.0035 so the reversal holds. That
+describes the installed PERC fleet, not the TOPCon and heterojunction devices now entering
+production, whose coefficients are smaller and sit at or above the long-term crossing of
+−0.00311 — and the plants this projection concerns would be built long after the present
+fleet is replaced. Section 4.7.2 now makes module technology the deciding factor rather
+than asserting a generic silicon value, and Section 5.6 recommends redoing the estimate
+against a specified module as the cheapest remaining extension. No per-technology
+coefficients are quoted, because the citable sources for them are datasheets rather than
+literature and the specific values were not verified here.
+
+**Presentation.** The remaining mixed spacing was in the headings: 36 carried a direct 1.5
+while 92 inherited the style. The override is cleared rather than a value imposed, so all
+128 take the template's spacing. Body is 315 paragraphs at 1.5 and captions 64 at single.
+
+**Still outstanding and still only the author's to do:** the reference list, unchanged for
+four versions at 23 entries against a prepared RIS of 40, which costs marks on two axes;
+the Lin citation for Zimbabwe GHI; and the logged-out test of the repository link.
+
+---
+
 ## 13. Outstanding
 
 **Open after the fifth round (§12q)**

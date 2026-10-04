@@ -138,6 +138,25 @@ def canonical_anchors():
 
 # Superseded text. Each was true of an earlier Chapter 3 and is now false.
 RETIRED = [
+    # Fifth critique. Four of these came BACK in v5 because the splice fix of
+    # that round let the generators' own stale wording reach the document for
+    # the first time in two rounds; they are guarded so that cannot recur.
+    ("categorical rather than a matter of degree",
+     "71.5 per cent correct ordering is well above chance; the failure is large "
+     "rather than marginal"),
+    ("two of five tested axes",
+     "the Random Forest is established better on one of five axes, mean bias"),
+    ("two of five resampled axes",
+     "the Random Forest is established better on one of five axes, mean bias"),
+    ("damping is robust to the wavenumber cut",
+     "the deficit deepens monotonically with the cut; Table 4.6 records it as "
+     "cut-dependent"),
+    ("performed marginally worse on the full 5,751-cell validation set",
+     "the cross-validated configurations are the better of the two on validation, "
+     "by 0.036 for XGBoost and 0.477 for the Random Forest"),
+    ("Hyperparameters for all four models were optimised by grid search",
+     "the search governed the deployed configuration for the two neural models only"),
+
     # Fourth critique. The U-Net retrain of Section 4.5 changed the ordering, and
     # the splice kept putting the old narrative sentences back, so these are
     # guarded by phrase: a numeric check cannot see a wrong ordinal.

@@ -244,17 +244,19 @@ P("The second check is less comfortable. The downscaled change agrees in sign wi
   % (100 * pbl5.same_sign.mean()))
 P("The deployment decision followed from a test that no accuracy metric could perform. "
   "The Random Forest, %s on aggregate error and better than the deployed model on "
-  "two of five tested axes, loses the scenario signal it would be required to project: "
+  "one of five tested axes, loses the scenario signal it would be required to project: "
   "its separation between pathways shrinks with lead time rather than growing, and only "
   "%.1f per cent of cells order the two pathways correctly. The mechanism is tree "
-  "extrapolation (Breiman, 2001), and the failure is categorical rather than a matter "
-  "of degree. This is "
+  "extrapolation (Breiman, 2001), and the failure is large rather than marginal, though "
+  "%.1f per cent correct ordering remains well above chance. This is "
   "why the improved U-Net configuration, which was adopted and is the version reported "
   "throughout, does not reopen the deployment on accuracy alone. Section 4.5 reports "
   "that it passes the screen and returns the lower aggregate error of the two, but that "
   "margin is not established under resampling while XGBoost's advantage on the spatial "
   "axes is, and the U-Net remains the only architecture whose field is damped."
-  % (rank("Random Forest").replace("-lowest", ""), scr.loc["Random Forest", "pct_ordered_long_term"]))
+  % (rank("Random Forest").replace("-lowest", ""),
+     scr.loc["Random Forest", "pct_ordered_long_term"],
+     scr.loc["Random Forest", "pct_ordered_long_term"]))
 
 H("5.2.4 RQ4: where suitability is highest", 3)
 P("Of %d assessed locations, **%d, %.1f per cent, approximately %s km², are classified "
@@ -316,7 +318,7 @@ P("**What this adds over an existing regional archive, and what it does not.** T
   "case for the statistical approach altogether.")
 P("**A demonstration that historical validation cannot substitute for a projection test.** "
   "The Random Forest passes every accuracy threshold, is %s on aggregate error, and "
-  "is better than the deployed model on two of five resampled axes, yet cannot produce "
+  "is better than the deployed model on one of five resampled axes, yet cannot produce "
   "the deliverable. The screen that detects this is cheap, is not standard practice, and "
   "would have changed the model selection in this study had it not been applied."
   % rank("Random Forest").replace("-lowest", ""))
@@ -416,6 +418,15 @@ P("**Settle what causes the U-Net's damping.** Part of this recommendation has b
      udv5.loc["U-Net, dropout 0 (adopted)", "RMSE_zw"],
      cut5.loc["U-Net", "k>=20"],
      uo.loc["baseline", "test_spec_ratio"]))
+P("**Settle the yield question against a specified module.** Section 4.7.2 shows that "
+  "whether the projected irradiance gain translates into a larger yield under the higher "
+  "pathway depends on the module temperature coefficient, and that the threshold falls "
+  "inside the range silicon devices span: PERC-class coefficients reverse the scenario "
+  "ordering, the smaller coefficients of TOPCon and heterojunction devices do not. The "
+  "estimate here is first order and generic. Repeating it with the coefficient, mounting "
+  "and derate assumptions of a specified module, against sub-daily temperature rather "
+  "than a monthly mean, would turn a conditional statement into a usable one, and it is "
+  "the cheapest remaining extension in the whole study.")
 P("**Extend the suitability analysis with infrastructure and demographic scenarios.** "
   "The present analysis can say how the resource changes at fixed sites. Answering where "
   "future sites should be requires projections of the transmission network and population "

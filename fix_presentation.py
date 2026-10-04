@@ -85,6 +85,12 @@ def main():
         if name.startswith("Heading"):
             for r in p.runs:
                 r.font.color.rgb = RGBColor(0, 0, 0)
+            # Thirty-six headings carried a direct 1.5 while ninety-two inherited
+            # the style, which is the heading half of the mixed-spacing report.
+            # The override is cleared rather than a value imposed, so every
+            # heading takes the template's spacing and the template stays in
+            # charge of heading format.
+            p.paragraph_format.line_spacing = None
             headings += 1
             continue
         if not t or name == "Bibliography":

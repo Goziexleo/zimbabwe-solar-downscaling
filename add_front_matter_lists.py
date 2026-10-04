@@ -144,7 +144,12 @@ def main():
             them; the number plus the leading description is what a reader
             scans for."""
             t = text.strip()
-            head = re.match(r"^((?:Table|Figure) \d+\.\d+\.\s*[^.]*\.)", t)
+            # The full stop must END a sentence, not sit inside a number:
+            # "SSP5-8.5" and "19.19 W/m²" both contain one, and an earlier
+            # version truncated Table 4.5's entry to "Scenario separation,
+            # SSP5-8." because of it. The lookahead requires whitespace or the
+            # end of the caption after the stop.
+            head = re.match(r"^((?:Table|Figure) \d+\.\d+\.\s*.*?\.)(?=\s|$)", t)
             return head.group(1).strip() if head else t
 
         tables = [entry(p.text) for p in d.paragraphs
