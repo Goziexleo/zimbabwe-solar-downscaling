@@ -118,6 +118,12 @@ BY_DOI = [
      "the closest published benchmark of deep learning downscaling"),
     ("10.1029/2018MS001400", "MPI-ESM1-2 model description"),
     ("10.1073/pnas.1611845114", "the closest published African siting study"),
+    ("10.5194/gmd-9-4087-2016",
+     "the CORDEX framework, cited in Chapter 2 for the dynamically downscaled "
+     "African archive; the sentence previously credited this to Harilal et al."),
+    ("10.1007/s00382-020-05494-x",
+     "CORDEX-CORE, the 0.22 degree ensemble Section 5.3 positions this work "
+     "against"),
     ("10.5194/essd-16-5243-2024",
      "SARAH-3, the satellite record Chapter 4 validates against; a title search "
      "returns an EGU conference abstract instead of the dataset paper"),

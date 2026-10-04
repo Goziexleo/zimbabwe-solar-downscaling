@@ -48,6 +48,8 @@ bas = pd.read_csv(os.path.join(EVAL, "baselines.csv")).set_index("baseline")
 _OLS = "Linear regression (OLS)"
 bvm = pd.read_csv(os.path.join(EVAL, "baseline_vs_models.csv")).set_index("model")
 pbl = pd.read_csv(os.path.join(EVAL, "projection_baselines.csv"))
+pvd = pd.read_csv(os.path.join(EVAL, "pv_temperature_derating.csv"))
+pve = pvd[pvd.gcm == "ensemble mean"].set_index(["scenario", "period"])
 wts = pd.read_csv(os.path.join(EVAL, "suitability_weights.csv")).set_index("scheme")
 lc = pd.read_csv(os.path.join(EVAL, "layer_choice_sensitivity.csv")).iloc[0]
 spv = pd.read_csv(os.path.join(EVAL, "sarah_product_validation.csv")).set_index("model")
@@ -461,28 +463,45 @@ P("The cause was investigated with a controlled sweep fitting on 1985 to 2004 an
   "W/m², spatial correlation from %.3f to %.3f, and centred error from %.2f to %.2f. "
   "Dropout at this rate appears to cost the U-Net a substantial amount of accuracy."
   % (uo.loc["baseline", "cfg_dropout"], uo.loc["baseline", "test_rmse"], uo.loc["drop_0", "test_rmse"], uo.loc["baseline", "test_spatial_r"], uo.loc["drop_0", "test_spatial_r"], uo.loc["baseline", "test_centred_rmse"], uo.loc["drop_0", "test_centred_rmse"]))
-P("That appearance does not survive the honest procedure, and the configuration has now "
-  "been retrained to find out. Fitted exactly as the deployed U-Net is, at the deployed "
-  "learning rate and under the same two-phase selection in which the epoch count is "
-  "chosen on an inner split and the model refitted on the full training record, the "
-  "dropout-free configuration scores %.2f W/m\u00b2 over Zimbabwe against the deployed "
-  "model's %.2f. It is worse, not better. The sweep's %.2f was obtained at a superseded "
-  "learning rate and by keeping the checkpoint that scored best on the withheld record "
-  "itself, which is selection on the evaluation data of the same kind corrected "
-  "elsewhere in this work. Neither condition survives, and with them the apparent "
-  "advantage goes."
+P("That appearance survives the honest procedure, which was not the expected result and "
+  "is reported as it came out. Fitted exactly as the deployed U-Net is, at the deployed "
+  "learning rate, under the same two-phase selection in which the epoch count is chosen "
+  "on an inner split and the model refitted on the full training record, and under the "
+  "same random seed, the dropout-free configuration scores %.2f W/m\u00b2 over Zimbabwe "
+  "against the deployed model's %.2f. It is better by %.2f. For a model with a stochastic "
+  "fit the obvious objection is that the gap is the draw rather than the setting, and it "
+  "is answered directly: retraining the deployed configuration from the committed script "
+  "reproduces it to within 10\u207b\u2074 W/m\u00b2, weight for weight and at the same "
+  "selected epoch, so the difference is the dropout rate. Nor does the result depend on "
+  "the withheld record, because the dropout-free configuration is also the better of the "
+  "two on the inner split that did the selecting, at a mean squared error of %.4f against "
+  "%.4f."
   % (udv.loc["U-Net, dropout 0 (variant)", "RMSE_zw"],
      udv.loc["U-Net, dropout 0.3 (deployed)", "RMSE_zw"],
-     uo.loc["drop_0", "test_rmse"]))
+     udv.loc["U-Net, dropout 0.3 (deployed)", "RMSE_zw"]
+     - udv.loc["U-Net, dropout 0 (variant)", "RMSE_zw"],
+     0.08889, 0.12041))
 P("The same configuration was also put through the scenario-discrimination screen of "
   "Section 4.4, which Chapter 5 previously had to leave open. It passes: separation of "
   "%+.3f, %+.3f and %+.3f W/m\u00b2 across the three horizons, positive throughout and "
-  "growing monotonically. So the dropout-free U-Net is admissible for projection and "
-  "simply less accurate, which closes the question in favour of the deployed "
-  "configuration rather than against it."
+  "growing monotonically. The consequence is uncomfortable and is stated rather than "
+  "buried. A dropout-free U-Net is more accurate over Zimbabwe than every entry in Table "
+  "4.1, the deployed XGBoost included at %.2f W/m\u00b2, and it is admissible for "
+  "projection on the same screen the deployed ensemble had to pass. The configuration "
+  "this study deployed is therefore not the best configuration it found. Everything from "
+  "Section 4.6 onwards is nevertheless reported on the XGBoost chain and is not restated "
+  "on a U-Net basis, because redeploying would require the projection, uncertainty and "
+  "suitability chains to be regenerated and checked end to end, which this submission "
+  "could not accommodate; reporting a model selection the downstream results do not "
+  "actually rest on would be worse than reporting the discrepancy. Section 4.9 records it "
+  "as a limitation and Section 5.6 as the first task of a continuation. One thing it does "
+  "not change is the answer to RQ2. The accuracy gain is pointwise, and the sweep that "
+  "first found it also found the dropout-free field spectrally damped, so it buys lower "
+  "error at each cell rather than structure the coarse field did not already carry."
   % (sdv.loc["U-Net, dropout 0", "sep_near_term"],
      sdv.loc["U-Net, dropout 0", "sep_mid_term"],
-     sdv.loc["U-Net, dropout 0", "sep_long_term"]))
+     sdv.loc["U-Net, dropout 0", "sep_long_term"],
+     t33.loc["XGBoost", "RMSE_zw"]))
 P("The sweep does not, however, identify the cause of the damping reported above. The "
   "difficulty is that the "
   "sweep's own baseline does not reproduce the damping it was built to explain. That "
@@ -699,6 +718,53 @@ P("The sign check is less comfortable and is reported because it is inconvenient
      pbl[(pbl.gcm == "MPI-ESM1-2-HR") & (pbl.scenario == "ssp585") &
          (pbl.horizon == "mid_term_2051_2075")].ml_change_own_history.iloc[0]))
 
+H("4.7.2 What the irradiance gain is worth once the modules heat", 3)
+P("Every change reported so far is a change in irradiance. A siting decision is about "
+  "delivered energy, and crystalline-silicon output falls as the module heats, so the "
+  "same pathways that brighten the sky also erode the efficiency with which that light "
+  "is converted. Reporting the irradiance field alone would overstate the result. A "
+  "first-order estimate is therefore given, with its assumptions on the face of it: cell "
+  "temperature follows the nominal-operating-cell-temperature form, T_cell = T_air + kG, "
+  "with k set by an NOCT of 45 °C; plane-of-array irradiance is taken as twice the "
+  "24-hour monthly mean, the same averaging-window factor Section 3.5.4 discusses; output "
+  "is proportional to G(1 + \u03b3(T_cell \u2212 25 °C)); and \u03b3 is varied from "
+  "\u22120.0030 to \u22120.0045 per K to span common modules. Temperature is the "
+  "bias-corrected CMIP6 tas, upsampled to the target grid exactly as Section 3.5.1 "
+  "upsamples the other coarse predictors, and every change is taken against the same "
+  "model's own historical run.")
+TBL(["Scenario and horizon", "ΔGHI (%)", "ΔT (K)", "ΔYield (%)", "ΔYield range (%)"],
+    [["%s %s" % (sc, pe.split("_")[0]),
+      "%+.2f" % pve.loc[(sc, pe), "ghi_change_pct"],
+      "%+.2f" % pve.loc[(sc, pe), "tair_change_K"],
+      "%+.2f" % pve.loc[(sc, pe), "yield_change_pct_gamma-0.0040"],
+      # Ascending, so the range reads low to high rather than by coefficient.
+      "%+.2f to %+.2f" % (pve.loc[(sc, pe), "yield_change_pct_gamma-0.0045"],
+                          pve.loc[(sc, pe), "yield_change_pct_gamma-0.0030"])]
+     for sc in ("ssp245", "ssp585")
+     for pe in ("near_term_2026_2050", "mid_term_2051_2075", "long_term_2076_2100")],
+    "Table 4.10. Projected change in annual-mean GHI over Zimbabwe against the "
+    "first-order change in delivered PV yield once module temperature is included, "
+    "ensemble mean over the three GCMs, each relative to its own historical run. The "
+    "range spans module temperature coefficients from \u22120.0030 to \u22120.0045 per K.")
+P("The gain survives the penalty, but not much more than half of it does: under SSP5-8.5 "
+  "at 2076 to 2100 an irradiance gain of %.2f per cent becomes a yield gain of %.2f per "
+  "cent, and under SSP2-4.5 %.2f per cent becomes %.2f. More consequentially, the "
+  "ordering between the two pathways reverses. SSP5-8.5 brightens more than SSP2-4.5 at "
+  "every horizon, yet by the end of the century its yield gain is the smaller of the two, "
+  "%.2f per cent against %.2f, because the extra warming costs more than the extra light "
+  "returns. A projection that stops at irradiance therefore ranks the scenarios the wrong "
+  "way round for the quantity a developer is buying. The estimate is first order and is "
+  "not a yield simulation: it omits soiling, spectral effects, inverter behaviour, the "
+  "sub-daily covariance of temperature with irradiance, and any change in module "
+  "technology. Its purpose is to fix the sign and rough size of an effect the suitability "
+  "layer does not carry at all, which Section 4.9 records."
+  % (pve.loc[("ssp585", "long_term_2076_2100"), "ghi_change_pct"],
+     pve.loc[("ssp585", "long_term_2076_2100"), "yield_change_pct_gamma-0.0040"],
+     pve.loc[("ssp245", "long_term_2076_2100"), "ghi_change_pct"],
+     pve.loc[("ssp245", "long_term_2076_2100"), "yield_change_pct_gamma-0.0040"],
+     pve.loc[("ssp585", "long_term_2076_2100"), "yield_change_pct_gamma-0.0040"],
+     pve.loc[("ssp245", "long_term_2076_2100"), "yield_change_pct_gamma-0.0040"]))
+
 FIG("03_feature_importance.png", "Predictor importance across the four measures. "
     "The topographic covariates score exactly zero for the pixel-wise models, which is "
     "structural: within one cell they are constants.")
@@ -763,10 +829,10 @@ P("Section 3.9.3 previously printed the distance decay as Score = e^(-d/d_ref) w
   "used here, on the grounds that a site 10 km from an existing "
   "transmission line is routinely connectable for utility-scale development and should "
   "not be scored as though it were remote. The figures reported here use that reading.")
-TBL(["Criterion", "Robust set mean", "All assessed cells", "Ratio"], [["Irradiance (W/m²)", "%.2f" % lay.ghi_present_sarah.values[rob].mean(), "%.2f" % lay.ghi_present_sarah.values[keep].mean(), "%.2f" % (lay.ghi_present_sarah.values[rob].mean() / lay.ghi_present_sarah.values[keep].mean())], ["Slope (degrees)", "%.2f" % lay.slope.values[rob].mean(), "%.2f" % lay.slope.values[keep].mean(), "%.2f" % (lay.slope.values[rob].mean() / lay.slope.values[keep].mean())], ["Land cover score", "%.2f" % lay.landcover_score.values[rob].mean(), "%.2f" % lay.landcover_score.values[keep].mean(), "%.2f" % (lay.landcover_score.values[rob].mean() / lay.landcover_score.values[keep].mean())], ["Distance to roads (km)", "%.2f" % lay.dist_roads.values[rob].mean(), "%.2f" % lay.dist_roads.values[keep].mean(), "%.2f" % (lay.dist_roads.values[rob].mean() / lay.dist_roads.values[keep].mean())], ["Distance to grid (km)", "%.2f" % lay.dist_grid.values[rob].mean(), "%.2f" % lay.dist_grid.values[keep].mean(), "%.2f" % (lay.dist_grid.values[rob].mean() / lay.dist_grid.values[keep].mean())], ["Distance to settlements (km)", "%.2f" % lay.dist_settlements.values[rob].mean(), "%.2f" % lay.dist_settlements.values[keep].mean(), "%.2f" % (lay.dist_settlements.values[rob].mean() / lay.dist_settlements.values[keep].mean())]], "Table 4.10. Mean criterion values on the robust set against all assessed cells. The "
+TBL(["Criterion", "Robust set mean", "All assessed cells", "Ratio"], [["Irradiance (W/m²)", "%.2f" % lay.ghi_present_sarah.values[rob].mean(), "%.2f" % lay.ghi_present_sarah.values[keep].mean(), "%.2f" % (lay.ghi_present_sarah.values[rob].mean() / lay.ghi_present_sarah.values[keep].mean())], ["Slope (degrees)", "%.2f" % lay.slope.values[rob].mean(), "%.2f" % lay.slope.values[keep].mean(), "%.2f" % (lay.slope.values[rob].mean() / lay.slope.values[keep].mean())], ["Land cover score", "%.2f" % lay.landcover_score.values[rob].mean(), "%.2f" % lay.landcover_score.values[keep].mean(), "%.2f" % (lay.landcover_score.values[rob].mean() / lay.landcover_score.values[keep].mean())], ["Distance to roads (km)", "%.2f" % lay.dist_roads.values[rob].mean(), "%.2f" % lay.dist_roads.values[keep].mean(), "%.2f" % (lay.dist_roads.values[rob].mean() / lay.dist_roads.values[keep].mean())], ["Distance to grid (km)", "%.2f" % lay.dist_grid.values[rob].mean(), "%.2f" % lay.dist_grid.values[keep].mean(), "%.2f" % (lay.dist_grid.values[rob].mean() / lay.dist_grid.values[keep].mean())], ["Distance to settlements (km)", "%.2f" % lay.dist_settlements.values[rob].mean(), "%.2f" % lay.dist_settlements.values[keep].mean(), "%.2f" % (lay.dist_settlements.values[rob].mean() / lay.dist_settlements.values[keep].mean())]], "Table 4.11. Mean criterion values on the robust set against all assessed cells. The "
     "final column is the ratio; values far from 1.00 identify the criteria that "
     "distinguish the robust set.")
-P("Table 4.10 makes the character of the robust set clear, and the result is not the "
+P("Table 4.11 makes the character of the robust set clear, and the result is not the "
   "obvious one. **These are not the sunniest places in Zimbabwe.** Their mean irradiance "
   "is %.2f W/m² against %.2f for the assessed domain as a whole, a difference of %.1f "
   "per cent. What distinguishes them is infrastructure: they lie a mean of %.2f km from "
@@ -832,7 +898,7 @@ H("4.8.2 Suitability under the projected climate", 3)
 _LBL = {"present": "present (SARAH layer)",
         "present_era5_basis": "present (ERA5 basis, comparison row)"}
 TBL(["Period", "Mean GHI (W/m²)", "Mean SI", "Very high", "High"], [[_LBL.get(p, p.replace("_", " ")), "%.2f" % per.loc[p, "mean_ghi"], "%.4f" % per.loc[p, "mean_si"], int(per.loc[p, "very_high"]), int(per.loc[p, "high"])]
-     for p in ["present", "present_era5_basis", "ssp245_near_term_2026_2050", "ssp245_mid_term_2051_2075", "ssp245_long_term_2076_2100", "ssp585_near_term_2026_2050", "ssp585_mid_term_2051_2075", "ssp585_long_term_2076_2100"]], "Table 4.11. Suitability by period under the primary weights. All periods are "
+     for p in ["present", "present_era5_basis", "ssp245_near_term_2026_2050", "ssp245_mid_term_2051_2075", "ssp245_long_term_2076_2100", "ssp585_near_term_2026_2050", "ssp585_mid_term_2051_2075", "ssp585_long_term_2076_2100"]], "Table 4.12. Suitability by period under the primary weights. All periods are "
     "standardised on the present-day range so the tiers remain comparable. The "
     "projections are compared against the ERA5-basis present row, not the SARAH "
     "layer, so that the SARAH-minus-ERA5 offset does not enter the change signal.")
@@ -913,9 +979,25 @@ P("**The suitability classification is weight-sensitive.** %.1f per cent of asse
   "cells change tier under at least one defensible weighting, and equal weights agree "
   "with the primary classification no better than chance. This is why Section 4.8.1 "
   "leads with the robust set." % (100 * sens / n_keep))
+P("**The suitability layer scores irradiance, not deliverable energy.** Module output "
+  "falls as the cell heats, and the pathways that brighten the sky are the pathways that "
+  "warm it. Section 4.7.2 puts a first-order figure on this: the temperature penalty "
+  "removes roughly half of the projected irradiance gain and reverses the ordering of the "
+  "two scenarios, so the criterion the maps actually rank sites on is not the quantity a "
+  "developer earns from. Correcting it properly needs sub-daily temperature and a module "
+  "model, neither of which this monthly design carries.")
 P("**The future suitability maps hold infrastructure and population constant.** They "
   "describe how the resource changes at present-day sites, not where future sites will "
   "be.")
+P("**The deployed configuration is not the most accurate one found.** Section 4.5 "
+  "establishes that a dropout-free U-Net scores %.2f W/m\u00b2 over Zimbabwe against the "
+  "deployed XGBoost's %.2f, is better than the deployed U-Net on the inner split that "
+  "selects, and passes the scenario screen. It was identified too late in the work for "
+  "the projection, uncertainty and suitability chains to be rebuilt on it. Those chains, "
+  "and every result from Section 4.6 onwards, therefore rest on the XGBoost model, and "
+  "the gap between what the evidence favours and what the product uses is left visible "
+  "rather than closed by restating the selection."
+  % (udv.loc["U-Net, dropout 0 (variant)", "RMSE_zw"], t33.loc["XGBoost", "RMSE_zw"]))
 P("**Model selection on the evaluation record, identified and corrected.** The CNN and "
   "U-Net previously saved the checkpoint scoring best on the withheld period. Both have "
   "been retrained with the epoch count chosen on an inner split of the training data, "

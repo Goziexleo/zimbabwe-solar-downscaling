@@ -6,6 +6,13 @@ many hours per model. Instead, hyperparameters are selected on a
 representative random sample of cells (domain-mean CV RMSE), then applied
 uniformly when the full model is retrained - consistent with how these
 models already share one fixed hyperparameter set across all cells.
+
+The deployed configuration is evaluated as an extra point on the same criterion.
+For XGBoost it lies outside the grid - Section 3.6.4 deploys eta=0.05,
+subsample=0.8 and min_child_weight=3, none of which the grid contains - so
+without it the search cannot say whether the configuration actually in use is
+better or worse than the one the search would pick. Results are written to CSV
+so the comparison is in the archive rather than only in a console log.
 """
 
 import os
@@ -22,6 +29,15 @@ from pixelwise_common import build_fine_pixel_dataset
 
 MODEL = sys.argv[1] if len(sys.argv) > 1 else "rf"
 assert MODEL in ("rf", "xgb")
+
+OUT = os.path.join("data/processed/evaluation", "hpo_pixelwise_%s.csv" % MODEL)
+N_JOBS = int(os.environ.get("HPO_N_JOBS", "-1"))
+
+# What Section 3.6.3 and Section 3.6.4 actually deploy.
+DEPLOYED = {
+    "rf": {"n_estimators": 500, "max_features": "sqrt", "min_samples_leaf": 5},
+    "xgb": {"max_depth": 6, "eta": 0.05, "subsample": 0.8, "min_child_weight": 3},
+}[MODEL]
 
 N_SUBSET_CELLS = 150
 N_FOLDS = 5
@@ -97,6 +113,12 @@ else:
         for mcw in [1, 5]
     ]
 
+if DEPLOYED not in grid:
+    grid.append(DEPLOYED)
+    print(f"Deployed configuration {DEPLOYED} is not in the grid; appended as an extra point.")
+else:
+    print(f"Deployed configuration {DEPLOYED} is in the grid.")
+
 print(f"\nGrid size: {len(grid)} combinations x {N_FOLDS} folds x {N_SUBSET_CELLS} cells "
       f"= {len(grid) * N_FOLDS * N_SUBSET_CELLS} total fits")
 
@@ -104,7 +126,7 @@ start_time = time.time()
 results = []
 cv_fn = cv_rmse_rf if MODEL == "rf" else cv_rmse_xgb
 for combo_idx, params in enumerate(grid):
-    cell_rmses = Parallel(n_jobs=-1)(delayed(cv_fn)(i, j, **params) for i, j in subset_cells)
+    cell_rmses = Parallel(n_jobs=N_JOBS)(delayed(cv_fn)(i, j, **params) for i, j in subset_cells)
     mean_rmse = float(np.mean(cell_rmses))
     results.append((params, mean_rmse))
     print(f"  [{combo_idx + 1}/{len(grid)}] {params} -> mean CV RMSE (CSI units): {mean_rmse:.5f} "
@@ -119,3 +141,21 @@ for params, rmse in results[:5]:
 
 best_params, best_rmse = results[0]
 print(f"\nSelected: {best_params}")
+
+import pandas as pd
+
+rows = []
+for params, rmse in results:
+    rows.append(dict(params, cv_rmse_csi=rmse, is_deployed=(params == DEPLOYED),
+                     in_grid=(params != DEPLOYED or DEPLOYED in grid[:-1])))
+df = pd.DataFrame(rows).sort_values("cv_rmse_csi").reset_index(drop=True)
+df["rank"] = df.index + 1
+df.to_csv(OUT, index=False)
+
+dep = df[df.is_deployed].iloc[0]
+print("\nDeployed configuration ranks %d of %d on the search criterion: "
+      "CV RMSE %.5f against the best %.5f, a difference of %.5f CSI units (%.2f per cent)."
+      % (int(dep["rank"]), len(df), dep["cv_rmse_csi"], best_rmse,
+         dep["cv_rmse_csi"] - best_rmse,
+         100.0 * (dep["cv_rmse_csi"] - best_rmse) / best_rmse))
+print("wrote %s" % OUT)

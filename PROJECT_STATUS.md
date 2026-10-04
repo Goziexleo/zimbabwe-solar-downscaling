@@ -1864,7 +1864,120 @@ matter and figure captions this build writes on purpose.
 
 ---
 
+## 12q. Fifth critique round: one reversal, one false premise, one missing physics
+
+Five items the previous rounds had left. Two were documentation; three changed what the
+work says.
+
+**The dropout result reverses, and the deployed configuration is not the best found.**
+`unet_dropout_variant.csv` had no generator — it was assembled by hand before the
+clear-sky rebuild, so it scored a variant trained on the superseded target against models
+trained on the new one, and carried a deployed U-Net figure (9.95 W m⁻²) the retrain had
+already overtaken. `compute_dropout_variant_comparison.py` now produces it, asserting
+first that both files describe the same target. Re-measured on one basis:
+
+| model | RMSE over Zimbabwe (W m⁻²) |
+|---|---|
+| **U-Net, dropout 0** | **8.62** |
+| XGBoost (deployed) | 8.92 |
+| CNN | 9.56 |
+| Random Forest | 10.13 |
+| U-Net, dropout 0.3 (deployed) | 11.66 |
+
+The dropout-free U-Net is the most accurate model in the study, ahead of the deployed
+XGBoost. It is also better on the inner split that does the selecting (0.0889 against
+0.1204), so the result does not come from the withheld record, and it passes the
+scenario-discrimination screen (+0.97, +1.38, +2.72 W m⁻², monotonic). §4.5 previously
+said "It is worse, not better" and closed the question in favour of the deployed
+configuration; that is now false and has been rewritten.
+
+**The obvious objection — that this is the training draw, not the setting — was tested and
+fails.** I first inferred from file dates that the deployed U-Net predated the commit
+adding a random seed, and built `rerun_unet_seeded_control.sh` to retrain the deployed
+configuration under the seed. The control reproduces the deployed model **bit for bit**:
+identical weights, the same selected epoch 7, the same inner MSE 0.12041. So the seed edit
+was made before the retrain and only committed later, the comparison was always like for
+like, and Appendix A's reproducibility claim now holds for the one model whose fit is
+stochastic. The inference from mtimes was wrong; the direct comparison settled it.
+
+What was **not** done is redeployment. Every result from §4.6 onwards rests on the
+XGBoost chain, and rebuilding the projection, uncertainty and suitability chains on a
+U-Net basis was not possible in this submission. §4.9 records the gap and §5.6 makes it
+the first task of a continuation. The alternative — restating the model selection without
+regenerating what depends on it — would be worse.
+
+**Chapter 2 asserted the opposite of our own data about the lowveld.** Two sentences put
+the country's highest irradiance in the lowveld and built the irradiance-versus-grid-access
+argument on it. `compute_elevation_irradiance_gradient.py` tests it against both observed
+products on the national mask, using the thesis's own elevation bands:
+
+| band | cells | SARAH | ERA5 |
+|---|---|---|---|
+| lowveld (<600 m) | 451 | 237.7 | 227.0 |
+| middleveld (600–1200 m) | 2023 | **245.3** | 237.2 |
+| highveld (>1200 m) | 817 | 243.2 | **238.6** |
+
+The lowveld carries the **lowest** mean of the three, and elevation correlates positively
+with GHI (+0.21 SARAH, +0.50 ERA5). The claim also contradicted §4.8.1, whose robust set
+falls in Mashonaland West, the Midlands and Matabeleland North with Masvingo at 5 cells,
+and §5.2.4, which already said irradiance spans too narrow a band to separate sites. The
+script asserts both directions, so the correction cannot silently rot.
+
+**The suitability layer scores irradiance and ignores module heating.** New §4.7.2 puts a
+first-order figure on it from the bias-corrected CMIP6 `tas`: the temperature penalty
+removes roughly half the projected gain, and it **reverses the scenario ordering**. SSP5-8.5
+brightens more than SSP2-4.5 at every horizon, yet by 2076–2100 its yield gain is the
+smaller of the two (+2.34% against +2.61%), because the extra warming costs more than the
+extra light returns. A projection reporting irradiance alone ranks the pathways the wrong
+way round for the quantity a developer earns from. Assumptions are on the face of the
+section (NOCT form, γ from −0.0030 to −0.0045 /K, daytime factor of two) and §4.9 records
+what the estimate omits.
+
+**Table 3.2 promised final values it did not contain.** §3.6.7 says twice that the table
+reports the selected values; it listed only ranges and criteria, so no model in the thesis
+was reproducible from it. A **Deployed value** column is added, parsed from the training
+scripts so it cannot drift from the code. `hpo_pixelwise.py` now also writes its results
+and evaluates the deployed configuration as an extra grid point, which quantifies what
+§7.6 had only asserted: the deployed XGBoost ranks **7 of 25** (0.03093 against 0.03001,
++3.1%) and its eta, subsample and minimum child weight all lie **outside** the grid the
+table states, so the search could never have returned it; the Random Forest's own configuration ranks
+**11 of 18** (+6.1%) and does lie inside its grid. The neural inner-split figures §3.6.7 quotes
+come from a search run before the clear-sky rebuild and are not the deployed models'
+scores (0.001245 CNN, 0.120408 U-Net); the ordering it established stands, and both
+deployed models carry the learning rate it chose.
+
+**A citation was supporting a claim from a different field.** Chapter 2 credited the
+CORDEX archive's 0.22° and 0.44° resolutions to Harilal et al. (2022) — which is
+*EnhancedSD*, a NeurIPS workshop paper on **statistical** downscaling of solar irradiance.
+The citation is a live Zotero field, so only the plain-text run before it was edited: the
+CORDEX sentence now closes and the citation attaches to a machine-learning clause it
+actually supports. Gutowski et al. (2016) and Teichmann et al. (2021) were added to
+`reference_additions.ris` (now 39 entries) so the resolution figures can be cited, which
+needs a Zotero insertion only the author can make. §5.3 and §5.6 now also state what this
+work can and cannot claim against that archive, and that the benchmark was not run.
+
+---
+
 ## 13. Outstanding
+
+**Open after the fifth round (§12q)**
+- **Redeploy the dropout-free U-Net, or justify not doing so.** It is the most accurate
+  model measured (8.62 against the deployed XGBoost's 8.92 W m⁻²), better on the inner
+  split, and passes the scenario screen. Acting on it means regenerating the projections,
+  the uncertainty budget and the suitability maps and rechecking all three; `drop0`
+  projections and MME aggregations already exist, so the first two stages are cheap. This
+  is a supervisor-level decision, not a cleanup task, and §4.9 and §5.6 both state the gap
+  rather than papering over it.
+- **Insert a CORDEX citation in Word.** The 0.22°/0.44° resolution figures in Chapter 2
+  now stand uncited, because the Harilal attribution was wrong. Gutowski et al. (2016) and
+  Teichmann et al. (2021) are in `reference_additions.ris` and need citing at that
+  sentence — a Zotero action.
+- **Re-run the neural learning-rate search on the rebuilt target.** `neural_hpo.csv` dates
+  from before the clear-sky rebuild, and its `is_deployed` flags point at rows that are not
+  the deployed configurations. The ordering it found still holds and the deployed models
+  carry the rate it chose, so this is a tidiness item, not a correctness one.
+- **Benchmark against a regional model.** §5.6 names it as the comparison most likely to
+  overturn the case for the statistical approach. Not run.
 
 **Not started**
 - **§3.9 Multi-Criteria Suitability Analysis — DONE.** The analysis runs end to end (§12a), the maps are generated (`make_suitability_maps.py`, figures 07–10), the future-period suitability is computed, and it is written into Chapter 4 §4.8. The acquisition table below is kept as the provenance record; every row that mattered was resolved.
