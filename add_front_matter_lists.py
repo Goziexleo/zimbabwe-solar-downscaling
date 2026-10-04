@@ -138,9 +138,18 @@ def main():
     if False:
         pass
     else:
-        tables = [p.text.strip() for p in d.paragraphs
+        def entry(text):
+            """First sentence only. Captions carry several sentences of
+            explanation, which belongs under the table and not in a list of
+            them; the number plus the leading description is what a reader
+            scans for."""
+            t = text.strip()
+            head = re.match(r"^((?:Table|Figure) \d+\.\d+\.\s*[^.]*\.)", t)
+            return head.group(1).strip() if head else t
+
+        tables = [entry(p.text) for p in d.paragraphs
                   if re.match(r"^Table \d+\.\d+\.", p.text.strip())]
-        figures = [p.text.strip() for p in d.paragraphs
+        figures = [entry(p.text) for p in d.paragraphs
                    if re.match(r"^Figure \d+\.\d+\.", p.text.strip())]
         print("captions found: %d tables, %d figures" % (len(tables), len(figures)))
 

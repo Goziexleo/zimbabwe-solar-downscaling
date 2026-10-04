@@ -3,7 +3,7 @@
 Resolved against the CrossRef API, not transcribed. Import
 `reference_additions.ris` into Zotero in one step.
 
-## Resolved (29)
+## Resolved (30)
 
 | Author | Year | Title | DOI | Why |
 |---|---|---|---|---|
@@ -33,6 +33,7 @@ Resolved against the CrossRef API, not transcribed. Import
 | (by DOI) | 2020 | Configuration and intercomparison of deep learning neural models for sta | 10.5194/gmd-13-2109-2020 | the closest published benchmark of deep learning downscaling |
 | (by DOI) | 2019 | Developments in the MPI‐M Earth System Model version 1.2 (MPI‐ESM1.2) an | 10.1029/2018ms001400 | MPI-ESM1-2 model description |
 | (by DOI) | 2017 | Strategic siting and regional grid interconnections key to low-carbon fu | 10.1073/pnas.1611845114 | the closest published African siting study |
+| (by DOI) | 2009 | On the temperature dependence of photovoltaic module electrical performa | 10.1016/j.solener.2008.10.008 | the NOCT cell-temperature form and the module temperature-coefficient range used in Section 4.7.2, which were otherwise uncited |
 | (by DOI) | 2016 | WCRP COordinated Regional Downscaling EXperiment (CORDEX): a diagnostic  | 10.5194/gmd-9-4087-2016 | the CORDEX framework, cited in Chapter 2 for the dynamically downscaled African archive; the sentence previously credited this to Harilal et al. |
 | (by DOI) | 2021 | Assessing mean climate change signals in the global CORDEX-CORE ensemble | 10.1007/s00382-020-05494-x | CORDEX-CORE, the 0.22 degree ensemble Section 5.3 positions this work against |
 | (by DOI) | 2024 | SARAH-3 – satellite-based climate data records of surface solar radiatio | 10.5194/essd-16-5243-2024 | SARAH-3, the satellite record Chapter 4 validates against; a title search returns an EGU conference abstract instead of the dataset paper |

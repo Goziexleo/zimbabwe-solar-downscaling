@@ -2027,6 +2027,95 @@ at b365df4. The 0.3 checkpoint is also kept at
 
 ---
 
+## 12s. Fourth critique: the splice was overwriting the fixes
+
+Score 59/100, up from 57. The substantive additions of the last round were verified by
+the examiner, who recomputed Table 4.10 from the stated formula and reproduced every
+value. What cost the round was that the U-Net retrain reached the tables, the abstract
+and Sections 4.4, 4.5 and 4.10 but not the narrative sentences, so the thesis described
+the model ordering in six incompatible ways.
+
+**The root cause was a defect in the splice, not carelessness in six places.**
+`splice_results_chapters.py` preserved the one Chapter 4-5 paragraph carrying a Zotero
+field by deep-copying the **whole old paragraph** and swapping it back in after the
+regenerated chapters were imported. Every wording change the generator made to that
+paragraph was therefore discarded on every splice. Section 5.2.3 went on saying the
+Random Forest was "third on aggregate error" for two rounds after the retrain made it
+fourth, because `rank()` was computing "highest" correctly and the splice kept replacing
+it. The code documented the behaviour and said to check the paragraph after every splice;
+I did not. The splice now extracts only the field's own run block, locates the
+regenerated paragraph, splits the run holding the plain-text citation and transplants the
+field into it, so the prose is the generator's and the field is the document's.
+
+**The selection rule is now written out.** Chapter 3 still said XGBoost was deployed
+because it achieved the lowest validation RMSE, which the retrain made false, while
+Chapters 4 and 5 justified it on spatial axes. An examiner would have put the obvious
+question: the Random Forest's composite criterion was rejected for being adopted after
+the ordering was known, so why is this different. Section 3.8.1 now states three ordered
+steps - pass the scenario screen; prefer the lowest RMSE **where the margin is
+established**; otherwise prefer the model established better on spatial structure - and
+Section 3.8.4 says plainly that the third step was formalised when the U-Net result
+arrived. The defence is empirical and is quoted: the Random Forest's structural advantage
+over XGBoost is not established (centred RMSE −0.126 [−0.304, +0.017], spatial
+correlation +0.001 [−0.001, +0.003]) while XGBoost's over the U-Net is (−1.531 [−1.659,
+−1.451] and +0.034 [+0.025, +0.045]). A rule promoting structure above an unestablished
+aggregate margin selects XGBoost over the U-Net and would not have selected the Random
+Forest over XGBoost.
+
+**Ranking sentences corrected**, all against the final order U-Net 8.62, OLS 8.80,
+XGBoost 8.92, CNN 9.56, Random Forest 10.13: Section 4.2's "lowest aggregate error" and
+its architecture spread, which quoted the full-box 1.18 beside masked figures and is now
+the masked 1.51; Section 4.3's claim that XGBoost was lower than the U-Net with intervals
+excluding zero, and that the Random Forest-U-Net interval contained zero when it excludes
+it; Section 4.4's closing "second"; Section 5.2.1's "established better than the U-Net"
+and "only XGBoost is established as better than all three others"; and Section 5.2.3's
+statement that the improved configuration "is less accurate than the deployed
+configuration", which was the plainest falsehood left in the document.
+
+**U-Net propagation finished.** Section 3.8.4's centred-error list carried the superseded
+3.793 (now 2.062) and an interval that has since changed sign. Section 4.5 said the U-Net
+is "damped at every cut tested" immediately after quoting a ratio of 1.07 at wavenumber
+3, which is an excess; it now says damped from wavenumber 5 upward and reconciles with
+Table 4.6's cut-dependent verdict. The sweep paragraph called the 0.3-dropout model "the
+deployed model", which is XGBoost. And a paragraph was added conceding what the retrain
+did for the structural statistics - spatial correlation 0.869 to 0.9642, centred error
+3.793 to 2.062 - because that narrows the gap Section 4.4 rests on and an examiner would
+otherwise find it unacknowledged.
+
+**The yield claim is qualified rather than withdrawn.** The reversal of the scenario
+ordering is real but coefficient-dependent, which the previous wording hid. Solving for
+the crossing gives γ = -0.00311 per K in the long term and -0.00442 in the mid term, with no
+crossing in the near term for any coefficient between −0.0060 and −0.0010; most
+crystalline-silicon modules are more negative than −0.0035, so the reversal holds for
+them and not for low-coefficient modules. The central coefficient −0.0040 is now stated,
+all 18 period-scenario-model combinations are reported as positive (0.92 to 3.50 per
+cent) so no single GCM carries the result, the 24-hour temperature basis is acknowledged
+as an untested assumption, and "removes roughly half" is now "between a third and a
+half", which is what the six combinations actually show. The NOCT form and the γ range
+are now cited to Skoplaki and Palyvos (2009), added to the RIS - **40 entries**.
+
+**Checked and not a defect.** Table 4.7 was queried for having changed while the deployed
+model did not. It is byte-identical to the version at b365df4 and the suitability layers
+behind it date from 2 October; the 10.11 to 11.23 move happened in the earlier basis
+alignment, when the table went onto the national mask. The caption now says so.
+
+**Smaller items.** The Eyring fragment, the second Damiani overclaim and the
+revision-history sentence in Section 4.8 are fixed; the distance-decay paragraph now
+states the function and the 145-against-42 consequence without the narrative. The Lin
+sentence beginning with a citation could only be half-fixed - the verb is lower-cased, but
+the field renders "Lin et al., 2023" and needs switching to narrative mode in Word.
+Captions carried three different line spacings (33 single, 6 at 1.5, 25 inherited) because
+an earlier presentation pass skipped them; they are now uniformly single, with body text
+at 1.5 across all 313 paragraphs. List-of-tables entries are now the caption's first
+sentence rather than the whole caption.
+
+**Guarded.** Ten of the retired phrases above are in `check_chapter3_consistency.py`'s
+RETIRED list, because no numeric check can see a wrong ordinal. Verified by injection: a
+copy of the document with "is second on aggregate error" added fails the guard with exit
+1, the real document passes with exit 0.
+
+---
+
 ## 13. Outstanding
 
 **Open after the fifth round (§12q)**

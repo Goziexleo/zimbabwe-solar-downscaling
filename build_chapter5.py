@@ -130,8 +130,10 @@ P("The comparison between architectures is answered with more care than the ques
   "cannot be separated on the spatial structure of the error or on spatial correlation. "
   "The answer is a split decision, not a ranking. The Random Forest returns the %s "
   "aggregate error. It cannot be separated from the CNN, whose interval contains zero, "
-  "but it is established better than the U-Net. Only XGBoost is established as better "
-  "than all three others on that axis." % rank("Random Forest"))
+  "but the U-Net is established better than it. No model is established better than all "
+  "three others on that axis: XGBoost is separable from the CNN and the Random Forest "
+  "and not from the U-Net, which is why Section 4.4 does not settle the deployment on "
+  "aggregate error." % rank("Random Forest"))
 P("The more consequential comparison is not among the four. A per-cell ordinary least "
   "squares regression, fitted on the same predictors over the same period against the "
   "same target, reaches %.2f W/m², below every architecture in Table 4.1. Its margin "
@@ -247,9 +249,11 @@ P("The deployment decision followed from a test that no accuracy metric could pe
   "%.1f per cent of cells order the two pathways correctly. The mechanism is tree "
   "extrapolation (Breiman, 2001), and the failure is categorical rather than a matter "
   "of degree. This is "
-  "why the improved U-Net configuration identified after the fact does not reopen the "
-  "decision on accuracy alone: Section 4.5 reports that it passes the screen but is less "
-  "accurate than the deployed configuration under the same training procedure."
+  "why the improved U-Net configuration, which was adopted and is the version reported "
+  "throughout, does not reopen the deployment on accuracy alone. Section 4.5 reports "
+  "that it passes the screen and returns the lower aggregate error of the two, but that "
+  "margin is not established under resampling while XGBoost's advantage on the spatial "
+  "axes is, and the U-Net remains the only architecture whose field is damped."
   % (rank("Random Forest").replace("-lowest", ""), scr.loc["Random Forest", "pct_ordered_long_term"]))
 
 H("5.2.4 RQ4: where suitability is highest", 3)

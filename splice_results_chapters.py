@@ -136,16 +136,30 @@ def main():
 
     # The one citation field in the range, kept so it can be put back.
     #
-    # NOTE: this carries the OLD paragraph across verbatim, field and prose
-    # together, so any wording the generator changed in that paragraph is lost.
-    # The paragraph is reported below; check it after every splice, or fix the
-    # text in the document afterwards.
-    keeper = None
+    # Only the field's own runs are kept, not the paragraph around them. An
+    # earlier version carried the whole old paragraph across, which silently
+    # discarded every wording change the generator made to it: Section 5.2.3
+    # went on saying the Random Forest was "third on aggregate error" for two
+    # rounds after the retrain made it fourth, because the splice kept putting
+    # the old sentence back. The field is now transplanted into the regenerated
+    # paragraph instead, so the prose is the generator's and the field is the
+    # document's.
+    keeper = keeper_lead = None
     for e in segment:
         if "ZOTERO_ITEM" in e.xml and e.tag.endswith("}p"):
-            keeper = copy.deepcopy(e)
-            print("preserving the citation field in: %s..."
-                  % Paragraph(e, d).text.strip()[:60])
+            kp = Paragraph(e, d)
+            runs = kp.runs
+            b = next((i for i, r in enumerate(runs)
+                      if 'fldCharType="begin"' in r._r.xml), None)
+            t = next((i for i, r in enumerate(runs)
+                      if 'fldCharType="end"' in r._r.xml), None)
+            assert b is not None and t is not None and t > b, (
+                "the preserved field is not a contiguous begin..end block")
+            keeper = [copy.deepcopy(r._r) for r in runs[b:t + 1]]
+            keeper_lead = " ".join(kp.text.strip().split()[:8])
+            keeper_text = "".join(r.text for r in runs[b:t + 1]).strip()
+            print("preserving the citation field %r from: %s..."
+                  % (keeper_text, kp.text.strip()[:60]))
     if args.dry_run:
         print("dry run, nothing written")
         return 0
@@ -175,20 +189,39 @@ def main():
     # Put the citation field back: find the regenerated paragraph that carries
     # the same plain-text citation and swap the old runs in for it.
     if keeper is not None:
-        kt = Paragraph(keeper, d).text.strip()
-        lead = " ".join(kt.split()[:8])
+        from docx.text.run import Run
+        done = False
         for ch in list(d.element.body):
-            if not ch.tag.endswith("}p"):
+            if not ch.tag.endswith("}p") or "ZOTERO_ITEM" in ch.xml:
                 continue
-            t = Paragraph(ch, d).text.strip()
-            if t.startswith(lead) and "ZOTERO_ITEM" not in ch.xml:
-                ch.addprevious(copy.deepcopy(keeper))
-                ch.getparent().remove(ch)
-                print("restored the citation field into the regenerated paragraph")
+            par = Paragraph(ch, d)
+            if not par.text.strip().startswith(keeper_lead):
+                continue
+            # Replace the generator's plain-text citation with the real field,
+            # splitting the run it sits in so the surrounding prose is kept.
+            for r in par.runs:
+                if keeper_text not in r.text:
+                    continue
+                head, tail = r.text.split(keeper_text, 1)
+                r.text = head
+                anchor = r._r
+                for fr in keeper:
+                    anchor.addnext(fr)
+                    anchor = fr
+                if tail:
+                    tail_el = copy.deepcopy(r._r)
+                    anchor.addnext(tail_el)
+                    Run(tail_el, par).text = tail
+                print("transplanted the citation field into the regenerated "
+                      "paragraph, keeping the generator's wording")
+                done = True
                 break
-        else:
-            print("NOTE: the Breiman citation field could not be re-sited; "
-                  "re-insert it in Word (Section 5.2.3, 'tree extrapolation').")
+            if done:
+                break
+        if not done:
+            print("NOTE: the %s field could not be re-sited; the regenerated "
+                  "paragraph no longer carries the plain-text citation it "
+                  "replaces. Re-insert it in Word (Section 5.2.3)." % keeper_text)
 
     dropped = prune_orphan_images(d)
     print("pruned %d orphaned image relationship(s)" % dropped)

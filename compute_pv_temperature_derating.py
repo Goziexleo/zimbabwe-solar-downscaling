@@ -38,6 +38,7 @@ PROC = os.path.join(ROOT, "data/processed")
 EVAL = os.path.join(PROC, "evaluation")
 BC = os.path.join(PROC, "cmip6_bias_corrected")
 OUT = os.path.join(EVAL, "pv_temperature_derating.csv")
+CROSS = os.path.join(EVAL, "pv_yield_scenario_crossover.csv")
 
 GCMS = {"ACCESS-CM2": "ghi_ACCESS_CM2",
         "CNRM-CM6-1": "ghi_CNRM_CM6_1",
@@ -51,7 +52,8 @@ NOCT_C = 45.0
 K_POA = (NOCT_C - 20.0) / 800.0      # K per W/m2 of plane-of-array irradiance
 DAYTIME_FACTOR = 2.0                 # 24-hour mean -> daytime mean
 T_STC_C = 25.0
-GAMMAS = [-0.0030, -0.0040, -0.0045]  # per K, common c-Si range
+GAMMA_CENTRAL = -0.0040              # the figure quoted in the text
+GAMMAS = [-0.0030, GAMMA_CENTRAL, -0.0045]  # per K, common c-Si range
 
 
 def to_celsius(t):
@@ -126,6 +128,67 @@ def main():
               % (w["scenario"], w["period"], g, y, "   SIGN REVERSES" if flip else ""))
     print("\n%d of %d period-scenario combinations reverse sign at gamma = -0.0040 /K."
           % (flips, len(ens)))
+
+    # The scenario ordering is not reversed at every coefficient, so the gamma at
+    # which the two pathways cross is solved for rather than asserted. The fields
+    # are cached first: the bisection evaluates the gap many times and reloading
+    # six datasets per evaluation made this the slowest part of the script.
+    cache = {}
+    for scen in SCENARIOS:
+        for period, (y0, y1) in PERIODS.items():
+            for gcm, hvar in GCMS.items():
+                gh = xr.open_dataset(os.path.join(
+                    PROC, "projections_xgb",
+                    "downscaled_ghi_%s_%s_2026_2100.nc" % (gcm, scen)))["ghi"]
+                gf = gh.sel(time=slice("%d-01-01" % y0, "%d-12-31" % y1)).mean("time").values
+                g0 = hist[hvar].mean("time").values
+                tf = xr.open_dataset(os.path.join(
+                    BC, "%s_%s_EDCDFm_corrected.nc" % (gcm, scen)))["tas"] \
+                    .sel(time=slice("%d-01-01" % y0, "%d-12-31" % y1)).mean("time") \
+                    .interp(lat=gh.lat, lon=gh.lon, method="linear").values
+                t0 = xr.open_dataset(os.path.join(
+                    BC, "%s_historical_EDCDFm_corrected.nc" % gcm))["tas"] \
+                    .mean("time").interp(lat=gh.lat, lon=gh.lon, method="linear").values
+                tf, t0 = to_celsius(tf), to_celsius(t0)
+                ok = mask & np.isfinite(gf) & np.isfinite(g0) & np.isfinite(tf) & np.isfinite(t0)
+                cache[(scen, period, gcm)] = (gf[ok], g0[ok], tf[ok], t0[ok])
+
+    def ens_yield(scen, period, gamma):
+        vals = []
+        for gcm in GCMS:
+            gf, g0, tf, t0 = cache[(scen, period, gcm)]
+            pf = gf * yield_factor(gf, tf, gamma)
+            p0 = g0 * yield_factor(g0, t0, gamma)
+            vals.append(100.0 * (pf.mean() - p0.mean()) / p0.mean())
+        return float(np.mean(vals))
+
+    print("\nScenario ordering, SSP5-8.5 against SSP2-4.5:")
+    cross_rows = []
+    for period in PERIODS:
+        gap = lambda g: ens_yield("ssp585", period, g) - ens_yield("ssp245", period, g)
+        lo_g, hi_g = -0.0060, -0.0010
+        if gap(lo_g) * gap(hi_g) > 0:
+            cross_rows.append(dict(period=period, gamma_crossover=np.nan))
+            print("  %-20s no crossing between gamma -0.0060 and -0.0010" % period)
+        else:
+            for _ in range(60):
+                mid = 0.5 * (lo_g + hi_g)
+                if gap(lo_g) * gap(mid) <= 0:
+                    hi_g = mid
+                else:
+                    lo_g = mid
+            g = 0.5 * (lo_g + hi_g)
+            cross_rows.append(dict(period=period, gamma_crossover=g))
+            print("  %-20s ordering reverses for gamma more negative than %.5f per K"
+                  % (period, g))
+    pd.DataFrame(cross_rows).to_csv(CROSS, index=False)
+    print("wrote %s" % CROSS)
+
+    gsub = df[df.gcm != "ensemble mean"]
+    col = "yield_change_pct_gamma%.4f" % GAMMA_CENTRAL
+    print("\nPer-GCM sign at gamma %.4f: %d of %d period-scenario-model cases positive"
+          % (GAMMA_CENTRAL, int((gsub[col] > 0).sum()), len(gsub)))
+    print("  range %.2f to %.2f per cent" % (gsub[col].min(), gsub[col].max()))
 
     lo, hi = "yield_change_pct_gamma-0.0030", "yield_change_pct_gamma-0.0045"
     w = ens[ens.period == "long_term_2076_2100"]

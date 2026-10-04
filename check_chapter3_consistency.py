@@ -138,6 +138,32 @@ def canonical_anchors():
 
 # Superseded text. Each was true of an earlier Chapter 3 and is now false.
 RETIRED = [
+    # Fourth critique. The U-Net retrain of Section 4.5 changed the ordering, and
+    # the splice kept putting the old narrative sentences back, so these are
+    # guarded by phrase: a numeric check cannot see a wrong ordinal.
+    ("achieved the lowest validation-period RMSE",
+     "the U-Net holds the lowest RMSE; XGBoost is deployed under step three of "
+     "the Section 3.8.1 rule"),
+    ("originally specified: the lowest validation-period RMSE",
+     "the rule is the three-step one stated in Section 3.8.1"),
+    ("one of two axes in the Section 3.8.4 selection criterion",
+     "RMSE is step two of the Section 3.8.1 rule, binding only where established"),
+    ("second place on aggregate error",
+     "the Random Forest returns the highest aggregate error of the four"),
+    ("is second on aggregate error",
+     "the Random Forest returns the highest aggregate error of the four"),
+    ("third on aggregate error",
+     "the Random Forest returns the highest aggregate error of the four"),
+    ("damped at every cut tested",
+     "the U-Net ratio exceeds one at wavenumber 3; damped from wavenumber 5 upward"),
+    ("is less accurate than the deployed configuration",
+     "the dropout-free U-Net is the more accurate of the two; its margin is not "
+     "established"),
+    ("removes roughly half of the projected irradiance gain",
+     "the penalty removes between a third and a half, depending on horizon"),
+    ("3.793 for the U-Net",
+     "the U-Net centred error is 2.062 after the dropout-free retrain"),
+
     # figures that survived the deployment change
     ("9.11", "XGBoost RMSE while early-stopped on the validation set; now 9.24"),
     ("+1.26", "XGBoost mean bias before the early-stopping fix; now +1.20"),

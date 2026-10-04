@@ -48,6 +48,8 @@ _OLS = "Linear regression (OLS)"
 bvm = pd.read_csv(os.path.join(EVAL, "baseline_vs_models.csv")).set_index("model")
 pbl = pd.read_csv(os.path.join(EVAL, "projection_baselines.csv"))
 pvd = pd.read_csv(os.path.join(EVAL, "pv_temperature_derating.csv"))
+pvx = pd.read_csv(os.path.join(EVAL, "pv_yield_scenario_crossover.csv")
+                  ).set_index("period")
 pve = pvd[pvd.gcm == "ensemble mean"].set_index(["scenario", "period"])
 wts = pd.read_csv(os.path.join(EVAL, "suitability_weights.csv")).set_index("scheme")
 lc = pd.read_csv(os.path.join(EVAL, "layer_choice_sensitivity.csv")).iloc[0]
@@ -232,11 +234,14 @@ TBL(["Model", "RMSE (W/m²)", "MAE", "Pearson R", "MBE", "Skill vs climatology",
     "interpolation is a circularity diagnostic rather than a skill reference, for the "
     "reason given in Section 3.7.3."
     % t33["climatology_rmse_zw"].iloc[0])
-P("The pixel-wise XGBoost ensemble attains the lowest aggregate error at %.2f W/m², "
-  "a skill score of %.4f against climatology, and a Pearson correlation of %.4f. The "
-  "spread across architectures is %.2f W/m² between best and worst, and Section 4.3 "
-  "addresses which part of that spread is statistically established."
-  % (R("XGBoost", "RMSE"), R("XGBoost", "SS vs climatology"), R("XGBoost", "Pearson R"), t33["RMSE"].max() - t33["RMSE"].min()))
+P("The lowest aggregate error belongs to the U-Net at %.2f W/m², with the deployed "
+  "XGBoost ensemble at %.2f, a skill score of %.4f against climatology and a Pearson "
+  "correlation of %.4f. Section 4.4 sets out why the deployment does not follow the "
+  "first column of this table. The spread across architectures is %.2f W/m² between "
+  "best and worst on the same Zimbabwe basis, and Section 4.3 addresses which part of "
+  "that spread is statistically established."
+  % (R("U-Net", "RMSE"), R("XGBoost", "RMSE"), R("XGBoost", "SS vs climatology"),
+     R("XGBoost", "Pearson R"), t33["RMSE_zw"].max() - t33["RMSE_zw"].min()))
 
 H("4.2.1 The linear baseline", 3)
 P("Chapter 1 justified machine learning on the ground that classical statistical "
@@ -388,15 +393,22 @@ P("This matters because Section 3.8.4 originally deployed the Random Forest on a
   "nonetheless deployed has nothing to do with historical fidelity, and is given in "
   "Section 4.4.")
 xc = pair("XGBoost", "CNN", "RMSE"); xu = pair("XGBoost", "U-Net", "RMSE")
-P("The Random Forest's second place on aggregate error is not established against the "
-  "neural models, and should not be reported as a ranking. Its difference from the U-Net "
-  "is %+.3f W/m² with an interval of %+.3f to %+.3f, and from the CNN %+.3f with %+.3f "
-  "to %+.3f; both intervals contain zero. The order in Table 4.1 changed when the neural "
-  "models were retrained, but the evidence separating those three did not."
+P("The Random Forest returns the highest aggregate error of the four, and the evidence "
+  "separating it from the two networks is mixed rather than uniform. Its difference from "
+  "the U-Net is %+.3f W/m² with an interval of %+.3f to %+.3f, which excludes zero, so "
+  "the U-Net is established the better of the two; its difference from the CNN is %+.3f "
+  "with %+.3f to %+.3f, which contains zero, so those two are not separable. The order "
+  "in Table 4.1 changed when the neural models were retrained, and the evidence moved "
+  "with it on one of the two comparisons but not the other."
   % (pair("Random Forest", "U-Net", "RMSE")[0], pair("Random Forest", "U-Net", "RMSE")[1], pair("Random Forest", "U-Net", "RMSE")[2], pair("Random Forest", "CNN", "RMSE")[0], pair("Random Forest", "CNN", "RMSE")[1], pair("Random Forest", "CNN", "RMSE")[2]))
-P("Against the convolutional models the aggregate comparison is unambiguous: XGBoost is "
-  "lower by %.3f W/m² against the CNN and %.3f against the U-Net, both intervals "
-  "excluding zero." % (abs(xc[0]), abs(xu[0])))
+P("Against the convolutional models the aggregate comparison splits. XGBoost is lower "
+  "than the CNN by %.3f W/m² with an interval of %+.3f to %+.3f, which excludes zero. "
+  "Against the U-Net it is %s by %.3f, and that interval, %+.3f to %+.3f, contains zero: "
+  "the two are not separable on aggregate error. Section 4.4 turns on exactly this, "
+  "because the axes on which they are separable point the other way."
+  % (abs(xc[0]), min(xc[1], xc[2]), max(xc[1], xc[2]),
+     "higher" if xu[0] > 0 else "lower", abs(xu[0]),
+     min(xu[1], xu[2]), max(xu[1], xu[2])))
 
 H("4.4 Model Selection and the Scenario-Discrimination Screen")
 P("Every metric in Sections 4.2 and 4.3 is computed over 2011 to 2024, a period in which "
@@ -468,8 +480,8 @@ P("This test is used as a screen and not as a ranking, and the distinction is es
      cut.loc["U-Net", "k>=11"], cut.loc["XGBoost", "k>=11"],
      t33.loc["U-Net", "RMSE"] - t33.loc["XGBoost", "RMSE"]))
 P("The wider point is that a model can satisfy every validation metric in Table 4.1 and "
-  "still be unfit for the purpose the product serves. The Random Forest is second on "
-  "aggregate error, better than the deployed model on two of five tested axes, and "
+  "still be unfit for the purpose the product serves. The Random Forest is better than "
+  "the deployed model on mean bias, not separable from it on either spatial axis, and "
   "unusable for projection. No metric computed on a historical period could have "
   "detected that.")
 
@@ -498,8 +510,10 @@ un_lo, un_hi = cut.loc["U-Net", "min"], cut.loc["U-Net", "max"]
 P("A second question is whether the models preserve the spectral character of the field "
   "they reproduce. Radially averaged power spectra were computed in clear-sky-index "
   "space, which is the space the models predict in. The U-Net damps fine-scale power "
-  "severely and robustly: its ratio to the truth is %.2f at wavenumber 3 and falls "
-  "monotonically to %.3f at wavenumber 20, so it is damped at every cut tested. This is "
+  "severely: its ratio to the truth is %.2f at wavenumber 3, a slight excess, and falls "
+  "monotonically to %.3f at wavenumber 20, so it is damped at every cut from wavenumber "
+  "5 upward rather than at every cut tested, which is why Table 4.6 records it as "
+  "cut-dependent. The direction is nonetheless unambiguous once fine scales are reached. This is "
   "the smoothing failure mode reported for machine-learning emulators generally (Rampal et al., 2024)."
   % (un_hi, un_lo))
 P("The cause was investigated with a controlled sweep fitting on 1985 to 2004 and "
@@ -544,12 +558,22 @@ P("Two things follow, and the second is why the deployment did not change with t
      scr.loc["U-Net", "sep_near_term"], scr.loc["U-Net", "sep_mid_term"],
      scr.loc["U-Net", "sep_long_term"],
      cut.loc["U-Net", "k>=3"], cut.loc["U-Net", "k>=11"], cut.loc["U-Net", "k>=20"]))
+P("One qualification belongs with that, and it cuts against the argument just made. "
+  "Removing dropout did not only lower the point error; it improved the spatial "
+  "statistics substantially. The U-Net's spatial correlation on the time-mean field rose "
+  "from %.4f to %.4f and its centred error fell from %.3f to %.3f W/m\u00b2, so the gap "
+  "on which Section 4.4 rests is much narrower than it was against the superseded "
+  "configuration. XGBoost remains established better on both axes, and that is what the "
+  "selection turns on, but the margin is now one of degree rather than of kind and is "
+  "reported as such."
+  % (0.8690, tay.loc["U-Net", "spatial_correlation_zw"],
+     3.793, tay.loc["U-Net", "centered_rmse_zw"]))
 P("The sweep does not, however, identify the cause of the damping reported above. The "
   "difficulty is that the "
   "sweep's own baseline does not reproduce the damping it was built to explain. That "
-  "baseline carries the same dropout rate as the deployed model, yet its spectral ratio "
-  "at wavenumber %d is %.2f, an excess of fine-scale power, not a deficit, against the "
-  "deployed model's %.3f at wavenumber 11. Removing dropout moves the sweep's ratio to "
+  "baseline carries the dropout rate of the superseded U-Net, yet its spectral ratio "
+  "at wavenumber %d is %.2f, an excess of fine-scale power, not a deficit, against that "
+  "model's %.3f at wavenumber 11. Removing dropout moves the sweep's ratio to "
   "%.2f, which is no closer to unity than the baseline was: %.2f against %.2f in absolute "
   "deviation. A sweep whose baseline does not exhibit the failure cannot isolate its "
   "cause, and the attribution to dropout is therefore withdrawn."
@@ -652,7 +676,9 @@ base = lay.ghi_present_era5.values[_zw]
 proj = {v.replace("ghi_", ""): lay[v].values[_zw] for v in lay.data_vars if v.startswith("ghi_ssp")}
 TBL(["Scenario and horizon", "Mean change (W/m²)", "Percent", "Range across domain"], [[k.replace("_", " "), "%+.2f" % (proj[k] - base).mean(), "%+.2f%%" % (100 * (proj[k] - base).mean() / base.mean()), "%+.2f to %+.2f" % ((proj[k] - base).min(), (proj[k] - base).max())]
      for k in sorted(proj)], "Table 4.7. Projected change in annual-mean GHI from the deployed XGBoost ensemble, "
-    "relative to the ERA5-derived present, across three GCMs.")
+    "relative to the ERA5-derived present, across three GCMs. Computed over the cells "
+    "inside the national boundary, the basis used throughout this chapter; an earlier "
+    "version of this table averaged the full analysis box and gave smaller changes.")
 P("All six projections give an increase in surface irradiance over Zimbabwe, ranging "
   "from %+.2f W/m² in the near term under SSP2-4.5 to %+.2f W/m² in the long term "
   "under SSP5-8.5, or roughly %.1f to %.1f per cent. The increase is larger under the "
@@ -770,7 +796,8 @@ P("Every change reported so far is a change in irradiance. A siting decision is 
   "with k set by an NOCT of 45 °C; plane-of-array irradiance is taken as twice the "
   "24-hour monthly mean, the same averaging-window factor Section 3.5.4 discusses; output "
   "is proportional to G(1 + \u03b3(T_cell \u2212 25 °C)); and \u03b3 is varied from "
-  "\u22120.0030 to \u22120.0045 per K to span common modules. Temperature is the "
+  "\u22120.0030 to \u22120.0045 per K to span common modules, the form and the range "
+  "both following the review of Skoplaki and Palyvos (2009). Temperature is the "
   "bias-corrected CMIP6 tas, upsampled to the target grid exactly as Section 3.5.1 "
   "upsamples the other coarse predictors, and every change is taken against the same "
   "model's own historical run.")
@@ -787,25 +814,47 @@ TBL(["Scenario and horizon", "ΔGHI (%)", "ΔT (K)", "ΔYield (%)", "ΔYield ran
     "Table 4.10. Projected change in annual-mean GHI over Zimbabwe against the "
     "first-order change in delivered PV yield once module temperature is included, "
     "ensemble mean over the three GCMs, each relative to its own historical run. The "
-    "range spans module temperature coefficients from \u22120.0030 to \u22120.0045 per K.")
-P("The gain survives the penalty, but not much more than half of it does: under SSP5-8.5 "
-  "at 2076 to 2100 an irradiance gain of %.2f per cent becomes a yield gain of %.2f per "
-  "cent, and under SSP2-4.5 %.2f per cent becomes %.2f. More consequentially, the "
-  "ordering between the two pathways reverses. SSP5-8.5 brightens more than SSP2-4.5 at "
-  "every horizon, yet by the end of the century its yield gain is the smaller of the two, "
-  "%.2f per cent against %.2f, because the extra warming costs more than the extra light "
-  "returns. A projection that stops at irradiance therefore ranks the scenarios the wrong "
-  "way round for the quantity a developer is buying. The estimate is first order and is "
-  "not a yield simulation: it omits soiling, spectral effects, inverter behaviour, the "
-  "sub-daily covariance of temperature with irradiance, and any change in module "
-  "technology. Its purpose is to fix the sign and rough size of an effect the suitability "
-  "layer does not carry at all, which Section 4.9 records."
+    "range spans module temperature coefficients from \u22120.0030 to \u22120.0045 per K; "
+    "the \u0394Yield column is the central value, \u22120.0040 per K.")
+P("The gain survives the penalty but is substantially reduced. At the central "
+  "coefficient of \u22120.0040 per K, an SSP5-8.5 irradiance gain of %.2f per cent at "
+  "2076 to 2100 becomes a yield gain of %.2f per cent, and under SSP2-4.5 %.2f per cent "
+  "becomes %.2f; across the six period-scenario combinations the penalty removes between "
+  "a third and a half of the irradiance gain. The direction is robust across the "
+  "ensemble: all %d period-scenario-model combinations give a positive yield change, "
+  "ranging from %.2f to %.2f per cent, so unlike the irradiance driver of Section 4.7.1 "
+  "no single model carries the result."
   % (pve.loc[("ssp585", "long_term_2076_2100"), "ghi_change_pct"],
      pve.loc[("ssp585", "long_term_2076_2100"), "yield_change_pct_gamma-0.0040"],
      pve.loc[("ssp245", "long_term_2076_2100"), "ghi_change_pct"],
      pve.loc[("ssp245", "long_term_2076_2100"), "yield_change_pct_gamma-0.0040"],
-     pve.loc[("ssp585", "long_term_2076_2100"), "yield_change_pct_gamma-0.0040"],
-     pve.loc[("ssp245", "long_term_2076_2100"), "yield_change_pct_gamma-0.0040"]))
+     len(pvd[pvd.gcm != "ensemble mean"]),
+     pvd[pvd.gcm != "ensemble mean"]["yield_change_pct_gamma-0.0040"].min(),
+     pvd[pvd.gcm != "ensemble mean"]["yield_change_pct_gamma-0.0040"].max()))
+P("A second result is more interesting and is stated with the condition it depends on. "
+  "At the central coefficient the ordering of the two pathways reverses in the long term: "
+  "SSP5-8.5 brightens more than SSP2-4.5 at every horizon, yet by 2076 to 2100 its yield "
+  "gain is the smaller of the two, %.2f per cent against %.2f, because the extra warming "
+  "costs more than the extra light returns. The reversal is a property of the module as "
+  "much as of the climate, so the threshold is reported rather than the single case: "
+  "solving for the coefficient at which the two pathways cross gives \u2212%.5f per K in the "
+  "long term and \u2212%.5f in the mid term, and no crossing in the near term for any "
+  "coefficient between \u22120.0060 and \u22120.0010. Most crystalline-silicon modules "
+  "are more negative than \u22120.0035, so the reversal holds for them, but it does not "
+  "hold for low-coefficient modules, where the two pathways instead converge. The claim "
+  "is therefore conditional: for typical modules a projection that stops at irradiance "
+  "ranks the scenarios the wrong way round for the quantity a developer is buying."
+  % (pve.loc[("ssp585", "long_term_2076_2100"), "yield_change_pct_gamma-0.0040"],
+     pve.loc[("ssp245", "long_term_2076_2100"), "yield_change_pct_gamma-0.0040"],
+     abs(pvx.loc["long_term_2076_2100", "gamma_crossover"]),
+     abs(pvx.loc["mid_term_2051_2075", "gamma_crossover"])))
+P("The estimate is first order and is not a yield simulation. It omits soiling, spectral "
+  "effects, inverter behaviour, the sub-daily covariance of temperature with irradiance, "
+  "and any change in module technology; it also takes the warming from a 24-hour mean "
+  "temperature, which understates the daytime operating temperature and assumes day and "
+  "night warm alike, an assumption this monthly design cannot test. Its purpose is to fix "
+  "the sign and rough size of an effect the suitability layer does not carry at all, "
+  "which Section 4.9 records.")
 
 FIG("03_feature_importance.png", "Predictor importance across the four measures. "
     "The topographic covariates score exactly zero for the pixel-wise models, which is "
@@ -864,13 +913,12 @@ P("**Only %d cells, %.1f per cent of those assessed and approximately %s km², a
   "ten can be moved by a defensible change of weights should not be presented as a "
   "planning product without that qualification attached."
   % (n_rob, 100 * n_rob / n_keep, "{:,.0f}".format(geo["area_km2"].sum())))
-P("Section 3.9.3 previously printed the distance decay as Score = e^(-d/d_ref) while "
-  "stating in prose that the score falls below 0.14 beyond d_ref, which the function does "
-  "not do: e^(-1) is 0.368. The distinction is not cosmetic, since the two readings "
-  "give robust sets of 145 and 42 cells respectively. The function as written is the one "
-  "used here, on the grounds that a site 10 km from an existing "
-  "transmission line is routinely connectable for utility-scale development and should "
-  "not be scored as though it were remote. The figures reported here use that reading.")
+P("The distance decay applied to the infrastructure criteria is Score = e^(-d/d_ref), "
+  "so a site at the reference distance scores e^(-1), or 0.368, rather than being treated "
+  "as remote. That choice is deliberate and it matters: scoring the reference distance at "
+  "0.14 instead would cut the robust set from 145 cells to 42. A site 10 km from an "
+  "existing transmission line is routinely connectable for utility-scale development, and "
+  "the gentler decay reflects that.")
 TBL(["Criterion", "Robust set mean", "All assessed cells", "Ratio"], [["Irradiance (W/m²)", "%.2f" % lay.ghi_present_sarah.values[rob].mean(), "%.2f" % lay.ghi_present_sarah.values[keep].mean(), "%.2f" % (lay.ghi_present_sarah.values[rob].mean() / lay.ghi_present_sarah.values[keep].mean())], ["Slope (degrees)", "%.2f" % lay.slope.values[rob].mean(), "%.2f" % lay.slope.values[keep].mean(), "%.2f" % (lay.slope.values[rob].mean() / lay.slope.values[keep].mean())], ["Land cover score", "%.2f" % lay.landcover_score.values[rob].mean(), "%.2f" % lay.landcover_score.values[keep].mean(), "%.2f" % (lay.landcover_score.values[rob].mean() / lay.landcover_score.values[keep].mean())], ["Distance to roads (km)", "%.2f" % lay.dist_roads.values[rob].mean(), "%.2f" % lay.dist_roads.values[keep].mean(), "%.2f" % (lay.dist_roads.values[rob].mean() / lay.dist_roads.values[keep].mean())], ["Distance to grid (km)", "%.2f" % lay.dist_grid.values[rob].mean(), "%.2f" % lay.dist_grid.values[keep].mean(), "%.2f" % (lay.dist_grid.values[rob].mean() / lay.dist_grid.values[keep].mean())], ["Distance to settlements (km)", "%.2f" % lay.dist_settlements.values[rob].mean(), "%.2f" % lay.dist_settlements.values[keep].mean(), "%.2f" % (lay.dist_settlements.values[rob].mean() / lay.dist_settlements.values[keep].mean())]], "Table 4.11. Mean criterion values on the robust set against all assessed cells. The "
     "final column is the ratio; values far from 1.00 identify the criteria that "
     "distinguish the robust set.")
@@ -1024,7 +1072,8 @@ P("**The suitability classification is weight-sensitive.** %.1f per cent of asse
 P("**The suitability layer scores irradiance, not deliverable energy.** Module output "
   "falls as the cell heats, and the pathways that brighten the sky are the pathways that "
   "warm it. Section 4.7.2 puts a first-order figure on this: the temperature penalty "
-  "removes roughly half of the projected irradiance gain and reverses the ordering of the "
+  "removes between a third and a half of the projected irradiance gain and, for typical "
+  "module coefficients, reverses the long-term ordering of the "
   "two scenarios, so the criterion the maps actually rank sites on is not the quantity a "
   "developer earns from. Correcting it properly needs sub-daily temperature and a module "
   "model, neither of which this monthly design carries.")

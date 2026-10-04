@@ -118,6 +118,9 @@ BY_DOI = [
      "the closest published benchmark of deep learning downscaling"),
     ("10.1029/2018MS001400", "MPI-ESM1-2 model description"),
     ("10.1073/pnas.1611845114", "the closest published African siting study"),
+    ("10.1016/j.solener.2008.10.008",
+     "the NOCT cell-temperature form and the module temperature-coefficient "
+     "range used in Section 4.7.2, which were otherwise uncited"),
     ("10.5194/gmd-9-4087-2016",
      "the CORDEX framework, cited in Chapter 2 for the dynamically downscaled "
      "African archive; the sentence previously credited this to Harilal et al."),
