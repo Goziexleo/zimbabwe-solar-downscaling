@@ -67,6 +67,9 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 
+from zimbabwe_mask import describe as mask_describe
+from zimbabwe_mask import zimbabwe_mask
+
 from ml_dataset_common import evaluation_baselines
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -91,13 +94,18 @@ def main():
     ds_f = xr.open_dataset(FIELDS)
     ds_val = xr.open_dataset(VAL)
     ds_cs = xr.open_dataset(CLEARSKY)
-    truth = ds_f["ghi_true"].values
+    # Masked to Zimbabwe, like every other reported metric. Computing the paired
+    # differences over the full box while Table 4.1 reports over the country gave
+    # two sets of numbers for one comparison: a reader differencing the table
+    # could not reproduce the interval beside it.
+    _m = zimbabwe_mask(ds_f["ghi_true"].values.shape)
+    truth = ds_f["ghi_true"].values[:, _m]
     times = pd.DatetimeIndex(ds_val.time.values)
     years = times.year.values
     uniq_years = np.unique(years)
     _, clim, _ = evaluation_baselines(ds_val, truth, ds_val.time.values, ds_cs)
 
-    preds = {label: ds_f[var].values for label, var in MODELS}
+    preds = {label: ds_f[var].values[:, _m] for label, var in MODELS}
     # index of the months belonging to each year, so a replicate is assembled
     # by concatenating whole years
     year_idx = {y: np.where(years == y)[0] for y in uniq_years}

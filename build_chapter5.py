@@ -155,15 +155,17 @@ P("Two qualifications belong with that answer, and both concern how the comparis
   "corrected: the epoch count is now chosen on an inner split of the training period, "
   "and the hyperparameter grids were re-run inside that period as well. The two "
   "corrections pull opposite ways, and Section 4.2 separates them; the net is that the "
-  "CNN ends at %.2f W/m² against the %.2f it reported under full leakage, and the U-Net "
-  "at %.2f against %.2f. "
+  "CNN moves %.2f W/m² from where it stood under full leakage and the U-Net %.2f the "
+  "other way, both measured between archived runs on the full analysis box. "
   "Separately, a controlled sweep shows the U-Net reaches %.2f W/m² under honest "
   "selection once its dropout setting is removed in that sweep, although Section 4.5 "
   "reports that the improvement does not survive an honest retrain. "
   "Neither fact overturns the deployment, for the reason given under RQ3, but together "
   "they mean this study compares particular configurations, selected in a particular "
   "way, rather than architectures in the abstract."
-  % (t33.loc["CNN", "RMSE"], leaky5.loc["CNN", "RMSE"], t33.loc["U-Net", "RMSE"], leaky5.loc["U-Net", "RMSE"], uo.loc["drop_0", "test_rmse"]))  # full box both sides: the archived snapshot has no masked columns
+  % (abs(t33.loc["CNN", "RMSE"] - leaky5.loc["CNN", "RMSE"]),
+     abs(t33.loc["U-Net", "RMSE"] - leaky5.loc["U-Net", "RMSE"]),
+     uo.loc["drop_0", "test_rmse"]))  # full box both sides: the archived snapshot has no masked columns
 P("Against traditional baselines the answer is unambiguous only for the admissible one. "
   "All four models beat a per-cell, per-calendar-month climatology. Scores against "
   "interpolation of the coarse irradiance field are not skill, because that field is a "

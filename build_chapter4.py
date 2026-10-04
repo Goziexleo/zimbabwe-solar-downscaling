@@ -15,6 +15,8 @@ manual step and is listed at the end of the run.
 import os
 import numpy as np
 import pandas as pd
+
+from zimbabwe_mask import zimbabwe_mask
 import xarray as xr
 from docx import Document
 from docx.shared import Pt, Inches
@@ -277,16 +279,24 @@ P("Two separate corrections were applied to the neural models, and they pull in 
   "are unchanged to four decimal places throughout, as they must be, having not been "
   "refitted."
   % (honest_ckpt.loc["CNN", "RMSE"] - leaky.loc["CNN", "RMSE"], honest_ckpt.loc["U-Net", "RMSE"] - leaky.loc["U-Net", "RMSE"], leaky.loc["CNN", "RMSE"], leaky.loc["U-Net", "RMSE"], honest_ckpt.loc["CNN", "RMSE"], honest_ckpt.loc["U-Net", "RMSE"], honest_ckpt.loc["CNN", "RMSE"] - RB("CNN", "RMSE"), honest_ckpt.loc["U-Net", "RMSE"] - RB("U-Net", "RMSE"), RB("CNN", "RMSE"), RB("U-Net", "RMSE")))
-P("The net effect is the informative part. The CNN ends at %.2f W/m² against the %.2f it "
-  "reported when both its checkpoint and its hyperparameters were chosen on the evaluation "
-  "record: an honest procedure reproduces the leaked result almost exactly, and the "
-  "apparent accuracy was not being bought by the leakage so much as by a configuration the "
-  "leakage happened to find. The U-Net ends at %.2f against %.2f, so for that architecture "
-  "part of the original figure genuinely was selection on the test set. One consequence is "
-  "visible in the ordering: the CNN now returns the second-lowest aggregate error and the "
-  "Random Forest the third. Section 4.3 shows that neither that reordering nor the previous "
-  "one is statistically established."
-  % (RB("CNN", "RMSE"), leaky.loc["CNN", "RMSE"], RB("U-Net", "RMSE"), leaky.loc["U-Net", "RMSE"]))
+# Stated as changes, not levels. The archived runs exist only on the full
+# analysis box, so quoting their absolute errors beside Table 4.1's masked
+# figures invited a reader to look for 12.73 in a table that reports 11.65.
+# A difference between two full-box runs is the quantity that matters here and
+# does not depend on which cells are counted.
+P("The net effect is the informative part. Correcting both defects leaves the CNN "
+  "%.2f W/m² from where it stood under full leakage: an honest procedure reproduces the "
+  "leaked result almost exactly, and the apparent accuracy was not being bought by the "
+  "leakage so much as by a configuration the leakage happened to find. The U-Net moves "
+  "%.2f W/m² the other way, so for that architecture part of the original figure "
+  "genuinely was selection on the test set. Both comparisons are between archived runs "
+  "on the full analysis box, which is the only basis on which the superseded figures "
+  "exist; Table 4.1 reports over Zimbabwe. One consequence is visible in the ordering: "
+  "the CNN now returns the second-lowest aggregate error and the Random Forest the "
+  "third. Section 4.3 shows that neither that reordering nor the previous one is "
+  "statistically established."
+  % (abs(RB("CNN", "RMSE") - leaky.loc["CNN", "RMSE"]),
+     abs(RB("U-Net", "RMSE") - leaky.loc["U-Net", "RMSE"])))
 P("The Taylor decomposition in Table 4.2 shows that the aggregate ranking conceals a "
   "sharp division in the spatial structure of the error. The two pixel-wise models "
   "reproduce the spatial pattern of the time-mean field almost exactly, at correlations "
@@ -573,8 +583,12 @@ P("What follows is not that an observational validation is unnecessary, but that
   )
 
 H("4.7 Projected Irradiance to 2100 and Its Uncertainty")
-base = lay.ghi_present_era5.values
-proj = {v.replace("ghi_", ""): lay[v].values for v in lay.data_vars if v.startswith("ghi_ssp")}
+# Masked, like every other reported figure. Unmasked this table gave +10.11 for
+# the long-term SSP5-8.5 change while Section 4.7.1 quoted +11.23 for the same
+# quantity, because the box is 42.8 per cent outside the country.
+_zw = zimbabwe_mask(lay.ghi_present_era5.values.shape)
+base = lay.ghi_present_era5.values[_zw]
+proj = {v.replace("ghi_", ""): lay[v].values[_zw] for v in lay.data_vars if v.startswith("ghi_ssp")}
 TBL(["Scenario and horizon", "Mean change (W/m²)", "Percent", "Range across domain"], [[k.replace("_", " "), "%+.2f" % (proj[k] - base).mean(), "%+.2f%%" % (100 * (proj[k] - base).mean() / base.mean()), "%+.2f to %+.2f" % ((proj[k] - base).min(), (proj[k] - base).max())]
      for k in sorted(proj)], "Table 4.7. Projected change in annual-mean GHI from the deployed XGBoost ensemble, "
     "relative to the ERA5-derived present, across three GCMs.")

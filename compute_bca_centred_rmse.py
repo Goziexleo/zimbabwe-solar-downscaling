@@ -26,6 +26,9 @@ import os
 import numpy as np
 import pandas as pd
 import xarray as xr
+
+from zimbabwe_mask import describe as mask_describe
+from zimbabwe_mask import zimbabwe_mask
 from scipy.stats import norm
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -79,8 +82,13 @@ def main():
     uniq = np.unique(years)
     year_idx = {y: np.where(years == y)[0] for y in uniq}
     full = np.arange(len(times))
-    truth = ds["ghi_true"].values
-    preds = {k: ds[v].values for k, v in MODELS.items()}
+    # Masked to Zimbabwe, like every other reported metric. Computing the paired
+    # differences over the full box while Table 4.1 reports over the country gave
+    # two sets of numbers for one comparison: a reader differencing the table
+    # could not reproduce the interval beside it.
+    _m = zimbabwe_mask(ds["ghi_true"].values.shape)
+    truth = ds["ghi_true"].values[:, _m]
+    preds = {k: ds[v].values[:, _m] for k, v in MODELS.items()}
 
     print(f"{len(uniq)} years, {len(times)} months, {N_BOOT} replicates, "
           f"jackknife n = {len(uniq)}")
