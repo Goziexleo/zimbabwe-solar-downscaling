@@ -483,8 +483,8 @@ P("The same configuration was also put through the scenario-discrimination scree
   % (sdv.loc["U-Net, dropout 0", "sep_near_term"],
      sdv.loc["U-Net, dropout 0", "sep_mid_term"],
      sdv.loc["U-Net, dropout 0", "sep_long_term"]))
-P("The sweep does not, however, identify the cause of the damping reported above, and an "
-  "earlier version of this section claimed that it did. The difficulty is that the "
+P("The sweep does not, however, identify the cause of the damping reported above. The "
+  "difficulty is that the "
   "sweep's own baseline does not reproduce the damping it was built to explain. That "
   "baseline carries the same dropout rate as the deployed model, yet its spectral ratio "
   "at wavenumber %d is %.2f, an excess of fine-scale power, not a deficit, against the "
@@ -495,9 +495,9 @@ P("The sweep does not, however, identify the cause of the damping reported above
   % (10, uo.loc["baseline", "test_spec_ratio"], cut.loc["U-Net", "k>=11"], uo.loc["drop_0", "test_spec_ratio"], abs(1 - uo.loc["drop_0", "test_spec_ratio"]), abs(1 - uo.loc["baseline", "test_spec_ratio"])))
 P("One result from the same sweep points the other way and is reported because it is "
   "inconvenient: removing the gradient penalty gives a spectral ratio of %.3f, the closest "
-  "to unity of any variant tested, while the penalty variants span %.2f to %.2f. An "
-  "earlier version of this section stated that the gradient penalty barely moves the "
-  "ratio and that a smoothness prior was therefore refuted. Neither half of that holds. "
+  "to unity of any variant tested, while the penalty variants span %.2f to %.2f. It does "
+  "not follow from this that the gradient penalty barely moves the ratio, nor that a "
+  "smoothness prior is refuted. "
   "A further reason for caution is that the sweep predates the hyperparameter correction "
   "of Section 3.6.7 and was run at the superseded learning rate, so its baseline differs "
   "from the deployed model in that setting as well as in failing to reproduce the "
@@ -514,9 +514,8 @@ P("The CNN does not damp: it never falls below %.2f at any cut and never approac
   "included to do. How closely it matches the target is not resolved by this test. Its "
   "ratio ranges from %.2f to %.2f across cuts, and the tail carries too little variance "
   "for a two-decimal figure to be meaningful: at wavenumber 11 the target holds 0.25 per "
-  "cent of its power there. An earlier version of this analysis reported the CNN as "
-  "sitting within 4 per cent of the target, which was the closest point of the sweep and "
-  "should not have been quoted as though the cut were incidental."
+  "cent of its power there. A figure of 4 per cent would take the closest point of the "
+  "sweep and treat the choice of cut as incidental, which it is not."
   % (cnn_lo, cnn_lo, cnn_hi))
 
 FIG("05_power_spectra.png", "Radially averaged power spectra in clear-sky-index "
@@ -621,8 +620,8 @@ P("The uncertainty budget carries the more consequential result. At every horizo
      u.loc["near_term_2026_2050", "pct_var_gcm"], u.loc["long_term_2076_2100", "pct_var_gcm"],
      u.loc["near_term_2026_2050", "pct_var_ds"], u.loc["long_term_2076_2100", "pct_var_ds"],
      max(u["pct_var_ssp"]) + 0.5))
-P("Two choices in constructing that budget deserve stating, because an earlier version of "
-  "this section got the first of them wrong. The downscaling term is the part of the "
+P("Two choices in constructing that budget deserve stating, because both are open "
+  "choices rather than conventions. The downscaling term is the part of the "
   "validation error that survives a twenty-five-year mean, %.2f W/m², not the monthly "
   "validation RMSE of %.2f. The two differ by a factor of six because random "
   "month-to-month error largely averages out of a three-hundred-month mean while "
@@ -759,9 +758,9 @@ P("**Only %d cells, %.1f per cent of those assessed and approximately %s km², a
   % (n_rob, 100 * n_rob / n_keep, "{:,.0f}".format(geo["area_km2"].sum())))
 P("Section 3.9.3 previously printed the distance decay as Score = e^(-d/d_ref) while "
   "stating in prose that the score falls below 0.14 beyond d_ref, which the function does "
-  "not do: e^(-1) is 0.368. That discrepancy was not cosmetic, since the two readings "
-  "give robust sets of 145 and 42 cells respectively. It has been resolved in favour of "
-  "the function as written, on the grounds that a site 10 km from an existing "
+  "not do: e^(-1) is 0.368. The distinction is not cosmetic, since the two readings "
+  "give robust sets of 145 and 42 cells respectively. The function as written is the one "
+  "used here, on the grounds that a site 10 km from an existing "
   "transmission line is routinely connectable for utility-scale development and should "
   "not be scored as though it were remote. The figures reported here use that reading.")
 TBL(["Criterion", "Robust set mean", "All assessed cells", "Ratio"], [["Irradiance (W/m²)", "%.2f" % lay.ghi_present_sarah.values[rob].mean(), "%.2f" % lay.ghi_present_sarah.values[keep].mean(), "%.2f" % (lay.ghi_present_sarah.values[rob].mean() / lay.ghi_present_sarah.values[keep].mean())], ["Slope (degrees)", "%.2f" % lay.slope.values[rob].mean(), "%.2f" % lay.slope.values[keep].mean(), "%.2f" % (lay.slope.values[rob].mean() / lay.slope.values[keep].mean())], ["Land cover score", "%.2f" % lay.landcover_score.values[rob].mean(), "%.2f" % lay.landcover_score.values[keep].mean(), "%.2f" % (lay.landcover_score.values[rob].mean() / lay.landcover_score.values[keep].mean())], ["Distance to roads (km)", "%.2f" % lay.dist_roads.values[rob].mean(), "%.2f" % lay.dist_roads.values[keep].mean(), "%.2f" % (lay.dist_roads.values[rob].mean() / lay.dist_roads.values[keep].mean())], ["Distance to grid (km)", "%.2f" % lay.dist_grid.values[rob].mean(), "%.2f" % lay.dist_grid.values[keep].mean(), "%.2f" % (lay.dist_grid.values[rob].mean() / lay.dist_grid.values[keep].mean())], ["Distance to settlements (km)", "%.2f" % lay.dist_settlements.values[rob].mean(), "%.2f" % lay.dist_settlements.values[keep].mean(), "%.2f" % (lay.dist_settlements.values[rob].mean() / lay.dist_settlements.values[keep].mean())]], "Table 4.10. Mean criterion values on the robust set against all assessed cells. The "
