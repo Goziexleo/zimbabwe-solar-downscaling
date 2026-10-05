@@ -45,6 +45,7 @@ stage "6 chapters, document, verification"
 ./finalise_dissertation.sh
 
 stage "7 sync"
+$PY brief/sync_brief_tables.py
 $PY brief/build_brief_formats.py --pdf --sync >/dev/null
 echo "synced"
 printf '\n========== COMPLETE (%s) ==========\n' "$(date +%H:%M:%S)"

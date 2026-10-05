@@ -84,6 +84,7 @@ stage "12 chapters, document, verification"
 ./finalise_dissertation.sh
 
 stage "13 sync deliverables"
+$PY brief/sync_brief_tables.py
 $PY brief/build_brief_formats.py --pdf --sync >/dev/null
 echo "synced to the project folder"
 

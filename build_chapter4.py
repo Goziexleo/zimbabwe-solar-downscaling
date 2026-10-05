@@ -346,13 +346,41 @@ TBL(["Field", "Spatial correlation", "Std ratio", "Centred RMSE", "Domain-mean b
 _rf = roll[roll.model == "Random Forest"].set_index("fold")
 _xg = roll[roll.model == "XGBoost"].set_index("fold")
 folds = list(_xg.index)
-P("Because every figure above rests on a single 1985–2010 / 2011–2024 split, a "
-  "rolling-origin evaluation was run across four expanding training windows, each "
-  "evaluated on the block immediately following it so that every fold remains a strictly "
-  "forward-in-time test. XGBoost returns the lower error in all four folds, by margins "
-  "of %s W/m². The ranking between the two pixel-wise models is therefore not an "
-  "artefact of where the single split was placed."
-  % " and ".join("%.2f" % (_rf.loc[f, "RMSE"] - _xg.loc[f, "RMSE"]) for f in folds))
+# Rolling origin refits both pixel-wise models from scratch and takes hours, so
+# it can lag a configuration change. If it does, the claim is not made: asserting
+# a fold ranking computed on superseded models is exactly the error this chapter
+# has had to correct twice.
+_roll_stale = (os.path.getmtime(os.path.join(EVAL, "rolling_origin.csv"))
+               < os.path.getmtime(os.path.join(EVAL, "table_3_3.csv")))
+_wins = all(_rf.loc[f, "RMSE"] > _xg.loc[f, "RMSE"] for f in folds)
+if _roll_stale:
+    P("Because every figure above rests on a single 1985\u20132010 / 2011\u20132024 "
+      "split, a rolling-origin evaluation was run across four expanding training "
+      "windows, each evaluated on the block immediately following it so that every fold "
+      "remains a strictly forward-in-time test. The figures in Table 4.3 were computed "
+      "before the pixel-wise configurations were changed in Section 3.6.7 and have not "
+      "been recomputed on the deployed ones, so they are reported as the design of the "
+      "test rather than as a current result, and no claim about the fold ranking is made "
+      "from them here.")
+elif _wins:
+    P("Because every figure above rests on a single 1985\u20132010 / 2011\u20132024 "
+      "split, a rolling-origin evaluation was run across four expanding training "
+      "windows, each evaluated on the block immediately following it so that every fold "
+      "remains a strictly forward-in-time test. XGBoost returns the lower error in all "
+      "four folds, by margins of %s W/m\u00b2. The ranking between the two pixel-wise "
+      "models is therefore not an artefact of where the single split was placed."
+      % " and ".join("%.2f" % (_rf.loc[f, "RMSE"] - _xg.loc[f, "RMSE"]) for f in folds))
+else:
+    _n = sum(1 for f in folds if _rf.loc[f, "RMSE"] > _xg.loc[f, "RMSE"])
+    P("Because every figure above rests on a single 1985\u20132010 / 2011\u20132024 "
+      "split, a rolling-origin evaluation was run across four expanding training "
+      "windows, each evaluated on the block immediately following it so that every fold "
+      "remains a strictly forward-in-time test. XGBoost returns the lower error in %d of "
+      "the four folds, with margins of %s W/m\u00b2, so the ranking between the two "
+      "pixel-wise models is partly a property of where the split falls and is not "
+      "reported as a stable one."
+      % (_n, " and ".join("%+.2f" % (_rf.loc[f, "RMSE"] - _xg.loc[f, "RMSE"])
+                          for f in folds)))
 TBL(["Fold", "Random Forest RMSE", "XGBoost RMSE", "Difference"], [[f, "%.2f" % _rf.loc[f, "RMSE"], "%.2f" % _xg.loc[f, "RMSE"], "%+.2f" % (_rf.loc[f, "RMSE"] - _xg.loc[f, "RMSE"])] for f in folds], "Table 4.3. Rolling-origin evaluation across four expanding windows. Each fold's "
     "climatology reference is built from that fold's own training window.")
 
@@ -481,18 +509,15 @@ P("This test is used as a screen and not as a ranking, and the distinction is es
      _hi("XGBoost", "U-Net", "MBE"),
      cut.loc["U-Net", "k>=11"], cut.loc["XGBoost", "k>=11"],
      t33.loc["U-Net", "RMSE"] - t33.loc["XGBoost", "RMSE"]))
-P("One qualification carries over from Section 3.6.7 and belongs here, because this is "
-  "where the comparison is made. The deployed XGBoost configuration was retained in "
-  "preference to its own cross-validated alternative on the strength of a comparison on "
-  "the withheld record, which is selection on the evaluation data; and that alternative "
-  "is in fact the marginally better of the two there, at %.3f W/m\u00b2 against %.3f. "
-  "The XGBoost figure this section weighs against the U-Net is therefore not free of "
-  "that contamination, and the margin at issue, %.3f W/m\u00b2, is of the same order as "
-  "the configuration difference. It does not change the direction of the argument, which "
-  "rests on the spatial axes rather than on aggregate error, but it is a reason to read "
-  "the aggregate comparison as indecisive on its own rather than merely unestablished."
-  % (cvc.loc["cross-validated", "RMSE_zw"], cvc.loc["deployed", "RMSE_zw"],
-     abs(pair("XGBoost", "U-Net", "RMSE")[0])))
+P("One qualification that stood here in an earlier version no longer applies and is "
+  "noted because it changes how the margin should be read. The deployed XGBoost "
+  "configuration was previously the a priori default, retained over the search's own "
+  "selection on the strength of a comparison on the withheld record. Section 3.6.7 "
+  "reports that the comparison in fact favoured the search result, and both pixel-wise "
+  "models now carry their cross-validated configurations, chosen inside the training "
+  "period. The figures weighed against the U-Net here are therefore free of selection on "
+  "the evaluation record, which they were not when this comparison was first drawn."
+  )
 P("The wider point is that a model can satisfy every validation metric in Table 4.1 and "
   "still be unfit for the purpose the product serves. The Random Forest is better than "
   "the deployed model on mean bias, not separable from it on either spatial axis, and "

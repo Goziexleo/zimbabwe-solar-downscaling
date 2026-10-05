@@ -40,8 +40,12 @@ PERSIST_MODELS = os.environ.get("PERSIST_RF_MODELS", "0") == "1"
 # total), which is also a reasonable regularisation adjustment given far
 # more samples per pixel. NOTE the ~14GB figure applies to the DAILY variant
 # only; the deployed monthly models measure ~4GB in total.
-MIN_SAMPLES_LEAF = int(os.environ.get("RF_MIN_SAMPLES_LEAF", "5"))
-N_ESTIMATORS = int(os.environ.get("RF_N_ESTIMATORS", "500"))
+# Cross-validated configuration, adopted for the reason given in
+# train_pixelwise_xgb.py. The a priori defaults were 500 trees with
+# min_samples_leaf 5; the search prefers 800 and 3, and on validation that is
+# the better of the two by 0.477 W/m2 over Zimbabwe.
+MIN_SAMPLES_LEAF = int(os.environ.get("RF_MIN_SAMPLES_LEAF", "3"))
+N_ESTIMATORS = int(os.environ.get("RF_N_ESTIMATORS", "800"))
 _max_features_raw = os.environ.get("RF_MAX_FEATURES", "sqrt")
 MAX_FEATURES = float(_max_features_raw) if _max_features_raw.replace(".", "", 1).isdigit() else _max_features_raw
 

@@ -36,12 +36,17 @@ os.makedirs(model_output_dir, exist_ok=True)
 # worse (10.0157), because holding back 20% of an already-small 312-month record
 # costs more than the stopping rule gains. Fixed rounds use all the training
 # data and no validation information.
+# Cross-validated configuration, adopted after Section 3.6.7 showed that the
+# a priori defaults (max_depth 6, eta 0.05, subsample 0.8, min_child_weight 3)
+# were retained on the strength of a comparison on the withheld record that in
+# fact favoured the search result. The search is hpo_pixelwise.py and scores on
+# 5-fold temporal cross-validation inside the training period only.
 N_ESTIMATORS = int(os.environ.get("XGB_N_ESTIMATORS", "200"))
 PERSIST_MODELS = os.environ.get("PERSIST_XGB_MODELS", "0") == "1"
-MAX_DEPTH = int(os.environ.get("XGB_MAX_DEPTH", "6"))
-ETA = float(os.environ.get("XGB_ETA", "0.05"))
-SUBSAMPLE = float(os.environ.get("XGB_SUBSAMPLE", "0.8"))
-MIN_CHILD_WEIGHT = int(os.environ.get("XGB_MIN_CHILD_WEIGHT", "3"))
+MAX_DEPTH = int(os.environ.get("XGB_MAX_DEPTH", "4"))
+ETA = float(os.environ.get("XGB_ETA", "0.1"))
+SUBSAMPLE = float(os.environ.get("XGB_SUBSAMPLE", "0.7"))
+MIN_CHILD_WEIGHT = int(os.environ.get("XGB_MIN_CHILD_WEIGHT", "5"))
 
 print("Loading training and validation datasets...")
 ds_train = xr.open_dataset(train_path)

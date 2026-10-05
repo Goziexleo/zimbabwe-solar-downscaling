@@ -54,7 +54,20 @@ def default_of(script, name):
     return m.group(1)
 
 
+# The a priori values, kept here because they are no longer in the training
+# scripts: those now carry the cross-validated configuration. This script exists
+# to document the comparison that justified the change, so the arm it is compared
+# against has to survive the change.
+A_PRIORI = {
+    "XGBoost": dict(max_depth=6, eta=0.05, subsample=0.8, min_child_weight=3),
+    "Random Forest": dict(n_estimators=500, max_features="sqrt", min_samples_leaf=5),
+}
+
+
 def deployed():
+    """The configurations the training scripts now carry, which since the
+    adoption are the cross-validated ones. Kept as a cross-check that the
+    scripts and hpo_pixelwise_*.csv agree."""
     return {
         "XGBoost": dict(max_depth=int(default_of("train_pixelwise_xgb.py", "XGB_MAX_DEPTH")),
                         eta=float(default_of("train_pixelwise_xgb.py", "XGB_ETA")),
@@ -126,8 +139,8 @@ def main():
 
     rows = []
     for family, tag in (("XGBoost", "xgb"), ("Random Forest", "rf")):
-        for label, cfg in (("deployed", deployed()[family]),
-                           ("cross-validated", cv_winner(tag))):
+        for label, cfg in (("a priori default", A_PRIORI[family]),
+                           ("cross-validated (deployed)", cv_winner(tag))):
             print("fitting %s, %s configuration: %s" % (family, label, cfg))
             preds = Parallel(n_jobs=N_JOBS, verbose=0)(
                 delayed(fit_cell)(family, cfg, Xtr[:, i, j, :], ytr[:, i, j],
@@ -158,8 +171,9 @@ def main():
     print()
     for family in ("XGBoost", "Random Forest"):
         g = df[df.model == family].set_index("configuration")
-        dep, cv = g.loc["deployed", "RMSE_zw"], g.loc["cross-validated", "RMSE_zw"]
-        print("%-14s deployed %.3f against cross-validated %.3f: the default is %s "
+        dep = g.loc["a priori default", "RMSE_zw"]
+        cv = g.loc["cross-validated (deployed)", "RMSE_zw"]
+        print("%-14s a priori %.3f against cross-validated %.3f: the default is %s "
               "by %.3f W/m2" % (family, dep, cv,
                                 "better" if dep < cv else "worse", abs(dep - cv)))
     print("\nwrote %s" % OUT)
