@@ -350,8 +350,29 @@ folds = list(_xg.index)
 # it can lag a configuration change. If it does, the claim is not made: asserting
 # a fold ranking computed on superseded models is exactly the error this chapter
 # has had to correct twice.
-_roll_stale = (os.path.getmtime(os.path.join(EVAL, "rolling_origin.csv"))
-               < os.path.getmtime(os.path.join(EVAL, "table_3_3.csv")))
+#
+# The test is the configuration the run recorded, not the file's date. A date
+# check passed on 5 October for a four-hour rerun that had refitted the
+# superseded models, because compute_rolling_origin.py hardcoded their
+# hyperparameters: the file was new and its contents were not.
+def _roll_config_matches():
+    if "config" not in roll.columns:
+        return False
+    import re as _re
+
+    def _dflt(script, name):
+        src = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), script)).read()
+        m = _re.search(r'os\.environ\.get\(\s*"%s"\s*,\s*"([^"]+)"' % name, src)
+        return m.group(1) if m else None
+
+    want = ("RF:max_features=%s,min_samples_leaf=%s,n_estimators=%s"
+            % (_dflt("train_pixelwise_rf.py", "RF_MAX_FEATURES"),
+               _dflt("train_pixelwise_rf.py", "RF_MIN_SAMPLES_LEAF"),
+               _dflt("train_pixelwise_rf.py", "RF_N_ESTIMATORS")))
+    return bool(roll["config"].astype(str).str.startswith(want).all())
+
+
+_roll_stale = not _roll_config_matches()
 _wins = all(_rf.loc[f, "RMSE"] > _xg.loc[f, "RMSE"] for f in folds)
 if _roll_stale:
     P("Because every figure above rests on a single 1985\u20132010 / 2011\u20132024 "

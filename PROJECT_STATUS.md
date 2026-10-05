@@ -2283,6 +2283,38 @@ the link. The 404s of 1 and 3 October predate the repository existing.
 
 ---
 
+## 12w. A four-hour rerun that refitted the superseded models
+
+The author ran `compute_rolling_origin.py` to completion after the pixel-wise
+configurations changed. It produced the eight fold RMSEs **identical to the 2 October
+file, to three decimals**. That is not a coincidence and not stability: the script
+hardcoded `n_estimators=500, max_features="sqrt", min_samples_leaf=5` for the Random
+Forest and `max_depth=6, learning_rate=0.05, subsample=0.8, min_child_weight=3` for
+XGBoost, so it refitted the configurations Section 3.6.7 had superseded. Four hours of
+compute described models that no longer exist.
+
+**The mtime guard passed while the content was stale**, which is the lesson. `build_chapter4.py`
+compared `rolling_origin.csv`'s date against `table_3_3.csv`'s, and the file was new. A
+date says when a number was written, not what it describes. The script now reads both
+configurations from the training scripts, the way every other consumer in the project
+does, and stamps the configuration it used into a `config` column; the chapter checks that
+column against the deployed defaults and reports the design of the test rather than a fold
+ranking when they disagree. It disagrees now, because the current file carries no `config`
+column at all.
+
+So Section 4.2 still makes no claim about the fold ranking, which is the correct state: the
+only rolling-origin numbers in existence belong to superseded models. A rerun under the
+fixed script would take about four hours and would produce the first fold ranking that
+describes the deployed configurations.
+
+**Not a defect, checked:** the CNN and U-Net rows are NaN in the RMSE column by design.
+The script reports those two in their own loss units — CSI squared and standardised-anomaly
+squared — as a relative-stability check, because they are not commensurable with the
+pixel-wise models' GHI RMSE. Table 4.3 is a two-model table for that reason and not
+because the neural fits failed.
+
+---
+
 ## 13. Outstanding
 
 **Open after the fifth round (§12q)**

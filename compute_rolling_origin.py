@@ -55,6 +55,37 @@ OUT_CSV = os.path.join(ROOT, "data/processed/evaluation/rolling_origin.csv")
 
 SKIP_NEURAL = os.environ.get("ROLLING_SKIP_NEURAL", "0") == "1"
 
+def _default_of(script, name):
+    """A training script's env-overridable default.
+
+    These were hardcoded until 5 October, which made a four-hour rerun after the
+    pixel-wise configurations changed reproduce the previous numbers to three
+    decimals: the script refitted the superseded models. They are read from the
+    training scripts now so the two cannot diverge again, and the configuration
+    actually used is written into the output so a reader can check it.
+    """
+    src = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), script)).read()
+    m = re.search(r'os\.environ\.get\(\s*"%s"\s*,\s*"([^"]+)"' % name, src)
+    assert m is not None, "could not read %s from %s" % (name, script)
+    return m.group(1)
+
+
+RF_CFG = dict(
+    n_estimators=int(_default_of("train_pixelwise_rf.py", "RF_N_ESTIMATORS")),
+    max_features=_default_of("train_pixelwise_rf.py", "RF_MAX_FEATURES"),
+    min_samples_leaf=int(_default_of("train_pixelwise_rf.py", "RF_MIN_SAMPLES_LEAF")),
+)
+XGB_CFG = dict(
+    max_depth=int(_default_of("train_pixelwise_xgb.py", "XGB_MAX_DEPTH")),
+    learning_rate=float(_default_of("train_pixelwise_xgb.py", "XGB_ETA")),
+    subsample=float(_default_of("train_pixelwise_xgb.py", "XGB_SUBSAMPLE")),
+    min_child_weight=int(_default_of("train_pixelwise_xgb.py", "XGB_MIN_CHILD_WEIGHT")),
+    n_estimators=int(_default_of("train_pixelwise_xgb.py", "XGB_N_ESTIMATORS")),
+)
+CFG_TAG = "RF:%s|XGB:%s" % (
+    ",".join("%s=%s" % kv for kv in sorted(RF_CFG.items())),
+    ",".join("%s=%s" % kv for kv in sorted(XGB_CFG.items())))
+
 FOLDS = [
     ("1999-2004", "1984-12-31", "1998-12-31", "2004-12-31"),
     ("2005-2010", "1984-12-31", "2004-12-31", "2010-12-31"),
@@ -157,15 +188,13 @@ def main():
                 clim[te_months == m] = src.mean(axis=0)[np.newaxis, :, :]
 
         def fit_rf(i, j):
-            m = RandomForestRegressor(n_estimators=500, max_features="sqrt",
-                                      min_samples_leaf=5, random_state=42, n_jobs=1)
+            m = RandomForestRegressor(random_state=42, n_jobs=1, **RF_CFG)
             m.fit(X_tr[:, i, j, :], y_tr[:, i, j])
             return i, j, m.predict(X_te[:, i, j, :])
 
         def fit_xgb(i, j):
-            m = xgb.XGBRegressor(max_depth=6, learning_rate=0.05, subsample=0.8,
-                                 min_child_weight=3, n_estimators=200,
-                                 reg_alpha=0.1, reg_lambda=1.0, random_state=42, n_jobs=1)
+            m = xgb.XGBRegressor(reg_alpha=0.1, reg_lambda=1.0, random_state=42,
+                                 n_jobs=1, **XGB_CFG)
             m.fit(X_tr[:, i, j, :], y_tr[:, i, j])
             return i, j, m.predict(X_te[:, i, j, :])
 
@@ -206,6 +235,9 @@ def main():
                 print(f"    CSI validation MSE {mse:.6f}")
 
     df = pd.DataFrame(rows)
+    # Stamp the configuration so a consumer can tell whether these numbers
+    # describe the deployed models rather than trusting the file's date.
+    df["config"] = CFG_TAG
     df.to_csv(OUT_CSV, index=False)
 
     print("\n" + "=" * 92)
