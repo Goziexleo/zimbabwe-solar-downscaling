@@ -2243,6 +2243,46 @@ the new configuration.
 
 ---
 
+## 12v. The reference list is complete, and one prepared entry was wrong
+
+The examiner has taken marks for cited-but-unlisted works in four consecutive
+versions, calling it the cheapest mark available. The proper repair is the author
+importing the RIS into Zotero, which I cannot do. What I could do is close the gap in
+the document itself.
+
+**Nine works cited in the body were missing from the list**: Cohen, Dozier & Frew,
+Ineichen & Perez, Lafferty & Sriver, Ronneberger et al., Skoplaki & Palyvos, and the
+three datasets the methods depend on (GADM, WorldPop, ESA CCI Land Cover), all three of
+which are cited in Chapter 3 prose and tables. `insert_missing_references.py` builds the
+entries from `reference_additions.ris`, formats them to match the Zotero output and
+inserts them in alphabetical position inside the bibliography field. The list is 32
+entries and nothing cited is unlisted. They are a stopgap by design: they sit inside the
+field, so a Zotero refresh regenerates the block and replaces them, which is the intended
+end state and needs no cleanup first.
+
+**One prepared entry was wrong twice over.** The hand-entered Dozier & Frew record
+carried DOI `10.1109/36.58983`, which resolves to a Price paper on regional
+evapotranspiration, and a title belonging to a third paper. Checking it against CrossRef
+before inserting caught it. The correct record is `10.1109/36.58986`. Both it and
+Ronneberger now resolve by DOI rather than being hand-entered, so the RIS has 32 verified
+of 41. This is the fourth time a reference in this project has pointed at the wrong paper,
+and the lesson has not changed: verify by DOI, and do not trust a title search.
+
+**A misattribution removed rather than reported.** Chapter 1 cited Lin et al. (2023), a
+downscaling study of East Asia, for the claim that annual GHI exceeds 2,000 kWh/m² across
+much of Zimbabwe. The citation is a Zotero field and cannot be re-pointed outside Word,
+but the text around it can be: the sentence now attaches that citation to a claim the
+paper does support, and the irradiance figure is left uncited with a Global Solar Atlas
+entry added to the RIS for the author to insert. Of the seven Lin citations the examiner
+counted, the other six legitimately support machine-learning downscaling claims and are
+untouched.
+
+**Repository link, checked.** Unauthenticated requests return 200 for the repository page
+and 200 for the raw README, so the 403 the examiner saw was their own network rather than
+the link. The 404s of 1 and 3 October predate the repository existing.
+
+---
+
 ## 13. Outstanding
 
 **Open after the fifth round (§12q)**

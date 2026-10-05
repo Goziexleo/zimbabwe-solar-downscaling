@@ -599,6 +599,33 @@ DO  - 10.1073/pnas.1611845114
 UR  - https://doi.org/10.1073/pnas.1611845114
 N1  - the closest published African siting study
 ER  - 
+TY  - CHAP
+AU  - Ronneberger, Olaf
+AU  - Fischer, Philipp
+AU  - Brox, Thomas
+TI  - U-Net: Convolutional Networks for Biomedical Image Segmentation
+JO  - Lecture Notes in Computer Science
+PY  - 2015
+SP  - 234
+EP  - 241
+DO  - 10.1007/978-3-319-24574-4_28
+UR  - https://doi.org/10.1007/978-3-319-24574-4_28
+N1  - the U-Net architecture of Section 2.2.2; it was hand-entered because a title search returns an invited-talk abstract, but the DOI resolves correctly and is now used directly
+ER  - 
+TY  - JOUR
+AU  - Dozier, J.
+AU  - Frew, J.
+TI  - Rapid calculation of terrain parameters for radiation modeling from digital elevation data
+JO  - IEEE Transactions on Geoscience and Remote Sensing
+PY  - 1990
+VL  - 28
+IS  - 5
+SP  - 963
+EP  - 969
+DO  - 10.1109/36.58986
+UR  - https://doi.org/10.1109/36.58986
+N1  - Dozier and Frew's terrain parameters, the sky-view factor of Section 3.5.2. The hand-entered version of this record carried DOI 10.1109/36.58983, which resolves to a Price paper on evapotranspiration, and a title belonging to a different paper again
+ER  - 
 TY  - JOUR
 AU  - Skoplaki, E.
 AU  - Palyvos, J.A.
@@ -698,19 +725,12 @@ DO  - 10.5194/essd-16-5243-2024
 UR  - https://doi.org/10.5194/essd-16-5243-2024
 N1  - SARAH-3, the satellite record Chapter 4 validates against; a title search returns an EGU conference abstract instead of the dataset paper
 ER  - 
-TY  - CHAP
-AU  - Ronneberger, O., Fischer, P., Brox, T.
-TI  - U-Net: Convolutional Networks for Biomedical Image Segmentation
-PY  - 2015
-UR  - https://doi.org/10.1007/978-3-319-24574-4_28
-N1  - Section 2.2.2; MICCAI 2015, LNCS 9351, 234-241 [NOT CrossRef-verified: check before submitting]
-ER  - 
-TY  - JOUR
-AU  - Dozier, J., Frew, J.
-TI  - Rapid upslope and downslope computation for efficient analysis of DEM
-PY  - 1990
-UR  - https://doi.org/10.1109/36.58983
-N1  - Section 3.5.2 sky-view factor; IEEE TGRS 28(5), 963-969 [NOT CrossRef-verified: check before submitting]
+TY  - DATA
+AU  - World Bank Group and Solargis
+TI  - Global Solar Atlas 2.0, long-term average of global horizontal irradiation for Zimbabwe
+PY  - 2024
+UR  - https://globalsolaratlas.info
+N1  - the national GHI figure in Chapter 1, which was previously attributed to Lin et al. (2023), a downscaling study of East Asia; the attribution is removed and this is the source to cite in its place [NOT CrossRef-verified: check before submitting]
 ER  - 
 TY  - DATA
 AU  - GADM

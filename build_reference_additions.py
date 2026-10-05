@@ -118,6 +118,15 @@ BY_DOI = [
      "the closest published benchmark of deep learning downscaling"),
     ("10.1029/2018MS001400", "MPI-ESM1-2 model description"),
     ("10.1073/pnas.1611845114", "the closest published African siting study"),
+    ("10.1007/978-3-319-24574-4_28",
+     "the U-Net architecture of Section 2.2.2; it was hand-entered because a "
+     "title search returns an invited-talk abstract, but the DOI resolves "
+     "correctly and is now used directly"),
+    ("10.1109/36.58986",
+     "Dozier and Frew's terrain parameters, the sky-view factor of Section "
+     "3.5.2. The hand-entered version of this record carried DOI 10.1109/36.58983, "
+     "which resolves to a Price paper on evapotranspiration, and a title "
+     "belonging to a different paper again"),
     ("10.1016/j.solener.2008.10.008",
      "the NOCT cell-temperature form and the module temperature-coefficient "
      "range used in Section 4.7.2, which were otherwise uncited"),
@@ -134,16 +143,14 @@ BY_DOI = [
 
 # No DOI, or not in CrossRef. Emitted from hand-entered fields and flagged.
 MANUAL = [
-    dict(ty="CHAP", title="U-Net: Convolutional Networks for Biomedical Image "
-                          "Segmentation",
-         author="Ronneberger, O., Fischer, P., Brox, T.", year="2015",
-         url="https://doi.org/10.1007/978-3-319-24574-4_28",
-         note="Section 2.2.2; MICCAI 2015, LNCS 9351, 234-241"),
-    dict(ty="JOUR", title="Rapid upslope and downslope computation for efficient "
-                          "analysis of DEM",
-         author="Dozier, J., Frew, J.", year="1990",
-         url="https://doi.org/10.1109/36.58983",
-         note="Section 3.5.2 sky-view factor; IEEE TGRS 28(5), 963-969"),
+    dict(ty="DATA", title="Global Solar Atlas 2.0, long-term average of global "
+                          "horizontal irradiation for Zimbabwe",
+         author="World Bank Group and Solargis", year="2024",
+         url="https://globalsolaratlas.info",
+         note="the national GHI figure in Chapter 1, which was previously "
+              "attributed to Lin et al. (2023), a downscaling study of East Asia; "
+              "the attribution is removed and this is the source to cite in its "
+              "place"),
     dict(ty="DATA", title="Global Administrative Areas, version 4.1",
          author="GADM", year="2022", url="https://gadm.org",
          note="national and provincial boundaries, Section 3.3.4"),

@@ -6,12 +6,43 @@ The prose claims have been corrected. The citation **fields** are yours, because
 inserting and deleting them is a Zotero operation. Work through
 `CITATION_AUDIT.md`; the short version:
 
-**Import `reference_additions.ris` first.** Zotero: File → Import → choose the
-file. It carries 37 entries — 27 resolved against the CrossRef API (title,
-journal, volume, pages and DOI come from CrossRef, not from me) and 10
-hand-entered datasets and software, each flagged in the note field as needing a
-check. That takes the list from 23 to 60, the floor an examiner expects. See
+**The reference list is no longer incomplete, but it is not yet Zotero's.**
+Nine works that the text cites were missing from the list for five versions
+running, and an examiner takes that mark cheaply. They have been inserted as
+plain-text entries in alphabetical position, formatted to match the Zotero
+output: Cohen, Dozier & Frew, Ineichen & Perez, Lafferty & Sriver, Ronneberger
+et al., Skoplaki & Palyvos, and the three datasets (GADM, WorldPop, ESA CCI).
+The list now shows 32 entries and nothing cited in the body is unlisted.
+
+**Those nine are a stopgap and a Zotero refresh will delete them, which is
+correct.** They sit inside the bibliography field, so the moment you import the
+RIS and press Refresh, Zotero regenerates the block from your library and
+replaces them with real entries. Nothing has to be removed first. Until you do
+that, do not edit them by hand — edit the library instead.
+
+**Import `reference_additions.ris`.** Zotero: File → Import → choose the file.
+It carries 41 entries — 32 resolved against the CrossRef API (title, journal,
+volume, pages and DOI come from CrossRef, not from me) and 9 hand-entered
+datasets and software, each flagged in the note field as needing a check. See
 `reference_additions_report.md` for what resolved and why each is needed.
+
+**One entry in that file was wrong and is now fixed.** The hand-entered Dozier &
+Frew record carried DOI `10.1109/36.58983`, which resolves to a Price paper on
+evapotranspiration, and a title belonging to a third paper. The correct record
+is `10.1109/36.58986`, *Rapid calculation of terrain parameters for radiation
+modeling from digital elevation data*, IEEE TGRS 28, 963–969. Both it and
+Ronneberger are now CrossRef-verified rather than hand-entered. If you had
+imported the earlier file, delete that entry and re-import.
+
+**One citation still needs re-pointing, and it is a factual error rather than a
+formatting one.** Chapter 1's claim that annual GHI exceeds 2,000 kWh/m² across
+much of Zimbabwe was cited to Lin et al. (2023), a downscaling study of East
+Asia, which does not support it. The attribution has been removed: the sentence
+now reads "...across much of the country, a resource comparable to the regions in
+which machine-learning downscaling has so far been demonstrated (Lin et al.,
+2023)", which is a claim that paper does support. **The irradiance figure is now
+uncited.** `reference_additions.ris` includes a Global Solar Atlas entry for it;
+insert that citation after the words "much of the country".
 
 Four title searches returned a plausible but wrong paper and were resolved by DOI
 instead: Efron's *Rejoinder* rather than the article, a tuning note rather than
