@@ -105,6 +105,32 @@ def _hi(a, b, metric):
     return max(abs(r[1]), abs(r[2]))
 
 
+# The sweep's closest-to-unity variant is derived rather than named, and its own
+# baseline configuration is compared against the deployed one, because the sweep
+# hardcodes both its learning rate and its dropout.
+_closest = (uo["test_spec_ratio"] - 1.0).abs().idxmin()
+# Readable labels: the raw variant keys are fine in a table and poor in a sentence.
+_VLABEL = {"baseline": "the baseline", "gp_none": "the penalty-free variant",
+           "gp_match": "the gradient-matching variant",
+           "gp_match_strong": "the strong gradient-matching variant",
+           "spectral": "the spectral-loss variant",
+           "clim_percell": "the per-cell climatology variant",
+           "drop_0": "the dropout-free variant", "drop_10": "the dropout 0.1 variant",
+           "small": "the reduced-width variant", "tiny": "the smallest variant"}
+
+
+def _fmt(v):
+    return ("%.10f" % float(v)).rstrip("0").rstrip(".") or "0"
+
+
+def _unet_lr():
+    import re as _re
+    src = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                            "train_unet_downscaler.py")).read()
+    m = _re.search(r'os\.environ\.get\(\s*"UNET_LEARNING_RATE"\s*,\s*"([^"]+)"', src)
+    return float(m.group(1))
+
+
 rob = sui.robustly_suitable.values.astype(bool)
 # "Retained" means not excluded by the mask, which is NOT the same as "not in
 # tier 4": a handful of retained cells score below 0.30 and land in the lowest
@@ -639,17 +665,27 @@ P("The sweep does not, however, identify the cause of the damping reported above
   "cause, and the attribution to dropout is therefore withdrawn."
   % (10, uo.loc["baseline", "test_spec_ratio"], cut.loc["U-Net", "k>=11"], uo.loc["drop_0", "test_spec_ratio"], abs(1 - uo.loc["drop_0", "test_spec_ratio"]), abs(1 - uo.loc["baseline", "test_spec_ratio"])))
 P("One result from the same sweep points the other way and is reported because it is "
-  "inconvenient: removing the gradient penalty gives a spectral ratio of %.3f, the closest "
-  "to unity of any variant tested, while the penalty variants span %.2f to %.2f. It does "
-  "not follow from this that the gradient penalty barely moves the ratio, nor that a "
-  "smoothness prior is refuted. "
-  "A further reason for caution is that the sweep predates the hyperparameter correction "
-  "of Section 3.6.7 and was run at the superseded learning rate, so its baseline differs "
-  "from the deployed model in that setting as well as in failing to reproduce the "
-  "damping. What can be said is that the adopted U-Net damps fine scales from "
+  "inconvenient: the variant whose spectral ratio comes closest to unity is %s at %.3f, "
+  "and removing the gradient penalty instead gives %.3f, while the penalty variants span "
+  "%.2f to %.2f. It does not follow from this that the gradient penalty barely moves the "
+  "ratio, nor that a smoothness prior is refuted. "
+  "A further reason for caution is that the sweep carries its own baseline configuration "
+  "rather than the deployed one: it fits at a learning rate of %s against the deployed "
+  "%s, and its baseline applies dropout at %s where the configuration adopted in this "
+  "section applies none. Its baseline is therefore a different model from the deployed "
+  "U-Net in two settings as well as in failing to reproduce the damping. What can be said "
+  "is that the adopted U-Net damps fine scales from "
   "wavenumber 5 upward, that the deficit deepens monotonically with the cut rather "
   "than holding at one value, and that the mechanism remains open."
-  % (uo.loc["gp_none", "test_spec_ratio"], uo.loc[["baseline", "gp_none", "gp_match", "gp_match_strong"], "test_spec_ratio"].min(), uo.loc[["baseline", "gp_none", "gp_match", "gp_match_strong"], "test_spec_ratio"].max()))
+  # Derived, not named: the closest-to-unity variant changed from gp_none to the
+  # spectral-loss variant when the sweep was rerun on the rebuilt target, and the
+  # sentence had the old winner written into it.
+  % (_VLABEL.get(_closest, _closest.replace("_", " ")),
+     uo.loc[_closest, "test_spec_ratio"],
+     uo.loc["gp_none", "test_spec_ratio"],
+     uo.loc[["baseline", "gp_none", "gp_match", "gp_match_strong"], "test_spec_ratio"].min(),
+     uo.loc[["baseline", "gp_none", "gp_match", "gp_match_strong"], "test_spec_ratio"].max(),
+     _fmt(uo.loc["baseline", "cfg_lr"]), _fmt(_unet_lr()), _fmt(uo.loc["baseline", "cfg_dropout"])))
 TBL(["Field"] + [c for c in cut.columns if c.startswith("k>=")] + ["Verdict"], [[f] + ["%.2f" % cut.loc[f, c] for c in cut.columns if c.startswith("k>=")]
      + [cut.loc[f, "robust"]]
      for f in ["Random Forest", "XGBoost", "CNN", "U-Net"]], "Table 4.6. Ratio of retained clear-sky-index power to the target's, as the "
