@@ -32,6 +32,7 @@ import argparse
 import itertools
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -47,8 +48,31 @@ CNN_GRID = {"lr": [0.0005, 0.001], "lambda_gp": [0.001, 0.01]}
 UNET_GRID = {"lr": [0.0002, 0.0005, 0.001]}
 
 # What is deployed today, for the comparison the write-up needs.
-DEPLOYED = {"CNN": {"lr": 0.0005, "lambda_gp": 0.01},
-            "U-Net": {"lr": 0.0002}}
+def _default_of(script, name):
+    """A training script's env-overridable default.
+
+    DEPLOYED was hardcoded as CNN lr 0.0005 with lambda_gp 0.01 and U-Net lr
+    0.0002 until 6 October, while the training scripts deployed 0.001 for all
+    three. The is_deployed column therefore flagged rows that were not the
+    deployed configurations, and for both models it flagged a row the search had
+    not selected. Read from the scripts so the two cannot diverge.
+    """
+    src = open(os.path.join(ROOT, script)).read()
+    m = re.search(r'os\.environ\.get\(\s*"%s"\s*,\s*"([^"]+)"' % name, src)
+    assert m is not None, "could not read %s from %s" % (name, script)
+    return float(m.group(1))
+
+
+DEPLOYED = {
+    "CNN": {"lr": _default_of("train_cnn_downscaler.py", "CNN_LEARNING_RATE"),
+            "lambda_gp": _default_of("train_cnn_downscaler.py", "CNN_LAMBDA_GP")},
+    "U-Net": {"lr": _default_of("train_unet_downscaler.py", "UNET_LEARNING_RATE")},
+}
+# A grid that cannot return the deployed configuration makes is_deployed empty
+# and the comparison meaningless, which is how this went unnoticed before.
+assert DEPLOYED["CNN"]["lr"] in CNN_GRID["lr"], DEPLOYED["CNN"]
+assert DEPLOYED["CNN"]["lambda_gp"] in CNN_GRID["lambda_gp"], DEPLOYED["CNN"]
+assert DEPLOYED["U-Net"]["lr"] in UNET_GRID["lr"], DEPLOYED["U-Net"]
 
 
 def candidates():

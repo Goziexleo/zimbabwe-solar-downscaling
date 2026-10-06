@@ -43,7 +43,14 @@ import xarray as xr
 from torch.utils.data import DataLoader, Dataset
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
-OUT = os.path.join(ROOT, "data/processed/evaluation/unet_optimisation.csv")
+# Overridable so a long rerun can write to a staging path and be swapped in only
+# once every variant is present. Writing straight to the live file let an
+# interrupted run on 6 October merge five fresh variants into eight superseded
+# ones, leaving Section 4.5 comparing a baseline from one model generation
+# against a dropout variant from another.
+OUT = os.environ.get(
+    "UNET_OPT_OUT",
+    os.path.join(ROOT, "data/processed/evaluation/unet_optimisation.csv"))
 TRAIN = os.path.join(ROOT, "data/processed/ml_ready/ml_training_dataset.nc")
 VAL = os.path.join(ROOT, "data/processed/ml_ready/ml_validation_dataset.nc")
 TOPO = os.path.join(ROOT, "data/processed/topography/zimbabwe_topographic_features_0.1deg.nc")
