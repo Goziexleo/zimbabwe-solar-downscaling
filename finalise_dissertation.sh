@@ -37,6 +37,34 @@ $PY add_front_matter_lists.py | tail -2
 echo "=== 7/8 table formatting ==="
 $PY normalise_tables.py | tail -2
 
+# A rebuild that aborts mid-way leaves the figures describing superseded models
+# while the tables describe the current ones, and nothing downstream notices: on
+# 5 October rerun_after_pixelwise_config.sh died at its configuration-check
+# stage and never reached make_figures.py, so the document carried plots of the
+# previous pixel-wise models for a day. Checked here because this chain runs
+# after every rebuild.
+echo "=== 7b figure freshness ==="
+$PY - <<'PYEOF2'
+import os, re, sys, time
+EV = "data/processed/evaluation"
+ref = os.path.getmtime(os.path.join(EV, "table_3_3.csv"))
+gens = open("build_chapter4.py").read() + open("build_chapter5.py").read()
+stale = []
+for name in sorted(set(re.findall(r'FIG\("([^"]+)"', gens))):
+    p = os.path.join("figures", name)
+    if not os.path.exists(p):
+        stale.append((name, "MISSING"))
+    elif os.path.getmtime(p) < ref:
+        stale.append((name, time.strftime("%b %d %H:%M", time.localtime(os.path.getmtime(p)))))
+if stale:
+    print("  FIGURES PREDATE THE CURRENT MODELS:")
+    for n, w in stale:
+        print("    %-30s %s" % (n, w))
+    print("  run make_figures.py and make_suitability_maps.py, then this chain again")
+    sys.exit(1)
+print("  all embedded figures are newer than table_3_3.csv")
+PYEOF2
+
 echo "=== 8/8 verify ==="
 $PY - <<'PYEOF'
 import os, re, docx
