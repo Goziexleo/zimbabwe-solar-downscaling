@@ -58,6 +58,13 @@ $PY compute_suitability.py
 $PY compute_robust_set_geography.py
 $PY compute_robustness_monte_carlo.py
 
+stage "9a derived products that read the XGBoost projections"
+# Missed on the first run of this script, which is why Section 4.7.2's yield
+# figures described the superseded projections for a day.
+$PY compute_pv_temperature_derating.py
+$PY compute_dropout_variant_comparison.py
+$PY compute_elevation_irradiance_gradient.py
+
 stage "9  the configuration comparison, now a priori against deployed"
 $PY compute_pixelwise_cv_config_check.py
 

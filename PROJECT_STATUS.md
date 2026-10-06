@@ -2324,13 +2324,19 @@ because the neural fits failed.
   future sentence added there has to displace one. The count printed by the script
   excludes the keyword line.
 
-- **Redeploy the dropout-free U-Net, or justify not doing so.** It is the most accurate
-  model measured (8.62 against the deployed XGBoost's 8.92 W m⁻²), better on the inner
-  split, and passes the scenario screen. Acting on it means regenerating the projections,
-  the uncertainty budget and the suitability maps and rechecking all three; `drop0`
-  projections and MME aggregations already exist, so the first two stages are cheap. This
-  is a supervisor-level decision, not a cleanup task, and §4.9 and §5.6 both state the gap
-  rather than papering over it.
+- **Redeploy the dropout-free U-Net — RESOLVED (§12r, §12u).** The configuration was
+  adopted and XGBoost kept as the deployed model, because the U-Net's RMSE margin is not
+  established, XGBoost is established better on three structural axes, the U-Net alone
+  damps the spectrum, and the ordering reverses on the full-box basis.
+- **Four CSVs still predate the current models; one of the four matters.**
+  `unet_optimisation.csv` (3 September) is the thirteen-variant U-Net sweep Section 4.5
+  quotes. It predates both the clear-sky rebuild and the dropout adoption; the text says
+  so, but only rerunning `optimise_unet.py` would make those figures describe anything
+  current. `rolling_origin.csv` carries no configuration stamp, so Section 4.2 reports
+  the design of the test and asserts no fold ranking. `sarah_era5_monthly.csv`
+  (28 August) is observational, depends on no model, and its age is not a defect. The
+  derating and dropout-comparison CSVs were stale for a day, are regenerated, and are
+  now wired into both rerun scripts.
 - **Insert a CORDEX citation in Word.** The 0.22°/0.44° resolution figures in Chapter 2
   now stand uncited, because the Harilal attribution was wrong. Gutowski et al. (2016) and
   Teichmann et al. (2021) are in `reference_additions.ris` and need citing at that

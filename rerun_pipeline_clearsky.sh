@@ -72,6 +72,11 @@ $PY compute_suitability.py
 $PY compute_robust_set_geography.py
 $PY compute_robustness_monte_carlo.py
 
+stage "9a derived products that read the projections or the validation fields"
+$PY compute_pv_temperature_derating.py
+$PY compute_dropout_variant_comparison.py
+$PY compute_elevation_irradiance_gradient.py
+
 stage "10 rolling origin (the long one)"
 $PY compute_rolling_origin.py
 
