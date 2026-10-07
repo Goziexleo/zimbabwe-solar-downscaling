@@ -120,14 +120,28 @@ def main():
     # Everything outside the bibliography block counts as cited, not just what
     # precedes it: Anthropic (2026) is cited in Appendix B, which follows the
     # References, and an earlier version of this slice missed it for that reason.
-    listed = "\n".join(ps[n].text for n in bib_idx)
+    listed_entries = [ps[n].text.strip() for n in bib_idx]
+    # A surname must START an entry to count as listed. Testing membership in the
+    # whole block matched co-authors: Taylor, K.E. is the seventh author on
+    # Eyring et al. (2016), so Taylor (2001) was reported as already listed and
+    # the Taylor diagram went uncited through seven rounds.
+    listed_first = set()
+    for t in listed_entries:
+        head = t.split(",", 1)[0].strip()
+        if head:
+            listed_first.add(head)
+    listed = "\n".join(listed_entries)
     body = "\n".join(p.text for n, p in enumerate(ps)
                      if not (bib_idx[0] <= n <= bib_idx[-1]))
 
     pending = []
     for f in records():
         surname = authors(f).split(",")[0].strip()
-        if not surname or surname not in body or surname in listed:
+        # Word-boundary match on the body. Plain containment put "Li" inside
+        # "Linke" and "Limpopo" and proposed Li (2010) as a cited-but-unlisted
+        # work when nothing cites it.
+        cited = re.search(r"\b%s\b" % re.escape(surname), body) is not None
+        if not surname or not cited or surname in listed_first:
             continue
         pending.append((sort_key(entry(f)), entry(f), surname))
     pending.sort()

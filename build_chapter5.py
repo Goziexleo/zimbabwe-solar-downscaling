@@ -336,11 +336,24 @@ P("**What this adds over an existing regional archive, and what it does not.** T
   "direct skill comparison against a dynamically downscaled product over Zimbabwe was "
   "not run, and Section 5.6 records it as the comparison most likely to overturn the "
   "case for the statistical approach altogether.")
+# The counterfactual here was "would have changed the model selection in this
+# study". It was true while the Random Forest led on aggregate error; after the
+# U-Net refit the Random Forest is highest of the four, so no accuracy-based rule
+# would have selected it and removing the screen changes nothing about this
+# study's choice. The contribution is what the screen detects, not what it
+# changed here, and the historical case is named as the earlier configuration it
+# was.
 P("**A demonstration that historical validation cannot substitute for a projection test.** "
-  "The Random Forest passes every accuracy threshold, is %s on aggregate error, and "
-  "is better than the deployed model on one of five resampled axes, yet cannot produce "
-  "the deliverable. The screen that detects this is cheap, is not standard practice, and "
-  "would have changed the model selection in this study had it not been applied."
+  "The Random Forest passes every accuracy threshold and is better than the deployed "
+  "model on mean bias, yet cannot separate the emission scenarios at all and so cannot "
+  "produce the deliverable. The screen that detects this is cheap and is not standard "
+  "practice, and no metric computed on a historical period can substitute for it. In "
+  "this study it does not change the outcome, because the Random Forest is %s on "
+  "aggregate error and would not have been selected on accuracy in any case; in an "
+  "earlier configuration of the same four models it led on aggregate error, and then the "
+  "screen was the only thing standing between that ranking and a product that cannot "
+  "project. That is the general claim: the screen is cheap insurance whose value does "
+  "not depend on whether it binds in the particular case."
   % rank("Random Forest").replace("-lowest", ""))
 P("**An explicit account of what the product does not contain.** The round-trip test "
   "establishes that the fields carry essentially no sub-grid information, and the study "
@@ -454,7 +467,7 @@ P("**Anchor the Section 4.5 sweep on the deployed configuration.** The refit thi
   "it: the U-Net carries the rate of %s that its own inner-split search selects, and its "
   "row in Table 4.1, its contribution to the architecture term of the uncertainty budget "
   "and its spectra are all those of the refitted model. What remains is the sweep itself. "
-  "Its baseline still differs from the deployed U-Net in %s, so it cannot isolate the "
+  "Its baseline still differs from the adopted U-Net in %s, so it cannot isolate the "
   "damping it was built to explain; anchoring it on the deployed configuration is the way "
   "to settle the mechanism, and it is the one change that would turn Section 4.5's open "
   "question into an answer."

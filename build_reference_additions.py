@@ -111,7 +111,7 @@ WANTED = [
 # entirely for O'Neill and Wu - so the identifier is given directly and CrossRef
 # still supplies every field written out.
 BY_DOI = [
-    ("10.1080/01621459.1987.10478410", "Section 3.8.2 uses BCa intervals"),
+    ("10.1080/01621459.1987.10478410", "Section 3.8.4 uses BCa intervals"),
     ("10.5194/gmd-9-3461-2016", "defines the SSP scenarios used"),
     ("10.1002/joc.5462", "the VALUE intercomparison of downscaling methods"),
     ("10.5194/gmd-13-2109-2020",

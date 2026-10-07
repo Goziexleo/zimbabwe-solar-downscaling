@@ -73,11 +73,11 @@ def load():
                        "  That is an environment fault, not a missing chapter: "
                        "run the guard in the\n  project environment."
                        % sys.executable)
-        return None, None, None
+        return None, None, None, None
     if not os.path.exists(CHAPTER):
         SKIP_REASON = ("chapter not found at:\n  %s\n"
                        "  Set CHAPTER3_PATH to check a copy elsewhere." % CHAPTER)
-        return None, None, None
+        return None, None, None, None
     d = docx.Document(CHAPTER)
     parts = [p.text for p in d.paragraphs]
     grids = []
@@ -85,7 +85,22 @@ def load():
         rows = [[re.sub(r"\s+", " ", c.text).strip() for c in r.cells] for r in t.rows]
         grids.append(rows)
         parts += [c for r in rows for c in r]
-    return re.sub(r"\s+", " ", " ".join(parts)), d.element.xml, grids
+    # Section 3.8 on its own, for the guard that forbids result intervals in the
+    # methods chapter. Headings carry the numbering, so the slice runs from the
+    # 3.8 heading to the next chapter-4 heading or the end of Chapter 3.
+    ps = list(d.paragraphs)
+    lo = next((i for i, q in enumerate(ps)
+               if q.style.name.startswith("Heading")
+               and q.text.strip().startswith("3.8")), None)
+    if lo is None:
+        s38 = ""
+    else:
+        hi = next((i for i in range(lo + 1, len(ps))
+                   if ps[i].style.name.startswith("Heading")
+                   and re.match(r"^(4|Chapter 4|CHAPTER 4)", ps[i].text.strip())),
+                  len(ps))
+        s38 = re.sub(r"\s+", " ", " ".join(q.text for q in ps[lo:hi]))
+    return (re.sub(r"\s+", " ", " ".join(parts)), d.element.xml, grids, s38)
 
 
 def canonical_anchors():
@@ -303,6 +318,32 @@ RETIRED = [
     ("against the deployed 0.0002",
      "the sweep's rate and the deployed rate became equal at the refit, so the "
      "comparison printed a value against itself"),
+
+    # Seventh critique. Chapter 3 carried twenty-two result figures copied from
+    # Chapter 4, which is regenerated while Chapter 3 is not, so each round left
+    # a stale copy in the methods chapter. All are removed; these guard the
+    # specific ones, and _no_intervals_in_methods() guards the class.
+    ("8.62 W/m\u00b2 against 8.92",
+     "the U-Net no longer returns the lower aggregate error, and Section 3.8.1 "
+     "now gives the reason without quoting figures"),
+    ("after the retrained U-Net of Section 4.5 returned the lower RMSE",
+     "that was an intermediate configuration, since superseded by the refit"),
+    ("8.92 W/m\u00b2 against 10.13",
+     "the a priori configurations' figures, replaced by the cross-validated ones"),
+    ("1.345 W/m\u00b2",
+     "the paired mean-bias difference is 1.247; Chapter 3 should not quote it"),
+    ("[-1.926, -0.606]",
+     "superseded BCa bound; Section 4.3 and Table C.6 carry the intervals"),
+    ("+1.218 W/m\u00b2",
+     "the aggregate deficit is +0.777; Chapter 3 should not quote it"),
+    ("at wavenumber 3, a slight excess",
+     "1.21 is the power retained BEYOND wavenumber 3; at wavenumber 3 the ratio "
+     "is 0.89, and Section 4.5 now names the quantity"),
+    ("each deployed model is applied",
+     "only XGBoost is deployed; Table C.9 also covers the Random Forest"),
+    ("would have changed the model selection in this study",
+     "the Random Forest is now highest on aggregate error, so no accuracy rule "
+     "would have selected it and the counterfactual is false"),
 ]
 
 EXPLANATORY = (r"earlier version|previously|an earlier|was wrong|no longer|superseded|"
@@ -425,8 +466,33 @@ def _numeric_boundary(text, start, end):
     return False
 
 
+def no_intervals_in_methods(prose_38):
+    """The methods chapter must not quote confidence intervals.
+
+    Twenty-two result figures accumulated in Sections 3.8.1 and 3.8.4 because
+    Chapter 4 is regenerated from the CSVs and Chapter 3 is edited in place, so
+    every rerun left the methods chapter one round behind. Naming each stale
+    value only resets the clock; this guards the class instead. Section 3.8 may
+    state which comparisons are established and why that is the criterion, and
+    must leave the numbers to Chapter 4 and Appendix C.
+
+    Sampling counts are allowed: "fourteen blocks" is methodology, not a result.
+    """
+    if not prose_38:
+        return []
+    bad = []
+    # "[-1.926, -0.606]" and "(-1.659 to -1.451)" and "-0.304 to +0.017"
+    for pat in (r"\[[-+\u2212]?\d+\.\d+,\s*[-+\u2212]?\d+\.\d+\]",
+                r"[-+\u2212]\d+\.\d+\s+to\s+[-+\u2212]\d+\.\d+"):
+        for m in re.finditer(pat, prose_38):
+            a = max(0, m.start() - 70)
+            bad.append("Section 3.8 quotes an interval: %r in '...%s...'"
+                       % (m.group(0), prose_38[a:m.end() + 40].replace("\n", " ")))
+    return bad
+
+
 def check():
-    prose, xml, grids = load()
+    prose, xml, grids, prose_38 = load()
     if prose is None:
         return None, None, None, None
 
@@ -441,7 +507,8 @@ def check():
                 continue
             resurrected.append((phrase, why))
 
-    return missing, resurrected, check_fields(xml), check_ablation_table(grids)
+    return (missing, resurrected, check_fields(xml) + no_intervals_in_methods(prose_38),
+            check_ablation_table(grids))
 
 
 def main():

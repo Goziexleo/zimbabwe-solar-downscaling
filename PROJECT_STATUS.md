@@ -2500,6 +2500,103 @@ images 13, zero defects, and `pytest tests/` green.
 
 ---
 
+## 13a. Seventh critique: the methods chapter was holding twenty-two result values
+
+Score 74, up from 71. The examiner's estimate of the examiner mark is 75-80 per
+cent, in the distinction band. Every item acted on.
+
+**Chapter 3 was describing the previous ranking, and the cause is structural.**
+Section 3.8.1 told the reader the U-Net returns the lower aggregate error at
+"8.62 against 8.92"; Section 3.8.4 quoted bootstrap intervals from two reruns
+ago. The root cause is that Chapter 4 is regenerated from the CSVs on every chain
+run while Chapter 3 is edited in place, so each regeneration left a stale copy of
+the results in the methods chapter. The critique found four. Checking every
+figure in Sections 3.8.1 and 3.8.4 against `bca_intervals.csv` found **twenty-two**,
+nine of them in a paragraph the critique had not flagged: the paired mean-bias
+difference (1.345 against 1.247), the aggregate deficit (+1.218 against +0.777),
+four centred errors, and the Random Forest's separation from each network.
+
+Refreshing them only resets the clock, so they are removed. Section 3.8 now
+states which comparisons are established and why that is the criterion, and
+leaves the values to Sections 4.3 and 4.4 and to Appendix C. `no_intervals_in_methods()`
+guards the class rather than the instances: it fails on any bracketed or
+"x to y" interval inside Section 3.8, and it was injection-tested in both
+directions. Sampling counts stay allowed, because "fourteen blocks" is
+methodology.
+
+**The interval form matters, and Appendix C made that visible.** Publishing the
+percentile, basic and BCa intervals side by side exposed what a single column
+hid: of the 36 comparisons, 22 exclude zero under all three forms and **nine
+under one or two**. Table C.6's "Established" column read `bca_spans_zero`
+alone, so it printed "yes" for comparisons whose percentile and basic intervals
+both span zero - the opposite of what publishing three forms is for. It now
+names which forms hold. Section 3.8.4 gains a paragraph on why: the resampling
+unit is the calendar year, the withheld record is fourteen years, and BCa
+estimates its acceleration by jackknife over those fourteen blocks with an
+asymptotic coverage guarantee. The mean-bias rows are the worst affected,
+because |MBE| is not smooth where the sign is near zero and folds the bootstrap
+distribution - which is why Section 4.4 already used the **signed** difference,
+and that verdict holds under all three forms. The three axes the deployment
+turns on are unanimous across forms, and an assertion in the guard now fails if
+that stops being true.
+
+**The spectra were being read off the wrong quantity.** Section 4.5 said the
+U-Net's ratio "is 1.21 at wavenumber 3". Table 4.6's columns are cumulative -
+1.21 is the power retained *beyond* k>=3 - while the per-wavenumber ratio at k=3
+is 0.89. The prose now names the quantity, and two things the cut table cannot
+show are stated: at wavenumbers 1 and 2 the U-Net holds 0.69 and 0.63 of the
+truth's power and the CNN 0.81 and 0.60, so **both** convolutional models
+under-represent the domain-scale gradient, which is a different failure from
+smoothing; and XGBoost carries an *excess* at the finest scales, 1.34 to 1.65 at
+k=30 to 34, where the target holds 0.002 per cent of its variance. The second
+qualifies "only the U-Net's spectrum is wrong" and is reported because Table C.7
+shows it.
+
+**A test without a criterion is a table.** Section 3.5 said the transfer
+assumption "is tested" and Appendix C printed the test, but no chapter gave its
+units, its averaging or a verdict. Section 4.7.1 now does: W/m2 of GHI, per-cell
+per-calendar-month climatologies, 0.59 as the floor against 4.82 for the
+ensemble, benchmarked against the projected signal it carries (3.32 to 16.96
+across the eighteen combinations) and against the 19.19 climatology reference.
+The mapping transfers, but not freely. MPI-ESM1-2-HR transfers worst at 6.71 and
+is also the driver whose sign disagrees - two diagnostics landing on one model.
+
+**One contribution claim had become false.** Section 5.4 said the scenario screen
+"would have changed the model selection in this study". After the U-Net refit the
+Random Forest is highest of the four, so no accuracy rule would have selected it
+and removing the screen changes nothing here. Reframed to the general claim, with
+the historical case named as the earlier configuration it was.
+
+**Two guard bugs, both found by their own false results.** `insert_missing_references.py`
+tested whether a surname appeared anywhere in the bibliography block: Taylor,
+K.E. is the seventh author on Eyring et al. (2016), so Taylor (2001) was reported
+as already listed and the Taylor diagram went uncited for seven rounds. The test
+is now whether an entry *starts* with the surname. The same function tested body
+citation by plain containment, which put "Li" inside "Linke" and proposed Li
+(2010) as cited; it now requires a word boundary. Cannon (2018) was listed and
+uncited, and is cited where it belongs - Section 3.4.4 corrects each predictor
+independently, and the N-dimensional transform is the method that would not.
+
+**Appendix formatting.** `fmt()` let numpy integers fall to the float branch, so
+a total of 36,381,312 printed as "36381312.0000" while the same quantity from
+`iterrows()` printed correctly. Ties on the score let rank 10 print above rank 9.
+C.4 now explains that all three U-Net candidates minimise at epoch 22 - not a cap
+(the ceiling is 100, patience 20) but a shallow noisy basin, 0.099 at epochs 20
+and 30 against 0.086 at the minimum. C.6 states the sign convention per metric,
+since positive favours the second model on the error metrics and the first on
+spatial correlation. C.10's national correlation moved to the caption.
+
+**The spacing complaint was not a defect.** All 42 captions are single-spaced at
+10pt and all 262 body paragraphs are 1.5; the count rose because Appendix C added
+ten captions. Two real faults were underneath it: Table 3.4's caption inherited
+its size instead of 10pt, and `fix_presentation.py`'s caption pattern matched
+only numeric prefixes, so it had never governed the appendix captions at all.
+
+Chain, three guards and the suite pass: citations 77, fields 203/203, sections 2,
+tables 32, images 13, zero defects.
+
+---
+
 ## 13. Outstanding
 
 **Open after the fifth round (§12q)**

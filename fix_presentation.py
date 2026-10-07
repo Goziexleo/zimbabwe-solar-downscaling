@@ -35,7 +35,12 @@ TITLE = ("Machine Learning-Based Downscaling of GCM Outputs for "
 AUTHOR = "Chiagozie Raphael Madukwe"
 BODY_SPACING = 1.5
 CAPTION_SPACING = 1.0
-CAPTION = re.compile(r"^\s*(Table|Figure)\s+\d+\.\d+\.")
+# Matching the forty-one captions that already carried an explicit size.
+CAPTION_SIZE = Pt(10)
+# The letter class admits Appendix C's "Table C.1." captions, which this pass
+# never matched and so never governed - they carried only whatever
+# build_appendix_c.py set.
+CAPTION = re.compile(r"^\s*(Table|Figure)\s+(?:\d+|[A-Z])\.\d+\.")
 
 TEXT_FIXES = [
     ("El Nino", "El Niño"),
@@ -103,6 +108,12 @@ def main():
             # in Chapters 1 to 3. They are set to single here, uniformly, and
             # still kept out of the justification below.
             pf.line_spacing = CAPTION_SPACING
+            # Size as well as spacing. Table 3.4's caption inherited the body
+            # size while the other forty-one carried an explicit 10pt, so one
+            # caption rendered larger than the rest.
+            for r in p.runs:
+                if r.font.size is None or r.font.size != CAPTION_SIZE:
+                    r.font.size = CAPTION_SIZE
             captions += 1
             continue
         pf.line_spacing = BODY_SPACING

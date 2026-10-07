@@ -22,6 +22,7 @@ import shutil
 import sys
 
 import docx
+import numpy as np
 import pandas as pd
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.shared import Pt
@@ -41,14 +42,22 @@ def csv(name):
 
 
 def fmt(v, nd=4):
+    """Format a cell, keeping counts as counts.
+
+    numpy integers are not instances of int, so a value that came from
+    Series.sum() took the float branch and a total of 36,381,312 printed as
+    "36381312.0000" while the same quantity read from iterrows() - a Python int
+    - printed correctly. Both integer paths are handled explicitly now.
+    """
     if isinstance(v, str):
         return v
     if pd.isna(v):
         return "—"
-    if isinstance(v, (int,)) or (isinstance(v, float) and float(v).is_integer()
-                                 and abs(v) >= 1000):
+    if isinstance(v, (int, np.integer)) or (
+            isinstance(v, (float, np.floating)) and float(v).is_integer()
+            and abs(float(v)) >= 1000):
         return "{:,}".format(int(v))
-    return ("%%.%df" % nd) % v
+    return ("%%.%df" % nd) % float(v)
 
 
 class Builder(object):
@@ -121,7 +130,10 @@ def build(b):
         keys = [c for c in h.columns
                 if c not in ("cv_rmse_csi", "is_deployed", "is_a_priori", "rank",
                              "in_grid")]
-        h = h.sort_values("cv_rmse_csi")
+        # Ties on the score are common - the Random Forest grid has seven
+        # pairs scoring identically - and sorting on the score alone let
+        # rank 10 print above rank 9. Rank breaks the tie.
+        h = h.sort_values(["cv_rmse_csi", "rank"])
         rows = []
         for _, r in h.iterrows():
             mark = ("deployed" if r.get("is_deployed") else
@@ -145,7 +157,13 @@ def build(b):
                  "Epoch", ""], rows,
                 "Neural hyperparameter search. Each candidate is fitted on 1985 to 2004 "
                 "and selected on 2005 to 2010, so the withheld record is never used. "
-                "Losses are not comparable between the two architectures.")
+                "Losses are not comparable between the two architectures. The epoch is "
+                "the one minimising inner-split error, not a cap or a stopping point: "
+                "the ceiling is 100 epochs and the early-stop patience 20. All three "
+                "U-Net candidates minimise at epoch 22, which reflects a shallow and "
+                "noisy basin rather than a fixed epoch - in the selected run the "
+                "inner-split error is 0.099 at epoch 20 and 0.099 at epoch 30 against "
+                "0.086 at the minimum, so the exact epoch is weakly determined.")
 
     # C.5 the U-Net sweep in full
     u = csv("unet_optimisation.csv")
@@ -165,17 +183,38 @@ def build(b):
     if bca is not None:
         rows = []
         for _, r in bca.iterrows():
+            # Reading only bca_spans_zero printed "yes" for comparisons the
+            # percentile and basic intervals both leave spanning zero, which is
+            # the opposite of what publishing three forms is for.
+            holds = [t for t, c in (("percentile", "pct_spans_zero"),
+                                    ("basic", "basic_spans_zero"),
+                                    ("BCa", "bca_spans_zero")) if not r[c]]
+            if len(holds) == 3:
+                verdict = "all three"
+            elif not holds:
+                verdict = "none"
+            elif len(holds) == 1:
+                verdict = "%s only" % holds[0]
+            else:
+                verdict = "%s" % " + ".join(holds)
             rows.append(["%s vs %s" % (r["model_a"], r["model_b"]), r["metric"],
                          "%+.4f" % r["plug_in"],
                          "%+.3f to %+.3f" % (r["pct_lo"], r["pct_hi"]),
                          "%+.3f to %+.3f" % (r["basic_lo"], r["basic_hi"]),
                          "%+.3f to %+.3f" % (r["bca_lo"], r["bca_hi"]),
-                         "no" if r["bca_spans_zero"] else "yes"])
+                         verdict])
         b.table(["Comparison", "Metric", "Estimate", "Percentile", "Basic",
-                 "BCa", "Established"], rows,
+                 "BCa", "Excludes zero under"], rows,
                 "Paired year-block resampling in all three interval forms, supporting "
                 "the choice of the bias-corrected and accelerated interval in Section "
-                "3.8.2. Positive values favour the second model named.")
+                "3.8.4, which also states why the form matters at fourteen blocks. The "
+                "estimate is the first model named minus the second, so a positive value "
+                "means the first has the larger value: on the error metrics (RMSE, "
+                "centred RMSE, |MBE|, standard-deviation ratio deviation) that favours "
+                "the second model, while on spatial correlation it favours the first. "
+                "Signed mean bias is directional and orders neither model on its own. "
+                "The final column reports which of the three forms exclude zero rather "
+                "than the BCa verdict alone.")
 
     # C.7 spectra
     s = csv("power_spectra.csv")
@@ -220,25 +259,35 @@ def build(b):
                  "%+.4f" % r["MBE"], "%.4f" % r["spatial R"]]
                 for _, r in tr.iterrows()]
         b.table(["Model", "Predictor source", "RMSE", "MBE", "Spatial r"], rows,
-                "Perfect-prognosis transfer test: each deployed model is applied to "
-                "bias-corrected predictors from each driving model over the historical "
-                "period and scored against the field it was trained to reproduce. The "
+                "Perfect-prognosis transfer test, interpreted in Section 4.7.1. Each "
+                "of the two pixel-wise models - XGBoost, which is deployed, and the "
+                "Random Forest, which is not - is applied to bias-corrected predictors "
+                "from each driving model over the historical period and scored against "
+                "the ERA5 field it was trained to reproduce. The comparison is between "
+                "per-cell, per-calendar-month climatologies, because individual CMIP6 "
+                "months do not correspond to ERA5 months (Section 3.5). RMSE and MBE are "
+                "in W/m\u00b2 of GHI; the ERA5 row is the floor the test can reach. The "
                 "design assumes the mapping learned from reanalysis predictors transfers "
                 "to model predictors, and this is the test of that assumption.")
 
     # C.10 elevation and irradiance
     e = csv("elevation_irradiance_gradient.csv")
     if e is not None:
+        # The national correlation is one value per product, so as a column it
+        # repeated down every band row. It belongs in the caption.
         rows = [[r["product"], r["band"], "{:,}".format(int(r["cells"])),
-                 "%.1f" % r["ghi_mean"], "%.0f" % r["elev_mean"],
-                 "%+.3f" % r["corr_elev_ghi_national"]]
+                 "%.1f" % r["ghi_mean"], "%.1f" % r["ghi_sd"], "%.0f" % r["elev_mean"]]
                 for _, r in e.iterrows()]
+        corr = ", ".join(
+            "%+.3f in %s" % (g["corr_elev_ghi_national"].iloc[0], prod)
+            for prod, g in e.groupby("product", sort=True))
         b.table(["Product", "Physiographic band", "Cells", "Mean GHI (W/m²)",
-                 "Mean elevation (m)", "National corr."], rows,
+                 "SD (W/m²)", "Mean elevation (m)"], rows,
                 "Observed annual-mean irradiance by physiographic band inside Zimbabwe, "
-                "in both observed products, supporting the correction in Chapter 2. The "
-                "final column is the correlation between elevation and irradiance across "
-                "all national cells.")
+                "in both observed products, supporting the correction in Chapter 2. "
+                "Across all national cells the correlation between elevation and "
+                "irradiance is %s, so elevation explains little of the spatial pattern "
+                "in either product." % corr)
 
 
 def main():

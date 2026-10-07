@@ -87,6 +87,76 @@ MODEL_ORDER = list(t33["RMSE_zw"].sort_values().index)
 _BEST = MODEL_ORDER[0]
 _SECOND = MODEL_ORDER[1]
 _n_above_ols = int((t33["RMSE_zw"] > bas.loc[_OLS, "RMSE_zw"]).sum())
+_psp = pd.read_csv(os.path.join(EVAL, "power_spectra.csv"))
+
+
+def _kratio(model, k):
+    """Power ratio to the target AT one wavenumber, not beyond a cut.
+
+    Table 4.6's columns are cumulative - "k>=3" is the power retained beyond
+    wavenumber 3 - and the prose described those figures as values "at"
+    a wavenumber. The two differ sharply at the large scales: the U-Net retains
+    1.21 of the truth's power beyond k>=3 while its ratio at k=3 itself is 0.89.
+    Both are reported now, each named for what it is.
+    """
+    r = _psp[_psp.wavenumber == k].iloc[0]
+    return float(r["CSI %s" % model]) / float(r["CSI Truth (ERA5)"])
+
+
+def _kmax():
+    return int(_psp.wavenumber.max())
+
+
+def _truth_share_beyond(k):
+    t = _psp["CSI Truth (ERA5)"]
+    return 100.0 * float(t[_psp.wavenumber >= k].sum()) / float(t.sum())
+
+
+def _forms(a, b, metric):
+    """Which of the three interval forms exclude zero, for one comparison.
+
+    Appendix C prints all three, so a verdict that holds under BCa alone is now
+    visible to a reader. With fourteen annual blocks the forms disagree near the
+    margin often enough that the chapter has to say which verdicts are robust to
+    the choice and which are not.
+    """
+    r = bca[(bca.model_a == a) & (bca.model_b == b) & (bca.metric == metric)]
+    if r.empty:
+        r = bca[(bca.model_a == b) & (bca.model_b == a) & (bca.metric == metric)]
+    r = r.iloc[0]
+    out = []
+    for tag, col in (("percentile", "pct_spans_zero"), ("basic", "basic_spans_zero"),
+                     ("BCa", "bca_spans_zero")):
+        if not bool(r[col]):
+            out.append(tag)
+    return out
+
+
+def _all_forms(a, b, metric):
+    return len(_forms(a, b, metric)) == 3
+
+
+def _caveat(a, b, metric):
+    """A clause naming the interval forms a verdict survives, when not all three.
+
+    Appendix C prints the percentile, basic and BCa intervals side by side, so a
+    verdict holding under one form and failing under another is now visible. Nine
+    of the comparisons are form-dependent at this sample size, and saying
+    "established" unqualified for those overstates what fourteen annual blocks
+    support.
+    """
+    f = _forms(a, b, metric)
+    if len(f) == 3 or not f:
+        return ""
+    names = {"percentile": "the percentile", "basic": "the basic", "BCa": "the BCa"}
+    return (", though only under %s interval of the three Appendix C reports"
+            % " and ".join(names[x] for x in f) if len(f) == 1 else
+            ", though not under %s interval"
+            % " or the ".join(names[x] for x in
+                              [k for k in ("percentile", "basic", "BCa")
+                               if k not in f]))
+
+
 def pair(a, b, metric):
     r = bca[(bca.model_a == a) & (bca.model_b == b) & (bca.metric == metric)]
     if r.empty:
@@ -159,9 +229,9 @@ def _sweep_mismatch():
                      % _fmt(dr_s))
     if not diffs:
         return ("it now matches the deployed learning rate and dropout, so what "
-                "separates it from the deployed U-Net is the failure to "
+                "separates it from the adopted U-Net is the failure to "
                 "reproduce the damping rather than any setting.")
-    return ("%s. Its baseline is therefore a different model from the deployed "
+    return ("%s. Its baseline is therefore a different model from the adopted "
             "U-Net in %s as well as in failing to reproduce the damping."
             % (", and ".join(diffs),
                "one setting" if len(diffs) == 1 else "%d settings" % len(diffs)))
@@ -497,11 +567,12 @@ v_m, lo_m, hi_m, _ = pair("Random Forest", "XGBoost", "|MBE|")
 v_c, lo_c, hi_c, _ = pair("Random Forest", "XGBoost", "centred RMSE")
 P("The result is mixed and is reported as such. XGBoost is established as better on "
   "aggregate error, by %+.3f W/m² with an interval of %+.3f to %+.3f that excludes "
-  "zero. The Random Forest is established as better on one axis, mean bias magnitude, by "
-  "%.3f W/m². Its centred-error advantage of %.3f W/m² does not survive resampling, at "
+  "zero%s. The Random Forest is better on one axis, mean bias magnitude, by "
+  "%.3f W/m²%s. Its centred-error advantage of %.3f W/m² does not survive resampling, at "
   "%+.3f to %+.3f, and neither spatial correlation nor the standard-deviation ratio can "
   "be distinguished."
-  % (v_r, lo_r, hi_r, abs(v_m), abs(v_c), lo_c, hi_c))
+  % (v_r, lo_r, hi_r, _caveat("Random Forest", "XGBoost", "RMSE"), abs(v_m),
+     _caveat("Random Forest", "XGBoost", "|MBE|"), abs(v_c), lo_c, hi_c))
 P("This matters because the composite criterion of Section 3.8.4, combining systematic "
   "offset with spatial error structure, favours the Random Forest. That "
   "criterion survives resampling on one of its two legs. The Random Forest does reproduce "
@@ -513,10 +584,12 @@ xc = pair("XGBoost", "CNN", "RMSE"); xu = pair("XGBoost", "U-Net", "RMSE")
 P("The Random Forest returns the highest aggregate error of the four, and the evidence "
   "separating it from the two networks is mixed rather than uniform. Its difference from "
   "the U-Net is %+.3f W/m² with an interval of %+.3f to %+.3f, which excludes zero, so "
-  "the U-Net is established the better of the two; its difference from the CNN is %+.3f "
-  "with %+.3f to %+.3f, which contains zero, so those two are not separable. The order "
-  "in Table 4.1 changed when the neural models were retrained, and the evidence moved "
-  "with it on one of the two comparisons but not the other."
+  "the U-Net is the better of the two on this interval - though not on all three: the "
+  "basic interval spans zero, so this is a verdict that depends on the interval form and "
+  "Section 3.8.4 says why that matters at this sample size. Its difference from the CNN "
+  "is %+.3f with %+.3f to %+.3f, which contains zero, so those two are not separable. "
+  "The order in Table 4.1 changed when the neural models were retrained, and the "
+  "evidence moved with it on one of the two comparisons but not the other."
   % (pair("Random Forest", "U-Net", "RMSE")[0], pair("Random Forest", "U-Net", "RMSE")[1], pair("Random Forest", "U-Net", "RMSE")[2], pair("Random Forest", "CNN", "RMSE")[0], pair("Random Forest", "CNN", "RMSE")[1], pair("Random Forest", "CNN", "RMSE")[2]))
 P("Against the convolutional models the aggregate comparison splits. XGBoost is lower "
   "than the CNN by %.3f W/m² with an interval of %+.3f to %+.3f, which excludes zero. "
@@ -633,15 +706,21 @@ cnn_lo, cnn_hi = cut.loc["CNN", "min"], cut.loc["CNN", "max"]
 un_lo, un_hi = cut.loc["U-Net", "min"], cut.loc["U-Net", "max"]
 P("A second question is whether the models preserve the spectral character of the field "
   "they reproduce. Radially averaged power spectra were computed in clear-sky-index "
-  "space, which is the space the models predict in. The U-Net damps fine-scale power "
-  "severely: its ratio to the truth is %.2f at wavenumber 3, a slight excess, and falls "
-  "monotonically to %.3f at wavenumber 20, so it is damped at every cut from wavenumber "
-  "5 upward rather than at every cut tested, which is why Table 4.6 records it as "
-  "cut-dependent. The direction is nonetheless unambiguous once fine scales are reached. "
-  "The ratios these cuts are taken from, at every wavenumber and for all four models, "
-  "are in Appendix C, Table C.7. This is "
+  "space, which is the space the models predict in. Table 4.6 reports the power "
+  "retained beyond a wavenumber cut, not the power at a single wavenumber, and "
+  "the distinction matters at the large scales. The U-Net retains %.2f of the truth\'s "
+  "power beyond wavenumber 3 and %.3f beyond wavenumber 20, falling monotonically in "
+  "between, so it is damped at every cut from wavenumber 5 upward rather than at every "
+  "cut tested, which is why Table 4.6 records it as cut-dependent. Per wavenumber the "
+  "picture at the coarse end is different and worse: at wavenumbers 1 and 2, the "
+  "domain-scale gradient, the U-Net holds only %.2f and %.2f of the truth\'s power and "
+  "the CNN %.2f and %.2f. Both convolutional models therefore under-represent the "
+  "largest scale in the field, which is a different failure from smoothing and is not "
+  "visible in a table whose first cut is wavenumber 3. The per-wavenumber ratios for all "
+  "four models are in Appendix C, Table C.7. The fine-scale half of this is "
   "the smoothing failure mode reported for machine-learning emulators generally (Rampal et al., 2024)."
-  % (un_hi, un_lo))
+  % (un_hi, un_lo, _kratio("U-Net", 1), _kratio("U-Net", 2),
+     _kratio("CNN", 1), _kratio("CNN", 2)))
 P("The cause was investigated with a controlled sweep fitting on 1985 to 2004 and "
   "selecting on 2005 to 2010, varying one setting at a time. Appendix C, Table C.5, "
   "reports all thirteen variants with their configurations; this section discusses the "
@@ -739,6 +818,20 @@ P("The CNN does not damp: it never falls below %.2f at any cut and never approac
   "cent of its power there. A figure of 4 per cent would take the closest point of the "
   "sweep and treat the choice of cut as incidental, which it is not."
   % (cnn_lo, cnn_lo, cnn_hi))
+# Raised because Appendix C publishes the per-wavenumber ratios, and a reader who
+# reads them will see this before being told about it.
+P("The pixel-wise models are not spectrally neutral either, in the opposite direction. "
+  "XGBoost carries an excess of power at the finest scales resolved, at ratios of %.2f, %.2f "
+  "and %.2f at wavenumbers 30, 32 and %d, and the Random Forest does the same more "
+  "mildly. This is almost certainly noise rather than structure: the target holds %.3f "
+  "per cent of its clear-sky-index variance beyond wavenumber 30, so a cell-by-cell "
+  "model free to vary independently between neighbours can add variance there at no cost "
+  "to any score computed over the whole field. It is reported because Table C.7 shows it "
+  "and because it qualifies the claim that only the U-Net\'s spectrum is wrong: the "
+  "U-Net\'s error is a deficit large enough to matter, the pixel-wise excess sits where "
+  "the field has almost no variance to get wrong."
+  % (_kratio("XGBoost", 30), _kratio("XGBoost", 32), _kratio("XGBoost", _kmax()),
+     _kmax(), _truth_share_beyond(30)))
 
 FIG("05_power_spectra.png", "Radially averaged power spectra in clear-sky-index "
     "space, with the ratio to the target. The U-Net damps at every cut; the CNN does "
@@ -922,6 +1015,52 @@ P("The sign check is less comfortable and is reported because it is inconvenient
              (pbl.horizon == "mid_term_2051_2075")].qdm_change_own_history.iloc[0]),
      pbl[(pbl.gcm == "MPI-ESM1-2-HR") & (pbl.scenario == "ssp585") &
          (pbl.horizon == "mid_term_2051_2075")].ml_change_own_history.iloc[0]))
+# Section 3.5 says the transfer assumption "is tested", and Appendix C prints the
+# test, but until now nothing in the chapters stated its units, its benchmark or
+# its verdict. A table without a criterion is not a test.
+_tr = {t: pd.read_csv(os.path.join(EVAL, "perfect_prognosis_transfer_%s.csv" % t))
+       for t in ("xgb", "rf")}
+
+
+def _trow(tag, src):
+    d = _tr[tag]
+    return d[d["predictor source"] == src].iloc[0]
+
+
+P("That transfer can be measured rather than only reasoned about, and Table C.9 measures "
+  "it. Each model is applied to each driving model\'s bias-corrected predictors over the "
+  "historical period and scored against the ERA5 field it was trained to reproduce, "
+  "per cell and per calendar month, so the comparison is between climatologies: "
+  "Section 3.5 notes that individual CMIP6 months do not correspond to ERA5 months, and "
+  "nothing here assumes they do. Errors are in W/m\u00b2 of GHI, on the same footing as "
+  "every other figure in this chapter. Given ERA5 predictors the deployed model returns "
+  "%.2f W/m\u00b2, which is the floor the test can reach. Given model predictors it "
+  "returns %.2f for the ensemble mean and %.2f to %.2f across the three drivers. The "
+  "benchmark that makes those numbers interpretable is the projected signal they are used "
+  "to carry: measured against each driver's own history, the changes this chapter "
+  "projects span %+.2f to %+.2f W/m\u00b2 across the eighteen driver, scenario and "
+  "horizon combinations, so the transfer error is of the same order as the smallest "
+  "change being claimed and roughly a third of the largest. It is well below the %.2f W/m\u00b2 climatology reference against "
+  "which skill is scored, and below the model\'s own %.2f on the withheld record, so the "
+  "mapping does transfer; it does not transfer freely, and the near-term projections are "
+  "the ones this most qualifies. The driver that transfers worst is MPI-ESM1-2-HR, at "
+  "%.2f W/m\u00b2, which is the same model whose sign disagreement is reported above - "
+  "two independent diagnostics landing on one driver. The Random Forest transfers "
+  "slightly better than the deployed model, %.2f against %.2f on the ensemble mean, "
+  "which is consistent with Section 4.4\'s finding that it reproduces the historical "
+  "level better and does not disturb the deployment, since Section 4.6 shows it cannot "
+  "separate the scenarios at all."
+  % (_trow("xgb", "ERA5 (as trained)").RMSE,
+     _trow("xgb", "CMIP6 ensemble mean").RMSE,
+     _tr["xgb"][_tr["xgb"]["predictor source"].str.startswith("CMIP6 ")
+                & (_tr["xgb"]["predictor source"] != "CMIP6 ensemble mean")].RMSE.min(),
+     _tr["xgb"][_tr["xgb"]["predictor source"].str.startswith("CMIP6 ")
+                & (_tr["xgb"]["predictor source"] != "CMIP6 ensemble mean")].RMSE.max(),
+     pbl.ml_change_own_history.min(), pbl.ml_change_own_history.max(),
+     t33.loc[_BEST, "climatology_rmse_zw"], t33.loc[_BEST, "RMSE_zw"],
+     _trow("xgb", "CMIP6 MPI-ESM1-2-HR").RMSE,
+     _trow("rf", "CMIP6 ensemble mean").RMSE,
+     _trow("xgb", "CMIP6 ensemble mean").RMSE))
 
 H("4.7.2 What the irradiance gain is worth once the modules heat", 3)
 P("Every change reported so far is a change in irradiance. A siting decision is about "
@@ -994,6 +1133,23 @@ P("A second result is more interesting and is stated with the condition it depen
      pve.loc[("ssp245", "long_term_2076_2100"), "yield_change_pct_gamma-0.0040"],
      abs(pvx.loc["long_term_2076_2100", "gamma_crossover"]),
      abs(pvx.loc["mid_term_2051_2075", "gamma_crossover"])))
+# The reversal is an ensemble-mean statement, and Table C.8 lets a reader check it
+# per driver. It does not hold for all three, and the count is derived here so it
+# cannot drift from the table.
+_lt = pvd[(pvd.gcm != "ensemble mean") & (pvd.period == "long_term_2076_2100")]
+_piv = _lt.pivot(index="gcm", columns="scenario",
+                 values="yield_change_pct_gamma-0.0040")
+_rev = _piv[_piv["ssp585"] < _piv["ssp245"]]
+_nrev, _ntot = len(_rev), len(_piv)
+_held = ", ".join(sorted(_rev.index))
+_notheld = ", ".join(sorted(set(_piv.index) - set(_rev.index)))
+P("The reversal is an ensemble-mean statement, and it does not hold uniformly across the "
+  "drivers. At the central coefficient it holds for %d of the %d models, %s, and not for "
+  "%s, whose irradiance gain under the higher pathway is large enough to survive the "
+  "temperature penalty (Appendix C, Table C.8). The conditional form of the claim is "
+  "therefore doubly necessary: it depends on the module and on the driving model, and a "
+  "developer told only the ensemble mean would not know either."
+  % (_nrev, _ntot, _held, _notheld))
 P("The estimate is first order and is not a yield simulation. It omits soiling, spectral "
   "effects, inverter behaviour, the sub-daily covariance of temperature with irradiance, "
   "and any change in module technology; it also takes the warming from a 24-hour mean "

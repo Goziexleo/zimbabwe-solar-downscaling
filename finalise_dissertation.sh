@@ -34,6 +34,11 @@ $PY fix_facts.py | tail -1
 # document rather than only the chapters the generators own.
 $PY fix_unet_refit_recorded.py | tail -1
 $PY add_appendix_c_crossrefs.py | tail -1
+$PY fix_methods_chapter_result_values.py | tail -1
+$PY fix_method_citations_v7.py | tail -1
+# Adds any work cited in the body but absent from the bibliography, as plain
+# text that a Zotero refresh replaces. Idempotent.
+$PY insert_missing_references.py | tail -1
 
 # Lists BEFORE table formatting: the abbreviations list is itself a table, so
 # formatting first leaves it in the generator's style.
