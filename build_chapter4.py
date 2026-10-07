@@ -357,12 +357,12 @@ P("The net effect is the informative part. Correcting both defects leaves the CN
   "%.2f W/m² the other way, so for that architecture part of the original figure "
   "genuinely was selection on the test set. Both comparisons are between archived runs "
   "on the full analysis box, which is the only basis on which the superseded figures "
-  "exist; Table 4.1 reports over Zimbabwe. One consequence is visible in the ordering: "
-  "the CNN now returns the second-lowest aggregate error and the Random Forest the "
-  "third. Section 4.3 shows that neither that reordering nor the previous one is "
-  "statistically established."
+  "exist; Table 4.1 reports over Zimbabwe. One consequence is visible in the ordering, "
+  "which now runs %s. Section 4.3 shows that neither that reordering nor the previous "
+  "one is statistically established throughout."
   % (abs(RB("CNN", "RMSE") - leaky.loc["CNN", "RMSE"]),
-     abs(RB("U-Net", "RMSE") - leaky.loc["U-Net", "RMSE"])))
+     abs(RB("U-Net", "RMSE") - leaky.loc["U-Net", "RMSE"]),
+     ", then ".join(MODEL_ORDER)))
 P("The Taylor decomposition in Table 4.2 shows that the aggregate ranking conceals a "
   "sharp division in the spatial structure of the error. The two pixel-wise models "
   "reproduce the spatial pattern of the time-mean field almost exactly, at correlations "
@@ -1227,7 +1227,8 @@ P("Four architectures were trained on the same predictor set and evaluated on a 
   "set in Chapter 3, and the differences between them are only partly established: "
   "XGBoost is better on aggregate error, the Random Forest better on mean bias, and the "
   "two cannot be separated on centred error or on spatial correlation. XGBoost is also "
-  "the most accurate of the four, so accuracy alone selects it; what the "
+  "the most accurate of the four on the point estimate, though Section 4.4 records that "
+  "its margin over the U-Net is not established; what the "
   "scenario-discrimination screen added was the removal of the Random Forest, which the "
   "accuracy criterion had never chosen and which loses the scenario signal it would be "
   "required to project, for a mechanical reason traceable to how regression trees behave "
