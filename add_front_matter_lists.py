@@ -149,13 +149,13 @@ def main():
             # version truncated Table 4.5's entry to "Scenario separation,
             # SSP5-8." because of it. The lookahead requires whitespace or the
             # end of the caption after the stop.
-            head = re.match(r"^((?:Table|Figure) \d+\.\d+\.\s*.*?\.)(?=\s|$)", t)
+            head = re.match(r"^((?:Table|Figure) (?:\d+|[A-Z])\.\d+\.\s*.*?\.)(?=\s|$)", t)
             return head.group(1).strip() if head else t
 
         tables = [entry(p.text) for p in d.paragraphs
-                  if re.match(r"^Table \d+\.\d+\.", p.text.strip())]
+                  if re.match(r"^Table (?:\d+|[A-Z])\.\d+\.", p.text.strip())]
         figures = [entry(p.text) for p in d.paragraphs
-                   if re.match(r"^Figure \d+\.\d+\.", p.text.strip())]
+                   if re.match(r"^Figure (?:\d+|[A-Z])\.\d+\.", p.text.strip())]
         print("captions found: %d tables, %d figures" % (len(tables), len(figures)))
 
         body = list(d.element.body)

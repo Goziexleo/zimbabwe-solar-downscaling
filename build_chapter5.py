@@ -22,6 +22,25 @@ OUT = os.path.expanduser("~/Library/CloudStorage/OneDrive-Personal(2)/UNI ZIM/"
                          "PROJECT CHAPTERS/CR_Madukwe_Chapter5_DRAFT.docx")
 
 t33 = pd.read_csv(os.path.join(EVAL, "table_3_3.csv")).set_index("model")
+
+def _fmt5(v):
+    return ("%.10f" % float(v)).rstrip("0").rstrip(".") or "0"
+
+
+def _unet_lr5():
+    """The deployed U-Net learning rate, read from the training script.
+
+    Section 5.6 named 0.0002 and 0.001 as literals and so kept recommending a
+    refit for a day after the refit was done.
+    """
+    import re as _re
+    src = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                            "train_unet_downscaler.py")).read()
+    m = _re.search(r'os\.environ\.get\(\s*"UNET_LEARNING_RATE"\s*,\s*"([^"]+)"', src)
+    assert m is not None, "could not read UNET_LEARNING_RATE"
+    return float(m.group(1))
+
+
 unc = pd.read_csv(os.path.join(EVAL, "uncertainty_decomposition_summary.csv"))
 info = pd.read_csv(os.path.join(EVAL, "information_content.csv")).set_index("field")
 per = pd.read_csv(os.path.join(EVAL, "suitability_by_period.csv")).set_index("period")
@@ -419,16 +438,29 @@ P("**Settle what causes the U-Net's damping.** Part of this recommendation has b
      udv5.loc["U-Net, dropout 0 (adopted)", "RMSE_zw"],
      cut5.loc["U-Net", "k>=20"],
      uo.loc["baseline", "test_spec_ratio"]))
-P("**Refit the U-Net at the learning rate its own search selects.** Section 3.6.7 "
-  "reports that on the rebuilt target the honest search prefers a rate of 0.0002 to the "
-  "deployed 0.001, by a small margin on the inner split. The U-Net is not the deployed "
-  "model, so nothing in the product depends on it, but its row in Table 4.1, its "
-  "contribution to the architecture term of the uncertainty budget and its spectra all "
-  "would move. The same applies to the variant sweep of Section 4.5, whose baseline "
-  "carries its own learning rate and dropout rather than the deployed ones and therefore "
-  "cannot isolate the damping it was built to explain: anchoring that sweep on the "
-  "deployed configuration is the way to settle the mechanism, and it is the one change "
-  "that would turn Section 4.5's open question into an answer.")
+# This recommendation used to be "refit the U-Net at the learning rate its own
+# search selects". That refit was carried out on 7 October: the U-Net carries
+# 2e-4 and Table 4.1, the uncertainty budget and the spectra are all the
+# refitted model's. What survives is the sweep's own baseline, which still
+# differs from the deployed configuration, and the gap is derived rather than
+# asserted so it cannot outlive its fix the way the refit did.
+_sweep_lr = float(uo.loc["baseline", "cfg_lr"])
+_sweep_dr = float(uo.loc["baseline", "cfg_dropout"])
+_gap = [g for g, on in (
+    ("its learning rate", abs(_sweep_lr - _unet_lr5()) > 1e-12),
+    ("its dropout rate", _sweep_dr > 0)) if on]
+P("**Anchor the Section 4.5 sweep on the deployed configuration.** The refit this "
+  "recommendation previously called for has been carried out, and Section 3.6.7 records "
+  "it: the U-Net carries the rate of %s that its own inner-split search selects, and its "
+  "row in Table 4.1, its contribution to the architecture term of the uncertainty budget "
+  "and its spectra are all those of the refitted model. What remains is the sweep itself. "
+  "Its baseline still differs from the deployed U-Net in %s, so it cannot isolate the "
+  "damping it was built to explain; anchoring it on the deployed configuration is the way "
+  "to settle the mechanism, and it is the one change that would turn Section 4.5's open "
+  "question into an answer."
+  % (_fmt5(_unet_lr5()),
+     " and ".join(_gap) if _gap else "no hyperparameter, only in failing to "
+     "reproduce the damping"))
 P("**Settle the yield question against a specified module.** Section 4.7.2 shows that "
   "whether the projected irradiance gain translates into a larger yield under the higher "
   "pathway depends on the module temperature coefficient, and that the threshold falls "

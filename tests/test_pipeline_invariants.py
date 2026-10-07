@@ -552,3 +552,41 @@ def test_withdrawn_dropout_attribution_stays_withdrawn():
             if phrase in src:
                 problems.append(f"{name} restates the withdrawn attribution: {phrase!r}")
     assert not problems, "\n  ".join(["The dropout attribution is withdrawn:"] + problems)
+
+
+def test_every_appendix_c_table_is_referenced():
+    """An appendix table nothing points at is padding, not evidence.
+
+    Appendix C is generated from the evaluation CSVs that fed no table in the
+    document. On the round that created it, nine of its ten tables were
+    reachable only through the List of Tables, which is how an appendix comes to
+    read as bulk. The pointers now live in two places - Chapters 4 and 5 are
+    regenerated, so theirs are in the generators, while Chapters 2 and 3 are
+    edited in place - and this checks the result rather than either source.
+
+    Matches "Table C.n" and the plural "Tables C.n and C.m": the first version
+    of this check read only the singular and reported the two grid tables as
+    orphans when they were in fact cited together.
+    """
+    import re
+    from check_chapter3_consistency import CHAPTER
+    if not os.path.exists(CHAPTER):
+        pytest.skip("dissertation not found at %s" % CHAPTER)
+    import docx
+    ps = [p.text.strip() for p in docx.Document(CHAPTER).paragraphs]
+    head = [i for i, t in enumerate(ps) if t.startswith("Appendix C")]
+    if not head:
+        pytest.skip("Appendix C not present")
+    start = head[0]
+    lot = [i for i, t in enumerate(ps) if t == "List of Tables"]
+    # Skip the front-matter lists, which name every table by construction.
+    body = "\n".join(ps[(lot[0] + 40 if lot else 0):start])
+    tables = sorted(int(m.group(1)) for t in ps[start:]
+                    for m in [re.match(r"^Table C\.(\d+)\.", t)] if m)
+    refs = set(re.findall(r"Tables?\s+C\.(\d+)", body))
+    refs |= set(re.findall(r"Tables?\s+C\.\d+\s+and\s+C\.(\d+)", body))
+    orphans = [n for n in tables if str(n) not in refs]
+    assert tables, "Appendix C has a heading but no numbered tables"
+    assert not orphans, (
+        "Appendix C tables cited nowhere in the chapters: %s"
+        % ", ".join("C.%d" % n for n in orphans))

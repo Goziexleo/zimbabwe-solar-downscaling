@@ -144,6 +144,20 @@ def canonical_anchors():
             if clim:
                 a.append(("ablation %s skill" % tag,
                           "%.4f" % (1.0 - r["RMSE_fullbox"] / clim)))
+
+    # The deployed U-Net learning rate, read from the training script rather than
+    # a CSV because that is where it lives. Section 3.6.4 named it as a literal
+    # and so kept saying 1e-3 for a day after the refit to 2e-4; an anchor makes
+    # the chapter name whatever the script deploys.
+    import re as _re
+    _src = os.path.join(ROOT, "train_unet_downscaler.py")
+    if os.path.exists(_src):
+        _m = _re.search(
+            r'os\.environ\.get\(\s*"UNET_LEARNING_RATE"\s*,\s*"([^"]+)"',
+            open(_src).read())
+        if _m:
+            _lr = ("%.10f" % float(_m.group(1))).rstrip("0").rstrip(".")
+            a.append(("deployed U-Net learning rate", _lr))
     return a
 
 
@@ -271,6 +285,24 @@ RETIRED = [
     ("direct radiation flux (rsds)",
      "rsds is not a model input; listing it among the selected predictors "
      "describes configuration B"),
+
+    # Seventh round. The U-Net was refitted at 2e-4 on 7 October, the rate its
+    # own inner-split search selects, and everything downstream regenerated. Four
+    # passages in Chapter 3 and Table 3.2 still described the refit as pending,
+    # which contradicted Chapter 4's own numbers rather than merely lagging them.
+    ("for three of the four the deployed configuration",
+     "all four models now carry the configuration their own search selected"),
+    ("recorded as an open item in Section 5.6 rather than changed late",
+     "the refit was carried out; Section 5.6 no longer recommends it"),
+    ("is that the deployed U-Net carries the rate this search prefers",
+     "it does carry that rate - this was the disclaimer for not refitting"),
+    ("an initial learning rate of 1e-3",
+     "the deployed U-Net learning rate is 2e-4"),
+    ("Refit the U-Net at the learning rate its own search selects",
+     "done; Section 5.6's item is now about anchoring the Section 4.5 sweep"),
+    ("against the deployed 0.0002",
+     "the sweep's rate and the deployed rate became equal at the refit, so the "
+     "comparison printed a value against itself"),
 ]
 
 EXPLANATORY = (r"earlier version|previously|an earlier|was wrong|no longer|superseded|"
@@ -374,6 +406,25 @@ def check_ablation_table(grids):
     return ["Section 3.7.4's ablation table is missing"]
 
 
+def _numeric_boundary(text, start, end):
+    """True when a retired FIGURE is a fragment of a longer, unrelated number.
+
+    The retired entries are matched as literal substrings, which is right for
+    sentences but wrong for figures: the retired XGBoost bias '+1.26' is a
+    prefix of '+1.268', a bootstrap bound in Appendix C that has nothing to do
+    with it. Requiring a non-digit on each side of a figure separates the two.
+    Decimal points count as digits here, so '8.80' does not match '8.805'.
+    """
+    DIGIT = "0123456789."
+    if text[end - 1] in "0123456789":
+        if end < len(text) and text[end] in DIGIT:
+            return True
+    if text[start] in "0123456789+-":
+        if start > 0 and text[start - 1] in DIGIT:
+            return True
+    return False
+
+
 def check():
     prose, xml, grids = load()
     if prose is None:
@@ -385,6 +436,8 @@ def check():
     for phrase, why in RETIRED:
         for m in re.finditer(re.escape(phrase), prose):
             if _explained(prose, m.start(), m.end()):
+                continue
+            if _numeric_boundary(prose, m.start(), m.end()):
                 continue
             resurrected.append((phrase, why))
 

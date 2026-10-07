@@ -138,6 +138,35 @@ def _unet_lr():
     return float(m.group(1))
 
 
+def _sweep_mismatch():
+    """How the sweep's baseline differs from the deployed U-Net, counted.
+
+    This read "a learning rate of %s against the deployed %s ... different in
+    two settings" with both values printed. After the 7 October refit the
+    deployed rate became 2e-4, the rate the sweep already used, so the sentence
+    printed "0.0002 against the deployed 0.0002" and still claimed two
+    settings. The differences are counted here instead of asserted.
+    """
+    lr_s, lr_d = float(uo.loc["baseline", "cfg_lr"]), _unet_lr()
+    dr_s = float(uo.loc["baseline", "cfg_dropout"])
+    diffs = []
+    if abs(lr_s - lr_d) > 1e-12:
+        diffs.append("it fits at a learning rate of %s against the deployed %s"
+                     % (_fmt(lr_s), _fmt(lr_d)))
+    if dr_s > 0:
+        diffs.append("its baseline applies dropout at %s where the "
+                     "configuration adopted in this section applies none"
+                     % _fmt(dr_s))
+    if not diffs:
+        return ("it now matches the deployed learning rate and dropout, so what "
+                "separates it from the deployed U-Net is the failure to "
+                "reproduce the damping rather than any setting.")
+    return ("%s. Its baseline is therefore a different model from the deployed "
+            "U-Net in %s as well as in failing to reproduce the damping."
+            % (", and ".join(diffs),
+               "one setting" if len(diffs) == 1 else "%d settings" % len(diffs)))
+
+
 rob = sui.robustly_suitable.values.astype(bool)
 # "Retained" means not excluded by the mask, which is NOT the same as "not in
 # tier 4": a handful of retained cells score below 0.30 and land in the lowest
@@ -454,7 +483,9 @@ P("Table 4.1 orders four models on quantities computed from a single 168-month r
   "construction: each replicate recomputes the time-mean map from resampled years, so "
   "sampling noise enters in quadrature and differences compress toward zero. The "
   "percentile method assumes an approximately unbiased distribution and is the wrong "
-  "interval here.")
+  "interval here. Appendix C, Table C.6, sets the percentile, basic and BCa intervals "
+  "beside one another for every difference, so the effect of that choice can be read "
+  "rather than taken on trust.")
 rows = []
 for metric, label in [("RMSE", "Aggregate RMSE"), ("|MBE|", "Mean bias magnitude"), ("centred RMSE", "Centred RMSE"), ("spatial R", "Spatial correlation"), ("std ratio dev", "Std ratio deviation")]:
     v, lo, hi, spans = pair("Random Forest", "XGBoost", metric)
@@ -606,11 +637,15 @@ P("A second question is whether the models preserve the spectral character of th
   "severely: its ratio to the truth is %.2f at wavenumber 3, a slight excess, and falls "
   "monotonically to %.3f at wavenumber 20, so it is damped at every cut from wavenumber "
   "5 upward rather than at every cut tested, which is why Table 4.6 records it as "
-  "cut-dependent. The direction is nonetheless unambiguous once fine scales are reached. This is "
+  "cut-dependent. The direction is nonetheless unambiguous once fine scales are reached. "
+  "The ratios these cuts are taken from, at every wavenumber and for all four models, "
+  "are in Appendix C, Table C.7. This is "
   "the smoothing failure mode reported for machine-learning emulators generally (Rampal et al., 2024)."
   % (un_hi, un_lo))
 P("The cause was investigated with a controlled sweep fitting on 1985 to 2004 and "
-  "selecting on 2005 to 2010, varying one setting at a time. The clearest result concerns "
+  "selecting on 2005 to 2010, varying one setting at a time. Appendix C, Table C.5, "
+  "reports all thirteen variants with their configurations; this section discusses the "
+  "ones that bear on accuracy and on spectra. The clearest result concerns "
   "accuracy rather than spectra: removing the spatial dropout that the deployed "
   "configuration applies at a rate of %.1f improves held-out error from %.2f to %.2f "
   "W/m², spatial correlation from %.3f to %.3f, and centred error from %.2f to %.2f. "
@@ -678,10 +713,7 @@ P("One result from the same sweep points the other way and is reported because i
   "%.2f to %.2f. It does not follow from this that the gradient penalty barely moves the "
   "ratio, nor that a smoothness prior is refuted. "
   "A further reason for caution is that the sweep carries its own baseline configuration "
-  "rather than the deployed one: it fits at a learning rate of %s against the deployed "
-  "%s, and its baseline applies dropout at %s where the configuration adopted in this "
-  "section applies none. Its baseline is therefore a different model from the deployed "
-  "U-Net in two settings as well as in failing to reproduce the damping. What can be said "
+  "rather than the deployed one: %s What can be said "
   "is that the adopted U-Net damps fine scales from "
   "wavenumber 5 upward, that the deficit deepens monotonically with the cut rather "
   "than holding at one value, and that the mechanism remains open."
@@ -693,7 +725,7 @@ P("One result from the same sweep points the other way and is reported because i
      uo.loc["gp_none", "test_spec_ratio"],
      uo.loc[["baseline", "gp_none", "gp_match", "gp_match_strong"], "test_spec_ratio"].min(),
      uo.loc[["baseline", "gp_none", "gp_match", "gp_match_strong"], "test_spec_ratio"].max(),
-     _fmt(uo.loc["baseline", "cfg_lr"]), _fmt(_unet_lr()), _fmt(uo.loc["baseline", "cfg_dropout"])))
+     _sweep_mismatch()))
 TBL(["Field"] + [c for c in cut.columns if c.startswith("k>=")] + ["Verdict"], [[f] + ["%.2f" % cut.loc[f, c] for c in cut.columns if c.startswith("k>=")]
      + [cut.loc[f, "robust"]]
      for f in ["Random Forest", "XGBoost", "CNN", "U-Net"]], "Table 4.6. Ratio of retained clear-sky-index power to the target's, as the "
@@ -928,7 +960,8 @@ P("The gain survives the penalty but is substantially reduced. At the central "
   "a third and a half of the irradiance gain. The direction is robust across the "
   "ensemble: all %d period-scenario-model combinations give a positive yield change, "
   "ranging from %.2f to %.2f per cent, so unlike the irradiance driver of Section 4.7.1 "
-  "no single model carries the result."
+  "no single model carries the result. Appendix C, Table C.8, gives the per-model "
+  "figures."
   % (pve.loc[("ssp585", "long_term_2076_2100"), "ghi_change_pct"],
      pve.loc[("ssp585", "long_term_2076_2100"), "yield_change_pct_gamma-0.0040"],
      pve.loc[("ssp245", "long_term_2076_2100"), "ghi_change_pct"],

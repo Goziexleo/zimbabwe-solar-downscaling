@@ -122,6 +122,44 @@ def run_one(model, cfg, log_dir):
     return r["inner_select_mse"], r["selected_epoch"], minutes, log_path
 
 
+def restamp():
+    """Recompute is_deployed on the existing CSV, without refitting anything.
+
+    The search scores are a property of the grid and the target; which row is
+    deployed is a property of the training scripts, and that moved after this
+    search last ran. On 7 October the U-Net was refitted at 2e-4, the rate its
+    own search selected, but neural_hpo.csv still flagged 1e-3 as deployed, so
+    the CSV, Table 3.2 and Appendix C all named a rate no longer in use. A
+    refit is hours; re-deriving one boolean column is not, so the flag is
+    recomputed here rather than left to the next full search.
+    """
+    df = pd.read_csv(OUT)
+    was = {m: df[(df.model == m) & df.is_deployed] for m in ("CNN", "U-Net")}
+    flag = []
+    for _, r in df.iterrows():
+        dep = DEPLOYED[r.model]
+        flag.append(all(
+            abs(float(r[k]) - float(v)) < 1e-12 for k, v in dep.items()))
+    df["is_deployed"] = flag
+    for m in ("CNN", "U-Net"):
+        sub = df[df.model == m]
+        assert sub.is_deployed.sum() == 1, (
+            "%s: %d rows flagged deployed, expected exactly 1 (DEPLOYED=%s)"
+            % (m, sub.is_deployed.sum(), DEPLOYED[m]))
+        d = sub[sub.is_deployed].iloc[0]
+        best = sub.loc[sub.inner_select_mse.idxmin()]
+        old = was[m]
+        moved = ("" if old.empty or old.index[0] == d.name
+                 else " (was lr %g)" % old.iloc[0].lr)
+        print("  %-5s deployed lr %g at %.6f%s; search prefers lr %g at %.6f%s"
+              % (m, d.lr, d.inner_select_mse, moved, best.lr,
+                 best.inner_select_mse,
+                 " - the same row" if best.name == d.name else ""))
+    df.to_csv(OUT, index=False)
+    print("re-stamped %s" % OUT)
+    return 0
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--dry-run", action="store_true")
@@ -182,4 +220,4 @@ def main():
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(restamp() if "--restamp" in sys.argv else main())

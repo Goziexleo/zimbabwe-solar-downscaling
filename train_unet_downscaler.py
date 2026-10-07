@@ -40,12 +40,18 @@ FINE_DYNAMIC_VARS = ["solar_zenith_angle", "sin_doy", "cos_doy"]
 
 target_var = "clear_sky_index"  # lives on the fine (fine_lat, fine_lon) target grid
 
-# Deployed configuration (Section 3.6.7): the HPO grid search selected
-# lr 1e-3 from the honest re-search (Section 3.6.7, hpo_neural.py): it wins on an
-# inner 2005-2010 split at 0.124575 against 2e-4 at 0.128886. The 2e-4 that
-# stood here came from a grid scored on the withheld record.
+# Deployed configuration (Section 3.6.7): lr 2e-4, the rate the honest
+# re-search selects (hpo_neural.py), winning an inner 2005-2010 split at
+# 0.086375 against 0.088893 for 1e-3. The figures 0.124575 and 0.128886 stood
+# here with the ordering the other way up; they came from the search run before
+# the clear-sky target was rebuilt, and the rebuilt-target search reverses them.
+# Refitting at 2e-4 moved the U-Net from 8.62 to 9.01 W/m2 over Zimbabwe, so the
+# honestly selected rate is the worse one on the withheld record and is deployed
+# anyway - picking 1e-3 because it scored better there is the selection this
+# study refuses to make.
 # Batch size, early-stop patience and weight decay were already at
-# their deployed values, and dropout 0.3 is set as DROPOUT_P in unet_model.py.
+# their deployed values, and dropout is set as DROPOUT_P in unet_model.py,
+# where it now defaults to 0.0 after the Section 4.5 sweep (it was 0.3).
 # LEARNING_RATE previously defaulted to the pre-HPO 5e-4 and the deployed 2e-4
 # was supplied only as a command-line environment override, so a plain rerun
 # silently reproduced a different model from the one reported in Table 3.3.
