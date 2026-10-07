@@ -418,6 +418,16 @@ P("**Settle what causes the U-Net's damping.** Part of this recommendation has b
      udv5.loc["U-Net, dropout 0 (adopted)", "RMSE_zw"],
      cut5.loc["U-Net", "k>=20"],
      uo.loc["baseline", "test_spec_ratio"]))
+P("**Refit the U-Net at the learning rate its own search selects.** Section 3.6.7 "
+  "reports that on the rebuilt target the honest search prefers a rate of 0.0002 to the "
+  "deployed 0.001, by a small margin on the inner split. The U-Net is not the deployed "
+  "model, so nothing in the product depends on it, but its row in Table 4.1, its "
+  "contribution to the architecture term of the uncertainty budget and its spectra all "
+  "would move. The same applies to the variant sweep of Section 4.5, whose baseline "
+  "carries its own learning rate and dropout rather than the deployed ones and therefore "
+  "cannot isolate the damping it was built to explain: anchoring that sweep on the "
+  "deployed configuration is the way to settle the mechanism, and it is the one change "
+  "that would turn Section 4.5's open question into an answer.")
 P("**Settle the yield question against a specified module.** Section 4.7.2 shows that "
   "whether the projected irradiance gain translates into a larger yield under the higher "
   "pathway depends on the module temperature coefficient, and that the threshold falls "

@@ -16,6 +16,7 @@ so the comparison is in the archive rather than only in a console log.
 """
 
 import os
+import re
 import sys
 import time
 import numpy as np
@@ -34,10 +35,36 @@ OUT = os.path.join("data/processed/evaluation", "hpo_pixelwise_%s.csv" % MODEL)
 N_JOBS = int(os.environ.get("HPO_N_JOBS", "-1"))
 
 # What Section 3.6.3 and Section 3.6.4 actually deploy.
-DEPLOYED = {
+def _default_of(script, name):
+    src = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), script)).read()
+    m = re.search(r'os\.environ\.get\(\s*"%s"\s*,\s*"([^"]+)"' % name, src)
+    assert m is not None, "could not read %s from %s" % (name, script)
+    return m.group(1)
+
+
+# The a priori configurations, which the deployed ones replaced in October. They
+# are kept as literals because they are no longer in the training scripts, and
+# they are the comparison arm: the XGBoost one lies outside the grid, so it is
+# appended as an extra point below.
+A_PRIORI = {
     "rf": {"n_estimators": 500, "max_features": "sqrt", "min_samples_leaf": 5},
     "xgb": {"max_depth": 6, "eta": 0.05, "subsample": 0.8, "min_child_weight": 3},
 }[MODEL]
+
+# What the training scripts actually deploy. This was hardcoded to the a priori
+# values until 7 October, so the is_deployed column flagged the superseded
+# configuration and Section 3.6.7 reported its rank as the deployed model's.
+DEPLOYED = {
+    "rf": lambda: {"n_estimators": int(_default_of("train_pixelwise_rf.py", "RF_N_ESTIMATORS")),
+                   "max_features": _default_of("train_pixelwise_rf.py", "RF_MAX_FEATURES"),
+                   "min_samples_leaf": int(_default_of("train_pixelwise_rf.py",
+                                                       "RF_MIN_SAMPLES_LEAF"))},
+    "xgb": lambda: {"max_depth": int(_default_of("train_pixelwise_xgb.py", "XGB_MAX_DEPTH")),
+                    "eta": float(_default_of("train_pixelwise_xgb.py", "XGB_ETA")),
+                    "subsample": float(_default_of("train_pixelwise_xgb.py", "XGB_SUBSAMPLE")),
+                    "min_child_weight": int(_default_of("train_pixelwise_xgb.py",
+                                                        "XGB_MIN_CHILD_WEIGHT"))},
+}[MODEL]()
 
 N_SUBSET_CELLS = 150
 N_FOLDS = 5
@@ -118,11 +145,14 @@ else:
         for mcw in [1, 5]
     ]
 
-if DEPLOYED not in grid:
-    grid.append(DEPLOYED)
-    print(f"Deployed configuration {DEPLOYED} is not in the grid; appended as an extra point.")
+assert DEPLOYED in grid, (
+    "the deployed configuration %s is not in the grid, so is_deployed would flag "
+    "nothing" % DEPLOYED)
+if A_PRIORI not in grid:
+    grid.append(A_PRIORI)
+    print(f"A priori configuration {A_PRIORI} is not in the grid; appended as an extra point.")
 else:
-    print(f"Deployed configuration {DEPLOYED} is in the grid.")
+    print(f"A priori configuration {A_PRIORI} is in the grid.")
 
 print(f"\nGrid size: {len(grid)} combinations x {N_FOLDS} folds x {N_SUBSET_CELLS} cells "
       f"= {len(grid) * N_FOLDS * N_SUBSET_CELLS} total fits")
@@ -151,8 +181,9 @@ import pandas as pd
 
 rows = []
 for params, rmse in results:
-    rows.append(dict(params, cv_rmse_csi=rmse, is_deployed=(params == DEPLOYED),
-                     in_grid=(params != DEPLOYED or DEPLOYED in grid[:-1])))
+    rows.append(dict(params, cv_rmse_csi=rmse,
+                     is_deployed=(params == DEPLOYED),
+                     is_a_priori=(params == A_PRIORI)))
 df = pd.DataFrame(rows).sort_values("cv_rmse_csi").reset_index(drop=True)
 df["rank"] = df.index + 1
 df.to_csv(OUT, index=False)

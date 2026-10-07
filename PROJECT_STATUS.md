@@ -2315,6 +2315,57 @@ because the neural fits failed.
 
 ---
 
+## 12x. The three long reruns, and a fifth script naming the wrong configuration
+
+All three completed on the current target and configurations. Two pending disclosures
+come out of the document; one new one goes in.
+
+**Rolling origin now describes the deployed models.** The 5 October run reproduced the
+2 October numbers to three decimals because the script hardcoded the superseded
+hyperparameters; with those read from the training scripts it returns different figures
+and stamps the configuration it used into a `config` column. XGBoost is lower in all four
+folds, by 1.97 and 1.75 and 0.70 and 0.99 W/m², so Section 4.2 asserts the ranking again instead of reporting only the
+design of the test. The configuration-based guard is what let this be trusted: a date
+check had passed on a run whose contents were stale.
+
+**The U-Net sweep is on the rebuilt target**, 13 of 14 variants. `combo_spec` fails on a
+tensor-shape mismatch where the spectral loss meets the per-cell climatology and has never
+run, in September or now, so 13 is the set the thesis has always reported. The accuracy
+findings hold; the spectral findings move, and the variant closest to unity changes from
+the penalty-free one to the spectral-loss one, a claim Section 4.5 had with the winner
+written into the sentence and now derives from the table.
+
+**The neural search contradicts one deployed choice.** For the CNN the deployed learning
+rate and penalty weight are the search's selection. For the U-Net they are not: on the
+rebuilt target the search prefers 0.0002 at 0.086375 against the deployed 0.001 at 0.088893, which
+is 2.8 per cent better on the inner split. The U-Net is not the deployed model, so nothing
+in the product depends on it, but Table 4.1, the architecture term and the spectra would
+all move if it were refitted. Section 3.6.7 now says so and Section 5.6 carries it as an
+open item, together with the point that the Section 4.5 sweep anchors on its own learning
+rate and dropout rather than the deployed ones and so cannot isolate the damping it was
+built to explain.
+
+**A fifth script naming the wrong configuration.** `hpo_pixelwise.py` hardcoded the a
+priori values under the name `DEPLOYED`, so its `is_deployed` column flagged the
+superseded configuration and Section 3.6.7 reported its rank as the deployed model's. The
+constant is now `A_PRIORI`, the deployed values are read from the training scripts, an
+assertion requires the deployed configuration to be inside the grid, and both flags are
+written. The flags are derivable from the stored grid results, so the two CSVs were
+re-stamped without refitting. Corrected: **both deployed configurations are their grids'
+selections, ranking first of 25 and first of 18**; the a priori ones rank 7 and 11. The
+section had said the deployed XGBoost ranked seventh.
+
+That makes five scripts found hardcoding hyperparameters the training scripts had moved
+on from — `compute_rolling_origin.py`, `hpo_pixelwise.py`, `hpo_neural.py`,
+`optimise_unet.py` and the regularisation omission in the first pixel-wise search. Four
+now read the training scripts; `optimise_unet.py` is left as a deliberate open item
+because anchoring it on the deployed configuration changes what the sweep tests.
+
+**Brief.** `sync_brief_tables.py` gained the rolling-origin table, which it had not
+covered, so the guard caught it on the first rerun rather than an examiner.
+
+---
+
 ## 13. Outstanding
 
 **Open after the fifth round (§12q)**
