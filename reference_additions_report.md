@@ -44,7 +44,7 @@ Resolved against the CrossRef API, not transcribed. Import
 
 Datasets and software without a DOI. Check each before submitting.
 
-- **Global Solar Atlas 2.0, long-term average of global horizontal irradiation for Zimbabwe** (2024), World Bank Group and Solargis — the national GHI figure in Chapter 1, which was previously attributed to Lin et al. (2023), a downscaling study of East Asia; the attribution is removed and this is the source to cite in its place
+- **Global Solar Atlas 2.0, long-term average of global horizontal irradiation for Zimbabwe** (2024), Solargis — the national GHI figure in Chapter 1, which was previously attributed to Lin et al. (2023), a downscaling study of East Asia; the attribution is removed and this is the source to cite in its place
 - **Global Administrative Areas, version 4.1** (2022), GADM — national and provincial boundaries, Section 3.3.4
 - **WorldPop constrained population counts, Zimbabwe 2020** (2020), WorldPop — the population criterion, Section 3.9
 - **ESA Climate Change Initiative Land Cover, v2.1.1** (2022), European Space Agency — the land-cover criterion, Section 3.9

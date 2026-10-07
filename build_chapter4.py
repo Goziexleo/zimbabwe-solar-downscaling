@@ -80,6 +80,13 @@ RB = lambda m, c: t33.loc[m, c]
 # replaced was sorted on the full-box figures, so once the metrics were masked
 # Table 4.1 listed its rows out of sequence.
 MODEL_ORDER = list(t33["RMSE_zw"].sort_values().index)
+# Derived, never named. The identity of the lowest-error architecture has now
+# inverted three times - XGBoost, then the U-Net after the dropout adoption, then
+# XGBoost again after the U-Net was refitted at the rate its own search selects -
+# and each time a sentence had the previous winner written into it.
+_BEST = MODEL_ORDER[0]
+_SECOND = MODEL_ORDER[1]
+_n_above_ols = int((t33["RMSE_zw"] > bas.loc[_OLS, "RMSE_zw"]).sum())
 def pair(a, b, metric):
     r = bca[(bca.model_a == a) & (bca.model_b == b) & (bca.metric == metric)]
     if r.empty:
@@ -262,14 +269,15 @@ TBL(["Model", "RMSE (W/m²)", "MAE", "Pearson R", "MBE", "Skill vs climatology",
     "interpolation is a circularity diagnostic rather than a skill reference, for the "
     "reason given in Section 3.7.3."
     % t33["climatology_rmse_zw"].iloc[0])
-P("The lowest aggregate error belongs to the U-Net at %.2f W/m², with the deployed "
-  "XGBoost ensemble at %.2f, a skill score of %.4f against climatology and a Pearson "
-  "correlation of %.4f. Section 4.4 sets out why the deployment does not follow the "
-  "first column of this table. The spread across architectures is %.2f W/m² between "
-  "best and worst on the same Zimbabwe basis, and Section 4.3 addresses which part of "
-  "that spread is statistically established."
-  % (R("U-Net", "RMSE"), R("XGBoost", "RMSE"), R("XGBoost", "SS vs climatology"),
-     R("XGBoost", "Pearson R"), t33["RMSE_zw"].max() - t33["RMSE_zw"].min()))
+P("The lowest aggregate error belongs to %s at %.2f W/m², with %s next at %.2f. The "
+  "deployed model attains a skill score of %.4f against climatology and a Pearson "
+  "correlation of %.4f. The spread across architectures is %.2f W/m² between best and "
+  "worst on the Zimbabwe basis, and Section 4.3 addresses which part of that spread is "
+  "statistically established; Section 4.4 sets out why the ordering of this column is "
+  "not by itself the selection rule."
+  % (_BEST, R(_BEST, "RMSE"), _SECOND, R(_SECOND, "RMSE"),
+     R("XGBoost", "SS vs climatology"), R("XGBoost", "Pearson R"),
+     t33["RMSE_zw"].max() - t33["RMSE_zw"].min()))
 
 H("4.2.1 The linear baseline", 3)
 P("Chapter 1 justified machine learning on the ground that classical statistical "
@@ -280,8 +288,9 @@ P("Chapter 1 justified machine learning on the ground that classical statistical
   "exactly the predictors the tree and network models receive, over the same training "
   "period, against the same clear-sky-index target, and converted to irradiance through "
   "the same clear-sky climatology.")
-P("The linear model attains %.2f W/m\u00b2. Three of the four architectures in Table 4.1 "
-  "sit above it; one, the U-Net, sits below. Resampling whole calendar years as in "
+P("The linear model attains %.2f W/m\u00b2, which is lower than every architecture in "
+  "Table 4.1: all four "
+  "sit above it. Resampling whole calendar years as in "
   "Section 4.3, neither of the two closest is separable from it: the margin over the "
   "deployed XGBoost is %+.3f W/m\u00b2 with a 95 per cent interval of %+.3f to %+.3f, and "
   "over the U-Net %+.3f (%+.3f to %+.3f), both spanning zero. The remaining two margins "
@@ -462,8 +471,8 @@ P("The result is mixed and is reported as such. XGBoost is established as better
   "%+.3f to %+.3f, and neither spatial correlation nor the standard-deviation ratio can "
   "be distinguished."
   % (v_r, lo_r, hi_r, abs(v_m), abs(v_c), lo_c, hi_c))
-P("This matters because Section 3.8.4 originally deployed the Random Forest on a "
-  "composite criterion combining systematic offset with spatial error structure. That "
+P("This matters because the composite criterion of Section 3.8.4, combining systematic "
+  "offset with spatial error structure, favours the Random Forest. That "
   "criterion survives resampling on one of its two legs. The Random Forest does reproduce "
   "the historical field better in level, and the analysis concedes that in full rather "
   "than dismissing it; the spatial-structure leg no longer clears its interval. The reason XGBoost is "
@@ -528,11 +537,12 @@ P("This test is used as a screen and not as a ranking, and the distinction is es
   "read precision into an unvalidated quantity, and treating the CNN's %.1f per cent as "
   "better than XGBoost's %.1f per cent would be the same error. Among the models that "
   "pass the screen, selection therefore falls back to validated historical performance, "
-  "and there the lowest aggregate error belongs to the U-Net, %.2f W/m\u00b2 against "
-  "XGBoost's %.2f. That is not sufficient to deploy it, and the standard applied is the "
-  "one already applied to the Random Forest. The margin is not established: its "
-  "bias-corrected interval runs %+.3f to %+.3f and spans zero. The axes on which the two "
-  "models are separable split three to one, and they split against the U-Net. XGBoost is "
+  "and there the lowest aggregate error is XGBoost's, %.2f W/m\u00b2 against the U-Net's "
+  "%.2f. That alone would not settle it, because the second step of the Section 3.8.1 "
+  "rule binds only where the margin is established and this one is not: its "
+  "bias-corrected interval runs %+.3f to %+.3f and spans zero. The decision therefore "
+  "rests on the third step, and there the axes on which the two models are separable "
+  "split three to one in the same direction as the point estimate. XGBoost is "
   "established better on centred RMSE by %.3f (%.3f to %.3f), on spatial correlation by "
   "%.4f (%.4f to %.4f) and on the standard-deviation ratio by %.4f (%.4f to %.4f); the "
   "U-Net is established better on mean bias, by %.3f (%.3f to %.3f). A bias is also the "
@@ -544,8 +554,8 @@ P("This test is used as a screen and not as a ranking, and the distinction is es
   "basis-dependent: over the full analysis box, on which the U-Net\'s advantage reverses, "
   "XGBoost leads by %.3f W/m\u00b2."
   % (scr.loc["CNN", "pct_ordered_long_term"], scr.loc["XGBoost", "pct_ordered_long_term"],
-     RB("U-Net", "RMSE_zw"), RB("XGBoost", "RMSE_zw"),
-     pair("U-Net", "XGBoost", "RMSE")[1], pair("U-Net", "XGBoost", "RMSE")[2],
+     RB("XGBoost", "RMSE_zw"), RB("U-Net", "RMSE_zw"),
+     pair("XGBoost", "U-Net", "RMSE")[1], pair("XGBoost", "U-Net", "RMSE")[2],
      _ab("XGBoost", "U-Net", "centred RMSE"), _lo("XGBoost", "U-Net", "centred RMSE"),
      _hi("XGBoost", "U-Net", "centred RMSE"),
      _ab("XGBoost", "U-Net", "spatial R"), _lo("XGBoost", "U-Net", "spatial R"),
@@ -556,15 +566,12 @@ P("This test is used as a screen and not as a ranking, and the distinction is es
      _hi("XGBoost", "U-Net", "MBE"),
      cut.loc["U-Net", "k>=11"], cut.loc["XGBoost", "k>=11"],
      t33.loc["U-Net", "RMSE"] - t33.loc["XGBoost", "RMSE"]))
-P("One qualification that stood here in an earlier version no longer applies and is "
-  "noted because it changes how the margin should be read. The deployed XGBoost "
-  "configuration was previously the a priori default, retained over the search's own "
-  "selection on the strength of a comparison on the withheld record. Section 3.6.7 "
-  "reports that the comparison in fact favoured the search result, and both pixel-wise "
-  "models now carry their cross-validated configurations, chosen inside the training "
-  "period. The figures weighed against the U-Net here are therefore free of selection on "
-  "the evaluation record, which they were not when this comparison was first drawn."
-  )
+P("Both figures in that comparison come from configurations selected inside the "
+  "training period. Section 3.6.7 reports the searches: each pixel-wise model carries "
+  "the configuration its own cross-validation chose, and the U-Net carries the learning "
+  "rate its own inner-split search chose. The comparison is therefore between four models "
+  "tuned by the same standard, which is what makes the margins above worth resampling at "
+  "all.")
 P("The wider point is that a model can satisfy every validation metric in Table 4.1 and "
   "still be unfit for the purpose the product serves. The Random Forest is better than "
   "the deployed model on mean bias, not separable from it on either spatial axis, and "
@@ -628,9 +635,10 @@ P("That appearance survives the honest procedure, which was not the expected res
      - udv.loc["U-Net, dropout 0 (adopted)", "RMSE_zw"],
      0.08889, 0.12041))
 P("Two things follow, and the second is why the deployment did not change with the "
-  "configuration. The U-Net now holds the lowest aggregate error in Table 4.1, below the "
-  "deployed XGBoost at %.2f W/m\u00b2, and it passes the scenario screen of Section 4.4 "
-  "with separation of %+.3f, %+.3f and %+.3f W/m\u00b2 across the three horizons. But "
+  "configuration. The U-Net sits second on aggregate error in Table 4.1, at %.2f "
+  "W/m\u00b2 against the deployed XGBoost's %.2f, and it passes the scenario screen of "
+  "Section 4.4 with separation of %+.3f, %+.3f and %+.3f W/m\u00b2 across the three "
+  "horizons. But "
   "Section 4.4 also records that the error margin is not established while XGBoost's "
   "advantage on the spatial axes is, and the spectra above are the reason to accept that "
   "verdict rather than argue with it. Removing dropout reduced the damping and did not "
@@ -640,7 +648,7 @@ P("Two things follow, and the second is why the deployment did not change with t
   "at each cell, not structure the coarse field did not already carry, which is why the "
   "answer to RQ2 is unchanged and why a model that reproduces the spatial pattern better "
   "is preferred for a product whose output is a map."
-  % (t33.loc["XGBoost", "RMSE_zw"],
+  % (t33.loc["U-Net", "RMSE_zw"], t33.loc["XGBoost", "RMSE_zw"],
      scr.loc["U-Net", "sep_near_term"], scr.loc["U-Net", "sep_mid_term"],
      scr.loc["U-Net", "sep_long_term"],
      cut.loc["U-Net", "k>=3"], cut.loc["U-Net", "k>=11"], cut.loc["U-Net", "k>=20"]))
@@ -829,7 +837,8 @@ P("The correct reading is not that this study has identified the right architect
 
 H("4.7.1 The operational baseline and consistency with the driver", 3)
 P("Two checks the projections were not previously subjected to are reported here. The "
-  "first is the operational alternative: bias-correcting each GCM's own rsds and "
+  "first is the operational alternative: bias-correcting each GCM's own rsds by quantile "
+  "delta mapping (Cannon et al., 2015) and "
   "interpolating it, which is the approach behind the published NEX-GDDP-CMIP6 product "
   "and the obvious thing a planner would do instead of training a model. The second is "
   "whether the downscaled change keeps the sign and size of the change in the driver it "
@@ -944,8 +953,8 @@ P("A second result is more interesting and is stated with the condition it depen
   "projection concerns would be built long after the present fleet is replaced, so the "
   "comparison that decides the matter is against the coefficient of the technology "
   "actually specified rather than against a generic crystalline-silicon value. What can "
-  "be said without that specification is narrower than the earlier draft of this "
-  "section claimed: a projection that stops at irradiance may rank the two pathways the "
+  "be said without that specification is correspondingly narrow: a projection that stops "
+  "at irradiance may rank the two pathways the "
   "wrong way round for the quantity a developer is buying, and whether it does is "
   "decided by the module."
   % (pve.loc[("ssp585", "long_term_2076_2100"), "yield_change_pct_gamma-0.0040"],
@@ -1184,17 +1193,15 @@ P("**The suitability layer scores irradiance, not deliverable energy.** Module o
 P("**The future suitability maps hold infrastructure and population constant.** They "
   "describe how the resource changes at present-day sites, not where future sites will "
   "be.")
-P("**The deployed model does not have the lowest validation error.** The U-Net, in the "
-  "dropout-free configuration adopted in Section 4.5, scores %.2f W/m\u00b2 over "
-  "Zimbabwe against the deployed XGBoost's %.2f. A reader ranking Table 4.1 on "
-  "aggregate error alone would deploy the other model, and the reason this study does "
-  "not is set out in Section 4.4: that margin is not established under resampling, "
-  "XGBoost is established better on three structural axes against the U-Net's one, and "
-  "the U-Net is the only architecture whose field is spectrally damped. The selection "
-  "therefore rests on the axes resampling establishes rather than on the headline "
-  "figure, which is the same standard that set the Random Forest aside, but it does "
-  "mean the deployed model is not the one a single-metric comparison would choose."
-  % (t33.loc["U-Net", "RMSE_zw"], t33.loc["XGBoost", "RMSE_zw"]))
+P("**No architecture beats a per-cell linear regression.** The deployed model returns "
+  "the lowest aggregate error of the four at %.2f W/m\u00b2, but a per-cell ordinary "
+  "least squares regression on the same predictors reaches %.2f, and Section 4.2.1 "
+  "reports that neither it nor the U-Net is separable from that line while the CNN and "
+  "the Random Forest are measurably worse than it. The machine learning in this study "
+  "therefore earns its complexity on none of the four architectures, and Section 4.5 "
+  "gives the reason: the target is too smooth for a nonlinear model to have anything to "
+  "find."
+  % (t33.loc[_BEST, "RMSE_zw"], bas.loc[_OLS, "RMSE_zw"]))
 P("**Model selection on the evaluation record, identified and corrected.** The CNN and "
   "U-Net previously saved the checkpoint scoring best on the withheld period. Both have "
   "been retrained with the epoch count chosen on an inner split of the training data, "

@@ -85,15 +85,15 @@ def paragraphs(n):
         "and carried into a suitability assessment for utility-scale "
         "photovoltaics.",
 
-        "On a withheld 2011 to 2024 record over Zimbabwe, a U-Net attains the lowest "
-        "error, %.2f W/m², against a gradient-boosted ensemble at %.2f, a convolutional "
-        "network at %.2f and a random forest at %.2f. The ensemble is deployed "
-        "nonetheless, at %.2f skill against climatology: its margin to the U-Net is not "
-        "established under resampling, its advantage on three structural axes is, and the "
-        "U-Net alone damps the spectrum. A per-cell linear regression reaches %.2f W/m², "
-        "indistinguishable from both leaders and ahead of the other two, so "
-        "no model here is established better than a straight line."
-        % (n["unet"], n["xgb"], n["cnn"], n["rf"], n["ss"], n["ols"]),
+        "On a withheld 2011 to 2024 record over Zimbabwe, a gradient-boosted ensemble "
+        "attains the lowest error, %.2f W/m², against a U-Net at %.2f, a convolutional "
+        "network at %.2f and a random forest at %.2f, at %.2f skill against climatology. "
+        "It is deployed on a margin resampling does not establish and an advantage on "
+        "three structural axes that it does, the U-Net alone damping the spectrum. A "
+        "per-cell linear regression reaches %.2f W/m², lower than all four: "
+        "indistinguishable from the two leaders and ahead of the other two, so no model "
+        "here earns its complexity."
+        % (n["xgb"], n["unet"], n["cnn"], n["rf"], n["ss"], n["ols"]),
 
         "A round-trip spectral test accounts for that: the target retains %.3f per cent of "
         "its time-mean variance below the 0.25 degree resolution of its source. The "

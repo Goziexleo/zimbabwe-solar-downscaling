@@ -207,11 +207,11 @@ margin over both networks: XGBoost − CNN -0.841 [-1.090, -0.353] and XGBoost �
 -1.471 [-1.893, -1.022]. **The deployment is unaffected** — it turned on scenario
 discrimination, and the Random Forest still fails that screen.
 
-**σ_arch is 57.26%** of long-term variance, with σ_DS at 9.04%.
+**σ_arch is 53.20%** of long-term variance, with σ_DS at 9.90%.
 Improving two of the four members narrowed the spread between architectures, which is
 exactly what that term measures — the mirror image of what the §6.13 correction did to it.
 Chapter 5's methodological point stands and is now much stronger: architecture choice
-dominates GCM choice (29.62%) by a factor of about 1.9.
+dominates GCM choice (32.44%) by a factor of about 1.6.
 
 **Corrected after the examiner's critique (1 Oct 2026).** Two errors were fixed here.
 σ_DS carried the MONTHLY validation RMSE (9.24 W m-2) into a budget whose other terms are
@@ -320,9 +320,9 @@ Ablation (XGBoost, all else constant):
 
 | Configuration | RMSE | Pearson R | SS vs climatology |
 |---|---|---|---|
-| A. Lagged `rsds`, 6 predictors (original) | 22.94 | 0.817 | −0.203 |
-| B. Lag fixed, `rsds` **kept** | **5.54** | **0.9894** | 0.7096 |
-| C. Lag fixed, `rsds` **dropped** (deployed) | 9.03 | 0.9721 | 0.5264 |
+| A. Lagged `rsds`, 6 predictors (original, not reproducible) | 22.94 | 0.817 | −0.203 |
+| B. Lag fixed, `rsds` **kept** | **5.29** | **0.9903** | 0.7227 |
+| C. Lag fixed, `rsds` **dropped** (deployed) | 8.94 | 0.9728 | 0.5313 |
 
 Skill is against the corrected 19.08 climatology, so configuration C agrees with §8 (0.5264). An earlier version used the leaky 17.98 reference and gave 0.6922 and 0.4932 — putting the same model at two different skill scores in two sections of this document.
 
@@ -737,7 +737,7 @@ Ordered by full-box RMSE, the columns shown. **The XGBoost−U-Net ranking depen
 | Model | RMSE | MAE | Pearson R | MBE | SS vs climatology | R² |
 |---|---|---|---|---|---|---|
 | **XGBoost (deployed)** | **8.94** | **6.54** | **0.9728** | +1.53 | **0.5313** | **0.9448** |
-| U-Net | 9.05 | 6.79 | 0.9722 | +0.22 | 0.5256 | 0.9434 |
+| U-Net | 9.30 | 7.00 | 0.9700 | +0.55 | 0.5125 | 0.9402 |
 | Random Forest | 9.75 | 7.30 | 0.9671 | +0.37 | 0.4887 | 0.9343 |
 | CNN | 10.04 | 7.51 | 0.9667 | +2.11 | 0.4738 | 0.9304 |
 
@@ -2363,6 +2363,66 @@ because anchoring it on the deployed configuration changes what the sweep tests.
 
 **Brief.** `sync_brief_tables.py` gained the rolling-origin table, which it had not
 covered, so the guard caught it on the first rerun rather than an examiner.
+
+---
+
+## 12y. Sixth critique: the U-Net refit reverses the ordering, and the linear result hardens
+
+Score 71, up from 65. Four items, all four acted on.
+
+**The U-Net is refitted at the rate its own search selects, and it got worse.** Section
+3.6.7's rerun search preferred 2e-4 to the deployed 1e-3 on the inner split, and the U-Net
+was the only model left at a setting its own search had not chosen — which mattered because
+Section 4.4 declines to deploy it precisely on the ground that its margin over XGBoost is
+not established. Refitting removes that vulnerability rather than disclosing it, and the
+result is the opposite of what the examiner feared: the U-Net moves from 8.62 to 9.01
+W/m² over Zimbabwe, so **XGBoost now holds the lowest aggregate error of the four** and the
+margin is still not established (-0.131, BCa [-0.336, +0.203]). The deployed model is now both
+the lowest-error architecture and the one established better on three structural axes.
+
+That is also the cleanest possible vindication of the selection rule. The honestly chosen
+configuration is worse on the withheld record, and it is reported anyway: choosing 1e-3
+because it scored better there would have been selection on the evaluation data, the defect
+corrected everywhere else in this chapter.
+
+**The linear result hardens.** With the U-Net above it, **all four architectures now sit
+above the per-cell OLS at 8.80 W/m²**. XGBoost and the U-Net remain indistinguishable from
+it and the CNN and Random Forest measurably worse, so the claim is no longer "none is
+established better than a straight line" but the stronger "the straight line returns the
+lowest error of the five". Section 4.2.1 says so, and Section 4.9's limitation is rewritten
+from "the deployed model does not have the lowest validation error", which is now false, to
+the fact that no architecture earns its complexity.
+
+**Asserted winners are now derived.** The identity of the lowest-error architecture has
+inverted three times — XGBoost, the U-Net after the dropout adoption, XGBoost again after
+this refit — and each time a sentence had the previous winner written into it. Sections 4.2,
+4.4, 4.5, 4.9, 5.2.1 and the abstract now take it from the table.
+
+**The ablation is reproducible for the first time.** `compute_rsds_ablation.py` refits
+configurations B and C at the deployed hyperparameters: B at 5.29 W/m² full box against C at
+8.94, where the table had carried 5.54 against 9.03 from the superseded configuration. A
+limitations sentence had been comparing 5.54 on the full box against 8.88 over Zimbabwe —
+two configurations and two bases in one clause. Configuration A needed the one-month
+predictor misalignment, a defect in the feature builder rather than a switch, so it is not
+reproducible and is labelled as a measurement under the original configuration. Both the
+`check_chapter3_consistency.py` anchors and its ABLATION map now read the CSV; hardcoding
+them is what let document and guard agree with each other while both disagreed with the
+models.
+
+**Revision history removed where it was confession, kept where it is method.** The
+leakage corrections stay, because an examiner needs to know the checkpoints were once
+selected on the withheld record and no longer are. Four passages in the narrative voice of
+a revision log are gone, including a whole paragraph in Section 4.4 and the framing in
+Section 3.6.7, which now states the cross-validated-beats-default finding as a result.
+
+**References: 32 to 38.** Anthropic, Efron, Solargis, Cannon and Holmgren added, and the
+methods that had no source now have one: quantile delta mapping, the BCa interval, the
+pvlib clear-sky implementation and the national irradiance figure. GADM, WorldPop and ESA
+CCI carry years so they match their entries. Two defects surfaced: the inserter's "cited"
+slice stopped at the References heading, so it could never see Appendix B and that is why
+Anthropic was missed; and CrossRef returns pvlib's authors with initials glued to the
+family names, which printed as "F. Holmgren, William" and was unfindable by surname. The
+builder normalises that now.
 
 ---
 

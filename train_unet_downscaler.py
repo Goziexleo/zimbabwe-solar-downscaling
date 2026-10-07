@@ -64,7 +64,12 @@ if hasattr(torch, "mps") and torch.backends.mps.is_available():
 
 EPOCHS = int(os.environ.get("EPOCHS", "100"))
 EARLY_STOP_PATIENCE = int(os.environ.get("UNET_EARLY_STOP_PATIENCE", "20"))
-LEARNING_RATE = float(os.environ.get("UNET_LEARNING_RATE", "1e-3"))
+# Adopted after the honest search of Section 3.6.7, rerun on the rebuilt target,
+# preferred 2e-4 to the 1e-3 deployed before it: 0.086375 against 0.088893 on the
+# inner split. The U-Net was the only model left running at a setting its own
+# search did not select, which mattered because Section 4.4 declines to deploy it
+# on the ground that its margin over XGBoost is not established.
+LEARNING_RATE = float(os.environ.get("UNET_LEARNING_RATE", "2e-4"))
 WEIGHT_DECAY = float(os.environ.get("UNET_WEIGHT_DECAY", "1e-4"))
 
 device = torch.device("mps" if torch.backends.mps.is_available() else ("cuda" if torch.cuda.is_available() else "cpu"))

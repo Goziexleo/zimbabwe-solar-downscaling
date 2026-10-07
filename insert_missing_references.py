@@ -117,8 +117,12 @@ def main():
     bib_idx = [n for n, p in enumerate(ps) if n > ri
                and p.style.name == "Bibliography" and p.text.strip()]
     assert bib_idx, "no bibliography entries found"
-    body = "\n".join(p.text for p in ps[:ri])
+    # Everything outside the bibliography block counts as cited, not just what
+    # precedes it: Anthropic (2026) is cited in Appendix B, which follows the
+    # References, and an earlier version of this slice missed it for that reason.
     listed = "\n".join(ps[n].text for n in bib_idx)
+    body = "\n".join(p.text for n, p in enumerate(ps)
+                     if not (bib_idx[0] <= n <= bib_idx[-1]))
 
     pending = []
     for f in records():

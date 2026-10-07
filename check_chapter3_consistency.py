@@ -121,18 +121,29 @@ def canonical_anchors():
             if not hit.empty:
                 a.append((label, "%.3f" % abs(hit.iloc[0]["plug_in"])))
 
-    # Section 3.7.4's ablation. Configurations A and B are one-off refits that
-    # no script re-emits, so unlike everything above these cannot be read from a
-    # CSV and are transcribed from Section 7.3 of PROJECT_STATUS.md. They are
-    # anchored anyway: the chapter now rests an argument on them, and a silent
-    # divergence between the two documents is exactly the drift this file
-    # exists to catch. Configuration C is already covered by the Table 3.3
-    # anchors above.
-    a += [("ablation A RMSE", "22.94"),
-          ("ablation A Pearson R", "0.817"),
-          ("ablation B RMSE", "5.54"),
-          ("ablation B Pearson R", "0.9894"),
-          ("ablation B skill", "0.7096")]
+    # Section 3.7.4's ablation. B and C are reproducible by
+    # compute_rsds_ablation.py and read from its CSV; hardcoding them here is
+    # what let the table go stale when the pixel-wise hyperparameters changed.
+    # Configuration A required the one-month predictor misalignment, which was a
+    # defect in the feature builder rather than a switch, so it is not
+    # reproducible and stays transcribed from Section 7.3 of PROJECT_STATUS.md.
+    a += [("ablation A RMSE", "22.94"), ("ablation A Pearson R", "0.817")]
+    abl = os.path.join(EVAL, "rsds_ablation.csv")
+    if os.path.exists(abl):
+        ab = pd.read_csv(abl)
+        clim = None
+        if os.path.exists(t33):
+            clim = float(pd.read_csv(t33)["climatology_rmse"].iloc[0])
+        for prefix, tag in (("B.", "B"), ("C.", "C")):
+            hit = ab[ab.configuration.str.startswith(prefix)]
+            if hit.empty:
+                continue
+            r = hit.iloc[0]
+            a.append(("ablation %s RMSE" % tag, "%.2f" % r["RMSE_fullbox"]))
+            a.append(("ablation %s Pearson R" % tag, "%.4f" % r["pearson_r"]))
+            if clim:
+                a.append(("ablation %s skill" % tag,
+                          "%.4f" % (1.0 - r["RMSE_fullbox"] / clim)))
     return a
 
 
@@ -312,13 +323,32 @@ def _explained(text, start, end):
     hi = len(text) if hi == -1 else hi + 1
     return re.search(EXPLANATORY, text[lo:hi], re.I) is not None
 
-# Section 3.7.4, by row label -> (RMSE, Pearson R, skill). Section 7.3 of
-# PROJECT_STATUS.md is the source; configuration C must also match Table 3.3.
-ABLATION = {
-    "A.": ("22.94", "0.817", "-0.203"),
-    "B.": ("5.54", "0.9894", "0.7096"),
-    "C.": ("9.03", "0.9721", "0.5264"),
-}
+# Section 3.7.4, by row label -> (RMSE, Pearson R, skill). B and C are read from
+# rsds_ablation.csv, because hardcoding them here is what let the table go stale
+# when the pixel-wise hyperparameters changed in October: the document and this
+# map agreed with each other and both disagreed with the models. Configuration A
+# needed the one-month predictor misalignment, which was a defect in the feature
+# builder rather than a switch, so it is not reproducible and stays transcribed.
+def _ablation_map():
+    import pandas as pd
+    m = {"A.": ("22.94", "0.817", "-0.203")}
+    f = os.path.join(EVAL, "rsds_ablation.csv")
+    t = os.path.join(EVAL, "table_3_3.csv")
+    if not (os.path.exists(f) and os.path.exists(t)):
+        return m
+    ab = pd.read_csv(f)
+    clim = float(pd.read_csv(t)["climatology_rmse"].iloc[0])
+    for pre in ("B.", "C."):
+        hit = ab[ab.configuration.str.startswith(pre)]
+        if hit.empty:
+            continue
+        r = hit.iloc[0]
+        m[pre] = ("%.2f" % r["RMSE_fullbox"], "%.4f" % r["pearson_r"],
+                  "%.4f" % (1.0 - r["RMSE_fullbox"] / clim))
+    return m
+
+
+ABLATION = _ablation_map()
 
 
 def check_ablation_table(grids):

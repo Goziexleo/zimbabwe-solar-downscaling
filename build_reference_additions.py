@@ -145,7 +145,7 @@ BY_DOI = [
 MANUAL = [
     dict(ty="DATA", title="Global Solar Atlas 2.0, long-term average of global "
                           "horizontal irradiation for Zimbabwe",
-         author="World Bank Group and Solargis", year="2024",
+         author="Solargis", year="2024",
          url="https://globalsolaratlas.info",
          note="the national GHI figure in Chapter 1, which was previously "
               "attributed to Lin et al. (2023), a downscaling study of East Asia; "
@@ -254,8 +254,18 @@ def by_doi(doi):
 
 def ris(it, why):
     t = (it.get("title") or [""])[0]
-    authors = ["%s, %s" % (a.get("family", ""), a.get("given", ""))
-               for a in it.get("author", []) if a.get("family")]
+    def _name(a):
+        """CrossRef sometimes glues an initial onto the family name, so pvlib
+        comes back as family "F. Holmgren", given "William". Left alone that
+        prints as "F. Holmgren, William" and no surname search can find it."""
+        fam, giv = (a.get("family") or "").strip(), (a.get("given") or "").strip()
+        m = re.match(r"^([A-Z])\.\s+(\S.*)$", fam)
+        if m:
+            fam = m.group(2)
+            giv = ("%s %s." % (giv, m.group(1))).strip()
+        return "%s, %s" % (fam, giv)
+
+    authors = [_name(a) for a in it.get("author", []) if a.get("family")]
     year = ""
     for k in ("published-print", "published-online", "issued"):
         p = it.get(k, {}).get("date-parts", [[None]])[0][0]
