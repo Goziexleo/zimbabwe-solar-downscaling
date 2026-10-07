@@ -273,7 +273,7 @@ P("The deployment decision followed from a test that no accuracy metric could pe
   "throughout, does not reopen the deployment on accuracy alone. Section 4.5 reports "
   "that it passes the screen and returns the lower aggregate error of the two, but that "
   "margin is not established under resampling while XGBoost's advantage on the spatial "
-  "axes is, and the U-Net remains the only architecture whose field is damped."
+  "axes is, and the U-Net remains the only architecture damped at every cut tested."
   % (rank("Random Forest").replace("-lowest", ""),
      scr.loc["Random Forest", "pct_ordered_long_term"],
      scr.loc["Random Forest", "pct_ordered_long_term"]))

@@ -590,3 +590,85 @@ def test_every_appendix_c_table_is_referenced():
     assert not orphans, (
         "Appendix C tables cited nowhere in the chapters: %s"
         % ", ".join("C.%d" % n for n in orphans))
+
+
+def test_cut_table_is_a_weighted_average_of_the_spectra():
+    """Table 4.6's cuts must lie inside Table C.7's per-wavenumber ratios.
+
+    The power retained beyond a cut is the truth-weighted average of the
+    per-wavenumber ratios from that cut upward, so it cannot fall outside their
+    range. For seven rounds it did: the cut table held a SHARE ratio - each
+    field's power beyond the cut as a fraction of its own total, model over
+    truth - while its caption and the chapter described power retained relative
+    to the target. The U-Net read 1.21 beyond wavenumber 3, reported as a slight
+    excess, when no per-wavenumber ratio from 3 upward exceeds 1.01 and its
+    actual power there is 0.83 of the truth's.
+
+    Nothing internal caught it because both tables were self-consistent and
+    came from the same arrays; only the relation between them was wrong. This
+    checks the relation. The share ratio is still emitted, under share_k>=N, and
+    is deliberately not checked here - it is a shape measure and may exceed the
+    per-wavenumber range.
+    """
+    import pandas as pd
+    EVAL = os.path.join(ROOT, "data/processed/evaluation")
+    sp_path = os.path.join(EVAL, "power_spectra.csv")
+    cut_path = os.path.join(EVAL, "effective_resolution_cut_sensitivity.csv")
+    if not (os.path.exists(sp_path) and os.path.exists(cut_path)):
+        pytest.skip("spectra not computed")
+    sp = pd.read_csv(sp_path)
+    cut = pd.read_csv(cut_path).set_index("field")
+    truth = sp["CSI Truth (ERA5)"]
+    cols = [c for c in cut.columns if c.startswith("k>=")]
+    assert cols, "the cut table has no k>=N columns"
+    problems = []
+    for field in cut.index:
+        col = "CSI %s" % field
+        if col not in sp.columns:
+            continue
+        ratio = sp[col] / truth
+        for c in cols:
+            k = int(c[3:])
+            m = sp.wavenumber >= k
+            lo, hi = ratio[m].min(), ratio[m].max()
+            v = float(cut.loc[field, c])
+            if not (lo - 1e-9 <= v <= hi + 1e-9):
+                problems.append(
+                    "%s %s = %.4f is outside the per-wavenumber range "
+                    "[%.4f, %.4f]; the cut table is not a weighted average of "
+                    "the spectra" % (field, c, v, lo, hi))
+    assert not problems, "\n  ".join(["Table 4.6 contradicts Table C.7:"] + problems)
+
+
+def test_no_em_dashes_or_spaced_hyphens_in_the_prose():
+    """House punctuation: no em dashes, no spaced hyphens used as dashes.
+
+    Both appeared this round, introduced by generator wording rather than by
+    hand, and the v8 re-check counted them. This checks rather than rewrites,
+    because the right replacement depends on the sentence - parentheses for an
+    apposition, a comma or colon for a single break - and a mechanical
+    substitution produces worse prose than the dash it removes.
+
+    The bibliography is excluded: Wilby et al. (2002) is titled "SDSM - a
+    decision support tool ..." with an em dash, and a cited title is quoted as
+    published.
+    """
+    import re
+    from check_chapter3_consistency import CHAPTER
+    if not os.path.exists(CHAPTER):
+        pytest.skip("dissertation not found at %s" % CHAPTER)
+    import docx
+    d = docx.Document(CHAPTER)
+    problems = []
+    for i, p in enumerate(d.paragraphs):
+        if p.style.name == "Bibliography":
+            continue
+        t = p.text
+        for m in re.finditer(r"—", t):
+            problems.append("para %d em dash: ...%s..."
+                            % (i, t[max(0, m.start() - 50):m.end() + 50]))
+        for m in re.finditer(r"(?<=\s)-(?=\s)", t):
+            problems.append("para %d spaced hyphen: ...%s..."
+                            % (i, t[max(0, m.start() - 50):m.end() + 50]))
+    assert not problems, "\n  ".join(
+        ["Replace these with commas, colons or parentheses:"] + problems)

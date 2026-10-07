@@ -161,7 +161,7 @@ def build(b):
                 "the one minimising inner-split error, not a cap or a stopping point: "
                 "the ceiling is 100 epochs and the early-stop patience 20. All three "
                 "U-Net candidates minimise at epoch 22, which reflects a shallow and "
-                "noisy basin rather than a fixed epoch - in the selected run the "
+                "noisy basin rather than a fixed epoch: in the selected run the "
                 "inner-split error is 0.099 at epoch 20 and 0.099 at epoch 30 against "
                 "0.086 at the minimum, so the exact epoch is weakly determined.")
 
@@ -173,10 +173,14 @@ def build(b):
                  "%.4f" % r["test_spatial_r"], "%.3f" % r["test_spec_ratio"]]
                 for _, r in u.sort_values("test_rmse").iterrows()]
         b.table(["Variant", "Dropout", "Loss", "Climatology", "Width", "Inner RMSE",
-                 "Test RMSE", "Spatial r", "Spectral ratio"], rows,
+                 "Test RMSE", "Spatial r", "Share ratio k\u226510"], rows,
                 "U-Net variant sweep in full, of which Section 4.5 discusses a subset. "
                 "Fitted on 1985 to 2004 and selected on 2005 to 2010. The sweep carries "
-                "its own baseline configuration, not the deployed one.")
+                "its own baseline configuration, not the deployed one. The final column "
+                "is a share ratio, each field's power beyond wavenumber 10 as a "
+                "fraction of its own total, prediction over truth, which measures where "
+                "a spectrum puts its power, not how much it retains, and is therefore "
+                "not comparable with Table 4.6.")
 
     # C.6 resampling intervals in all three forms
     bca = csv("bca_intervals.csv")
@@ -227,8 +231,13 @@ def build(b):
         b.table(["Wavenumber", "Wavelength (km)"]
                 + [c.replace("CSI ", "") for c in cols if c != "CSI Truth (ERA5)"], rows,
                 "Radially averaged power spectra in clear-sky-index space, each "
-                "expressed as a ratio to the target's own power at the same wavenumber. "
-                "Section 4.5 reports the cut sensitivity derived from these.")
+                "expressed as a ratio to the target's own power at the same wavenumber: "
+                "the entry is that field's power at that wavenumber divided by the "
+                "target's. Table 4.6 aggregates these, reporting the power retained "
+                "beyond a cut as the target-weighted average of the ratios from that cut "
+                "upward, so no entry in Table 4.6 can fall outside the range of the "
+                "ratios here. The sweep in Table C.5 reports a different quantity again, "
+                "a share ratio, and names it as such.")
 
     # C.8 PV yield by GCM
     p = csv("pv_temperature_derating.csv")
@@ -260,8 +269,8 @@ def build(b):
                 for _, r in tr.iterrows()]
         b.table(["Model", "Predictor source", "RMSE", "MBE", "Spatial r"], rows,
                 "Perfect-prognosis transfer test, interpreted in Section 4.7.1. Each "
-                "of the two pixel-wise models - XGBoost, which is deployed, and the "
-                "Random Forest, which is not - is applied to bias-corrected predictors "
+                "of the two pixel-wise models (XGBoost, which is deployed, and the "
+                "Random Forest, which is not) is applied to bias-corrected predictors "
                 "from each driving model over the historical period and scored against "
                 "the ERA5 field it was trained to reproduce. The comparison is between "
                 "per-cell, per-calendar-month climatologies, because individual CMIP6 "

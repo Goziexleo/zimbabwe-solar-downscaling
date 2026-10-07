@@ -2541,9 +2541,11 @@ turns on are unanimous across forms, and an assertion in the guard now fails if
 that stops being true.
 
 **The spectra were being read off the wrong quantity.** Section 4.5 said the
-U-Net's ratio "is 1.21 at wavenumber 3". Table 4.6's columns are cumulative -
-1.21 is the power retained *beyond* k>=3 - while the per-wavenumber ratio at k=3
-is 0.89. The prose now names the quantity, and two things the cut table cannot
+U-Net's ratio "is 1.21 at wavenumber 3", while the per-wavenumber ratio at k=3
+is 0.89. This diagnosis was only half right and §13b corrects it: 1.21 is not
+the power retained beyond k>=3 either, as stated here, but a *share* ratio that
+had been mislabelled as retained power. The actual retained power beyond k>=3 is
+0.83. The prose now names the quantity, and two things the cut table cannot
 show are stated: at wavenumbers 1 and 2 the U-Net holds 0.69 and 0.63 of the
 truth's power and the CNN 0.81 and 0.60, so **both** convolutional models
 under-represent the domain-scale gradient, which is a different failure from
@@ -2591,6 +2593,96 @@ spatial correlation. C.10's national correlation moved to the caption.
 ten captions. Two real faults were underneath it: Table 3.4's caption inherited
 its size instead of 10pt, and `fix_presentation.py`'s caption pattern matched
 only numeric prefixes, so it had never governed the appendix captions at all.
+
+Chain, three guards and the suite pass: citations 77, fields 203/203, sections 2,
+tables 32, images 13, zero defects.
+
+---
+
+## 13b. Eighth critique: Table 4.6 was reporting a quantity its caption did not describe
+
+Score 77, up from 74, with every v7 item confirmed fixed. Three items; the first
+is the most serious error found in any round, because two tables in the document
+contradicted each other as mathematics rather than as bookkeeping.
+
+**Table 4.6 held a share ratio under a power-ratio caption.** The critique's
+argument was decisive and checkable: power retained beyond a cut is the
+target-weighted average of the per-wavenumber ratios from that cut upward, so it
+cannot exceed the largest of them. The U-Net's 1.21 beyond wavenumber 3 was
+therefore impossible, because no per-wavenumber ratio from 3 upward exceeds
+1.0085. Recomputing from `power_spectra.csv` confirmed it: the retained power is
+**0.83**, not 1.21.
+
+The cause was not two different runs. Both tables come from the same arrays. The
+cut table computed
+
+    (sum_model(k>=c) / sum_model(all)) / (sum_truth(k>=c) / sum_truth(all))
+
+which is each field's share of its **own** power beyond the cut, model over
+truth, while the caption said "ratio of retained clear-sky-index power to the
+target's" and the chapter read it that way. The two differ most exactly where it
+mattered: the U-Net's share ratio rose above one at k>=3 **because** its deficit
+at wavenumbers 1 and 2 is worse still (0.69 and 0.63), which makes the power that
+remains look fine-scale-heavy. The chapter reported that artefact as "a slight
+excess" at the very wavenumber where the model is damped.
+
+Correcting it **strengthens** the result rather than weakening it. On retained
+power the U-Net runs 0.83, 0.59, 0.34, 0.16, 0.08, 0.05 across the six cuts, so
+it is damped at **every** cut and is the only architecture that is; the old
+share ratio made it "cut-dependent" and forced the chapter into the awkward
+"damped from wavenumber 5 upward". Section 4.4's figures move with it, from 0.233
+to 0.161 for the U-Net beyond wavenumber 11 and from 1.058 to 1.007 for XGBoost,
+the latter now reading as a clean match to the target.
+
+The share ratio is kept, under `share_k>=N`, because it is a legitimate measure
+of spectral **shape** and because the Section 4.5 sweep computes exactly that
+quantity. The sweep's comparison against the deployed model is now made
+share-against-share rather than across definitions, Table C.5's column is renamed
+"share ratio", and Tables 4.6, C.5 and C.7 each state their own definition.
+
+`test_cut_table_is_a_weighted_average_of_the_spectra` makes the relation itself an
+invariant: every Table 4.6 entry must lie inside the range of C.7's ratios from
+that cut upward. Nothing internal had caught this for seven rounds because both
+tables were individually self-consistent and derived from one array - only the
+relation between them was wrong, and no guard was looking at a relation.
+Reinstating the share ratio makes the new test fail, which was checked.
+
+**A retired phrase was enforcing the error.** "Damped at every cut tested" had
+been banned in an earlier round precisely because the share ratio put the U-Net
+above one at k>=3. On the corrected quantity the phrase is accurate, so the entry
+is withdrawn with the reason recorded in place. A guard entry that enforces a
+superseded mistake is worse than no entry: this one would have blocked its own
+correction.
+
+**The transfer argument compared unlike quantities.** Section 4.7.1 argued the
+transfer works because its error (4.82) sits below the model's own 8.88 on the
+withheld record. But 8.88 is a monthly error and 4.82 a climatology error, and
+averaging to a climatology removes most of the noise, so the comparison flattered
+the transfer by construction. The only like-for-like reference is the ERA5 floor
+of 0.59, against which the transfer error is about **eight times** larger, and
+that is now what the section says. The defensible argument is structural, not a
+matter of magnitude: every change reported is differenced against the same
+chain's own historical run, so any time-constant part of the error cancels and
+what survives is the domain-mean bias, **-0.13 W/m2** for the ensemble and -0.29
+to +0.17 across the drivers, against projected changes of +3.32 to +16.96. The
+untestable assumption is that the error stays constant into the future, and that,
+not its size, is the real limit.
+
+**Typography.** Em dashes and spaced hyphens used as dashes, all introduced by
+generator wording this round and last. Fixed at source in every generator and in
+the two paragraphs already written into the document; parentheses for an
+apposition, a comma or colon for a single break. The em dash inside Wilby et
+al.'s title is left alone, being part of the published title.
+`test_no_em_dashes_or_spaced_hyphens_in_the_prose` checks rather than rewrites,
+because the right replacement depends on the sentence.
+
+**A process failure of my own, worth recording.** The first attempt at the
+Chapter 4 spectral edits applied five replacements in one pass and raised on the
+fifth, so the file was never written and four edits were silently lost - and I
+reported them as applied because each individual assertion had passed before the
+exception. The rendered table and the prose then disagreed with each other for
+one chain run. Partial-failure passes must either write what succeeded or report
+what did not; asserting per edit and writing once at the end does neither.
 
 Chain, three guards and the suite pass: citations 77, fields 203/203, sections 2,
 tables 32, images 13, zero defects.

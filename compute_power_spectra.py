@@ -161,12 +161,36 @@ def main():
         pc = spectra_csi[label]
         row = {"field": label}
         for c in cuts:
-            r = ((np.nansum(pc[c:]) / np.nansum(pc)) /
-                 (np.nansum(ref_csi[c:]) / np.nansum(ref_csi)))
-            row["k>=%d" % (c + 1)] = float(r)
+            # POWER ratio: the model's power beyond the cut over the truth's
+            # power beyond the same cut. This is a weighted average of the
+            # per-wavenumber ratios in power_spectra.csv, with the truth's power
+            # as the weights, so it cannot lie outside their range - which is
+            # the invariant tests/ now checks.
+            #
+            # What stood here was a SHARE ratio: each field's power beyond the
+            # cut as a fraction of its OWN total, model over truth. That is a
+            # measure of spectral SHAPE and it is reported below under its own
+            # name, but it is not "power retained relative to the target" and
+            # reading it as such inverted the headline: the U-Net scored 1.21
+            # beyond wavenumber 3, described in the chapter as a slight excess,
+            # while its actual power there is 0.83 of the truth's. The share
+            # ratio rose above one precisely because the U-Net's deficit at
+            # wavenumbers 1 and 2 is worse still (0.69 and 0.63), which makes
+            # what remains look fine-scale-heavy. For a damping claim the power
+            # ratio is the quantity.
+            row["k>=%d" % (c + 1)] = float(
+                np.nansum(pc[c:]) / np.nansum(ref_csi[c:]))
+        for c in cuts:
+            row["share_k>=%d" % (c + 1)] = float(
+                (np.nansum(pc[c:]) / np.nansum(pc)) /
+                (np.nansum(ref_csi[c:]) / np.nansum(ref_csi)))
         vals = [row["k>=%d" % (c + 1)] for c in cuts]
         row["min"], row["max"] = min(vals), max(vals)
-        row["robust"] = ("damped at every cut" if max(vals) < 0.75
+        # Thresholds restated for the power ratio. "Damped at every cut" now
+        # means every cut falls short of the target, which is what the phrase
+        # says; under the share ratio it required max < 0.75 and so missed a
+        # field damped at every cut by a smaller margin.
+        row["robust"] = ("damped at every cut" if max(vals) < 0.95
                          else "stable across cuts" if (max(vals) - min(vals)) < 0.15
                          else "CUT-DEPENDENT")
         sens.append(row)

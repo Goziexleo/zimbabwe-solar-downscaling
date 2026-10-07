@@ -201,6 +201,24 @@ EDITS = [
      "order 10 W/m².",
      "For scale, that bias is of order a tenth of the downscaling uncertainty "
      "reported in Section 4.7."),
+
+    # --- typography: dashes. The v8 re-check counted em dashes and spaced
+    # hyphens used as dashes. Every generator source is fixed, but these two
+    # paragraphs were already written into the document, so they are corrected
+    # here. Parentheses for an apposition, a comma for a single break. The em
+    # dash inside Wilby et al.'s title is left alone: it is part of the
+    # published title, not this thesis's punctuation.
+    ("the natural inference from the sequence of published figures - that "
+     "removing a predictor improved the model - is not what occurred",
+     "the natural inference from the sequence of published figures (that "
+     "removing a predictor improved the model) is not what occurred"),
+
+    ("The three axes the third step turns on \u2014 centred error, spatial "
+     "correlation, the standard-deviation ratio \u2014 exclude zero under all "
+     "three interval forms",
+     "The three axes the third step turns on (centred error, spatial "
+     "correlation and the standard-deviation ratio) exclude zero under all "
+     "three interval forms"),
 ]
 
 NEW_PARA_AFTER = "No validation metric in Table 3.3 is capable of detecting this"
@@ -222,7 +240,7 @@ NEW_PARA = (
     "the condition the BCa transformation assumes away; where the sign is not at "
     "issue the signed difference is the sounder statistic and is what Section 4.4 "
     "uses. None of this reaches the deployment. The three axes the third step "
-    "turns on — %s — exclude zero under all three interval forms, so the "
+    "turns on (%s) exclude zero under all three interval forms, so the "
     "selection of XGBoost does not depend on which interval is read."
     % (N_BLOCKS, N_BLOCKS, N_BLOCKS, N_TOTAL, N_ALL, N_PART,
        ", ".join(_robust)))

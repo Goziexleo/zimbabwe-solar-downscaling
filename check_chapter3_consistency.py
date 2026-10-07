@@ -213,8 +213,14 @@ RETIRED = [
      "the Random Forest returns the highest aggregate error of the four"),
     ("third on aggregate error",
      "the Random Forest returns the highest aggregate error of the four"),
-    ("damped at every cut tested",
-     "the U-Net ratio exceeds one at wavenumber 3; damped from wavenumber 5 upward"),
+    # Retired in an earlier round and REINSTATED as correct in the eighth. This
+    # phrase was banned because the cut table showed the U-Net above one at
+    # wavenumber 3, which made "damped at every cut" false. That 1.21 was a
+    # share ratio mislabelled as retained power; on the power ratio the U-Net is
+    # 0.83 at wavenumber 3 and falls monotonically, so it IS damped at every cut
+    # and the phrase is now the accurate one. Kept here as a comment because a
+    # guard entry that enforces a superseded error is worse than no entry: this
+    # one would have blocked the correction.
     ("is less accurate than the deployed configuration",
      "the dropout-free U-Net is the more accurate of the two; its margin is not "
      "established"),

@@ -584,7 +584,7 @@ xc = pair("XGBoost", "CNN", "RMSE"); xu = pair("XGBoost", "U-Net", "RMSE")
 P("The Random Forest returns the highest aggregate error of the four, and the evidence "
   "separating it from the two networks is mixed rather than uniform. Its difference from "
   "the U-Net is %+.3f W/m² with an interval of %+.3f to %+.3f, which excludes zero, so "
-  "the U-Net is the better of the two on this interval - though not on all three: the "
+  "the U-Net is the better of the two on this interval, though not on all three: the "
   "basic interval spans zero, so this is a verdict that depends on the interval form and "
   "Section 3.8.4 says why that matters at this sample size. Its difference from the CNN "
   "is %+.3f with %+.3f to %+.3f, which contains zero, so those two are not separable. "
@@ -651,8 +651,8 @@ P("This test is used as a screen and not as a ranking, and the distinction is es
   "%.4f (%.4f to %.4f) and on the standard-deviation ratio by %.4f (%.4f to %.4f); the "
   "U-Net is established better on mean bias, by %.3f (%.3f to %.3f). A bias is also the "
   "one discrepancy of the four that a downstream correction can remove. Section 4.5 adds "
-  "the consideration that settles it: the U-Net is the only architecture whose field is "
-  "spectrally damped, retaining %.3f of the truth's power beyond wavenumber 11 where "
+  "the consideration that settles it: the U-Net is the only architecture damped at every "
+  "cut tested, retaining %.3f of the truth's power beyond wavenumber 11 where "
   "XGBoost retains %.3f. XGBoost is deployed on that basis, and it is recorded as a "
   "trade between tested quantities rather than as dominance. The ordering is in any case "
   "basis-dependent: over the full analysis box, on which the U-Net\'s advantage reverses, "
@@ -707,11 +707,12 @@ un_lo, un_hi = cut.loc["U-Net", "min"], cut.loc["U-Net", "max"]
 P("A second question is whether the models preserve the spectral character of the field "
   "they reproduce. Radially averaged power spectra were computed in clear-sky-index "
   "space, which is the space the models predict in. Table 4.6 reports the power "
-  "retained beyond a wavenumber cut, not the power at a single wavenumber, and "
+  "retained beyond a wavenumber cut, meaning its power beyond that cut divided by the "
+  "target\'s power beyond the same cut, not the power at a single wavenumber, and "
   "the distinction matters at the large scales. The U-Net retains %.2f of the truth\'s "
   "power beyond wavenumber 3 and %.3f beyond wavenumber 20, falling monotonically in "
-  "between, so it is damped at every cut from wavenumber 5 upward rather than at every "
-  "cut tested, which is why Table 4.6 records it as cut-dependent. Per wavenumber the "
+  "between, so it is damped at every cut tested and is the only one of the four that "
+  "is. Per wavenumber the "
   "picture at the coarse end is different and worse: at wavenumbers 1 and 2, the "
   "domain-scale gradient, the U-Net holds only %.2f and %.2f of the truth\'s power and "
   "the CNN %.2f and %.2f. Both convolutional models therefore under-represent the "
@@ -758,7 +759,7 @@ P("Two things follow, and the second is why the deployment did not change with t
   "verdict rather than argue with it. Removing dropout reduced the damping and did not "
   "remove it: the ratio still falls monotonically with the cut, from %.2f at wavenumber 3 "
   "to %.3f at 11 and %.3f at 20, and the U-Net remains the only architecture of the four "
-  "whose field is damped at all. The accuracy it gains is pointwise. It buys lower error "
+  "damped at every cut tested. The accuracy it gains is pointwise. It buys lower error "
   "at each cell, not structure the coarse field did not already carry, which is why the "
   "answer to RQ2 is unchanged and why a model that reproduces the spatial pattern better "
   "is preferred for a product whose output is a map."
@@ -778,16 +779,21 @@ P("One qualification belongs with that, and it cuts against the argument just ma
      3.793, tay.loc["U-Net", "centered_rmse_zw"]))
 P("The sweep does not, however, identify the cause of the damping reported above. The "
   "difficulty is that the "
-  "sweep's own baseline does not reproduce the damping it was built to explain. That "
-  "baseline carries the dropout rate of the superseded U-Net, yet its spectral ratio "
-  "at wavenumber %d is %.2f, an excess of fine-scale power, not a deficit, against that "
-  "model's %.3f at wavenumber 11. Removing dropout moves the sweep's ratio to "
+  "sweep's own baseline does not reproduce the damping it was built to explain. The "
+  "sweep reports a fine-scale share ratio rather than the retained power of Table 4.6: "
+  "each field's power beyond wavenumber %d as a fraction of its own total, prediction "
+  "over truth, which measures where a spectrum puts its power rather than how much it "
+  "has. The two are compared here on that one quantity, not across definitions. The "
+  "sweep's baseline carries the dropout rate of the superseded U-Net, yet its share "
+  "ratio is %.2f, placing more of its power at fine scales than the truth does, where "
+  "the deployed model's share ratio beyond wavenumber 11 is %.3f, a severe deficit. "
+  "Removing dropout moves the sweep's ratio to "
   "%.2f, which is no closer to unity than the baseline was: %.2f against %.2f in absolute "
   "deviation. A sweep whose baseline does not exhibit the failure cannot isolate its "
   "cause, and the attribution to dropout is therefore withdrawn."
-  % (10, uo.loc["baseline", "test_spec_ratio"], cut.loc["U-Net", "k>=11"], uo.loc["drop_0", "test_spec_ratio"], abs(1 - uo.loc["drop_0", "test_spec_ratio"]), abs(1 - uo.loc["baseline", "test_spec_ratio"])))
+  % (10, uo.loc["baseline", "test_spec_ratio"], cut.loc["U-Net", "share_k>=11"], uo.loc["drop_0", "test_spec_ratio"], abs(1 - uo.loc["drop_0", "test_spec_ratio"]), abs(1 - uo.loc["baseline", "test_spec_ratio"])))
 P("One result from the same sweep points the other way and is reported because it is "
-  "inconvenient: the variant whose spectral ratio comes closest to unity is %s at %.3f, "
+  "inconvenient: the variant whose share ratio comes closest to unity is %s at %.3f, "
   "and removing the gradient penalty instead gives %.3f, while the penalty variants span "
   "%.2f to %.2f. It does not follow from this that the gradient penalty barely moves the "
   "ratio, nor that a smoothness prior is refuted. "
@@ -807,17 +813,23 @@ P("One result from the same sweep points the other way and is reported because i
      _sweep_mismatch()))
 TBL(["Field"] + [c for c in cut.columns if c.startswith("k>=")] + ["Verdict"], [[f] + ["%.2f" % cut.loc[f, c] for c in cut.columns if c.startswith("k>=")]
      + [cut.loc[f, "robust"]]
-     for f in ["Random Forest", "XGBoost", "CNN", "U-Net"]], "Table 4.6. Ratio of retained clear-sky-index power to the target's, as the "
-    "wavenumber cut is moved. The verdict column distinguishes findings that survive the "
-    "choice of cut from those that do not.")
-P("The CNN does not damp: it never falls below %.2f at any cut and never approaches the "
-  "U-Net's collapse, so its explicit spatial-gradient penalty is doing the work it was "
-  "included to do. How closely it matches the target is not resolved by this test. Its "
+     for f in ["Random Forest", "XGBoost", "CNN", "U-Net"]], "Table 4.6. Clear-sky-index power retained beyond a wavenumber cut, as the cut "
+    "is moved: for each field, its summed power at wavenumbers at or above the cut "
+    "divided by the target's summed power over the same wavenumbers. Each entry is "
+    "therefore the target-weighted average of the per-wavenumber ratios in Appendix C, "
+    "Table C.7, from that cut upward, and cannot fall outside their range. The verdict "
+    "column distinguishes findings that survive the choice of cut from those that do "
+    "not.")
+P("The CNN does not collapse: its lowest value at any cut is %.2f against the U-Net's "
+  "%.2f, so its explicit spatial-gradient penalty is doing the work it was included to "
+  "do, though it does fall short of the target at the two finest cuts rather than "
+  "holding at or above it throughout. How closely it matches the target is not resolved "
+  "by this test. Its "
   "ratio ranges from %.2f to %.2f across cuts, and the tail carries too little variance "
   "for a two-decimal figure to be meaningful: at wavenumber 11 the target holds 0.25 per "
   "cent of its power there. A figure of 4 per cent would take the closest point of the "
   "sweep and treat the choice of cut as incidental, which it is not."
-  % (cnn_lo, cnn_lo, cnn_hi))
+  % (cnn_lo, un_lo, cnn_lo, cnn_hi))
 # Raised because Appendix C publishes the per-wavenumber ratios, and a reader who
 # reads them will see this before being told about it.
 P("The pixel-wise models are not spectrally neutral either, in the opposite direction. "
@@ -1022,6 +1034,13 @@ _tr = {t: pd.read_csv(os.path.join(EVAL, "perfect_prognosis_transfer_%s.csv" % t
        for t in ("xgb", "rf")}
 
 
+def _drv(tag):
+    """The three driving-model rows, excluding the ensemble-mean row."""
+    d = _tr[tag]
+    src = d["predictor source"]
+    return d[src.str.startswith("CMIP6 ") & (src != "CMIP6 ensemble mean")]
+
+
 def _trow(tag, src):
     d = _tr[tag]
     return d[d["predictor source"] == src].iloc[0]
@@ -1036,28 +1055,36 @@ P("That transfer can be measured rather than only reasoned about, and Table C.9 
   "every other figure in this chapter. Given ERA5 predictors the deployed model returns "
   "%.2f W/m\u00b2, which is the floor the test can reach. Given model predictors it "
   "returns %.2f for the ensemble mean and %.2f to %.2f across the three drivers. The "
-  "benchmark that makes those numbers interpretable is the projected signal they are used "
-  "to carry: measured against each driver's own history, the changes this chapter "
-  "projects span %+.2f to %+.2f W/m\u00b2 across the eighteen driver, scenario and "
-  "horizon combinations, so the transfer error is of the same order as the smallest "
-  "change being claimed and roughly a third of the largest. It is well below the %.2f W/m\u00b2 climatology reference against "
-  "which skill is scored, and below the model\'s own %.2f on the withheld record, so the "
-  "mapping does transfer; it does not transfer freely, and the near-term projections are "
-  "the ones this most qualifies. The driver that transfers worst is MPI-ESM1-2-HR, at "
-  "%.2f W/m\u00b2, which is the same model whose sign disagreement is reported above - "
-  "two independent diagnostics landing on one driver. The Random Forest transfers "
+  "only like-for-like comparison is the ERA5 row, because both are climatology errors: "
+  "on that basis the transfer error is about %.0f times the floor, which is the honest "
+  "statement of its size. It should not be set against the %.2f W/m\u00b2 this model "
+  "returns on the withheld record, nor against the %.2f W/m\u00b2 climatology reference, "
+  "because those are monthly errors and averaging to a climatology removes most of the "
+  "noise they contain; comparing the two would flatter the transfer by construction. "
+  "What makes the projections defensible is not the size of this error but its "
+  "structure. Every change this chapter reports is differenced against the same chain\'s "
+  "own historical run, so any part of the transfer error that is constant in time "
+  "cancels, and what survives the differencing is the domain-mean bias, %+.2f W/m\u00b2 "
+  "for the ensemble and %+.2f to %+.2f across the three drivers, small against "
+  "projected changes of %+.2f to %+.2f W/m\u00b2. The assumption that cannot be tested "
+  "is that the error stays constant: nothing in a historical test can show whether the "
+  "same mapping misreads future predictors by the same amount, and that, rather than the "
+  "magnitude above, is the real limit on the projections. The driver that transfers worst is MPI-ESM1-2-HR, at "
+  "%.2f W/m\u00b2, which is the same model whose sign disagreement is reported above, so "
+  "two independent diagnostics land on one driver. The Random Forest transfers "
   "slightly better than the deployed model, %.2f against %.2f on the ensemble mean, "
   "which is consistent with Section 4.4\'s finding that it reproduces the historical "
   "level better and does not disturb the deployment, since Section 4.6 shows it cannot "
   "separate the scenarios at all."
   % (_trow("xgb", "ERA5 (as trained)").RMSE,
      _trow("xgb", "CMIP6 ensemble mean").RMSE,
-     _tr["xgb"][_tr["xgb"]["predictor source"].str.startswith("CMIP6 ")
-                & (_tr["xgb"]["predictor source"] != "CMIP6 ensemble mean")].RMSE.min(),
-     _tr["xgb"][_tr["xgb"]["predictor source"].str.startswith("CMIP6 ")
-                & (_tr["xgb"]["predictor source"] != "CMIP6 ensemble mean")].RMSE.max(),
+     _drv("xgb").RMSE.min(), _drv("xgb").RMSE.max(),
+     _trow("xgb", "CMIP6 ensemble mean").RMSE
+     / _trow("xgb", "ERA5 (as trained)").RMSE,
+     t33.loc[_BEST, "RMSE_zw"], t33.loc[_BEST, "climatology_rmse_zw"],
+     _trow("xgb", "CMIP6 ensemble mean").MBE,
+     _drv("xgb").MBE.min(), _drv("xgb").MBE.max(),
      pbl.ml_change_own_history.min(), pbl.ml_change_own_history.max(),
-     t33.loc[_BEST, "climatology_rmse_zw"], t33.loc[_BEST, "RMSE_zw"],
      _trow("xgb", "CMIP6 MPI-ESM1-2-HR").RMSE,
      _trow("rf", "CMIP6 ensemble mean").RMSE,
      _trow("xgb", "CMIP6 ensemble mean").RMSE))
