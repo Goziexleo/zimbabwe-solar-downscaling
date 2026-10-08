@@ -56,7 +56,7 @@ for var in variables:
                     # which truncates the country: Beitbridge is at 22.217 S and
                     # about 51 cells of Zimbabwe fell outside the grid. Changing
                     # this requires re-running the whole pipeline, not just the
-                    # download - see RUNBOOK_DOMAIN_FIX.md.
+                    # download. The widened-domain redownload is described in PROJECT_STATUS.
                 },
                 output_filename
             )

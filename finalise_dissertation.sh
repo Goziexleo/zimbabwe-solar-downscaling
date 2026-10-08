@@ -39,6 +39,9 @@ $PY fix_method_citations_v7.py | tail -1
 # Adds any work cited in the body but absent from the bibliography, as plain
 # text that a Zotero refresh replaces. Idempotent.
 $PY insert_missing_references.py | tail -1
+# Appendix A describes the repository, so its script count is read from
+# git here rather than written as a literal that goes stale.
+$PY fix_appendix_a_script_count.py | tail -1
 
 # Lists BEFORE table formatting: the abbreviations list is itself a table, so
 # formatting first leaves it in the generator's style.
@@ -56,7 +59,7 @@ $PY normalise_tables.py | tail -2
 
 # A rebuild that aborts mid-way leaves the figures describing superseded models
 # while the tables describe the current ones, and nothing downstream notices: on
-# 5 October rerun_after_pixelwise_config.sh died at its configuration-check
+# 5 October a rerun script died at its configuration-check
 # stage and never reached make_figures.py, so the document carried plots of the
 # previous pixel-wise models for a day. Checked here because this chain runs
 # after every rebuild.

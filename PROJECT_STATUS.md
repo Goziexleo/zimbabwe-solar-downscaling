@@ -2689,6 +2689,72 @@ tables 32, images 13, zero defects.
 
 ---
 
+## 13c. The repository is pruned to what produces the result
+
+The repository had grown to 153 tracked files, 114 of them top-level Python
+scripts, because every one-off written during the audit rounds was committed
+alongside the pipeline. Fifty-one files were removed; 102 remain, 83 of them
+scripts.
+
+**What went, and why none of it produces a result.** Twenty consumed `fix_*.py`
+scripts that each patched the .docx once and are recorded in the round that ran
+them; seven other one-shot document edits (`apply_author_edits`,
+`reframe_chapter1`, `trim_revision_history`, `update_ai_declaration`,
+`sync_docs_after_rerun`, `disclose_domain_limitation`,
+`insert_study_area_figure`); the four-script MERRA-2 predictor branch, abandoned
+early and mentioned nowhere in the dissertation; twelve `rerun_*`/`run_*` shell
+scripts written for particular reruns; seven stale handover and audit documents;
+and a tracked `download.log`, which is a runtime output and is now gitignored
+along with `reference_additions_report.md`.
+
+`build_thesis.py` went with them, and that is a safety improvement rather than
+housekeeping. It rebuilt the dissertation from scratch, which would destroy the
+77 Zotero fields that exist only in the merged file. It had carried a warning in
+the README for months; a script that must never be run does not belong in a
+repository a reader is invited to use.
+
+**What was kept, and the one thing that nearly went wrong.** The keep set is the
+acquisition, preprocessing, hyperparameter-selection, training, evaluation,
+projection, suitability, figure and document stages, plus the guards and the test
+suite, because Appendix A promises a reader can regenerate every table and figure
+in Chapters 4 and 5. A first pass classified by filename prefix and would have
+deleted `pixelwise_common.py`, which ten scripts import; the import graph is a
+hard constraint, not a naming convention, and the final pass resolved it before
+removing anything. Every kept file was then checked against the removal list:
+nothing live references anything removed, all 88 scripts still parse, and no
+import resolves to a deleted module.
+
+**The layout stays flat.** Numbered stage directories were considered and
+rejected: every script derives its data paths from its own file location, so
+moving one breaks its access to `data/`, and restructuring would have meant
+editing that logic in a hundred files to gain tidiness the README delivers for
+nothing. The README now lists all eight stages in order with every script named,
+which it did not before - 32 of the kept scripts appeared nowhere in it, and it
+still advertised `build_thesis.py` and two deleted documents.
+
+**Two claims about the repository were wrong in the thesis itself.** Section 3.11
+and Appendix A each describe the repository, written independently and drifting
+independently: both said "76 top-level Python scripts" when there were 114, and
+Section 3.11 also said "a test suite of 21 invariant checks" when there are 28.
+`fix_appendix_a_script_count.py` now reads the count from `git ls-files` at run
+time and runs in the chain, and the test count is removed rather than corrected,
+because it changes whenever a test is added - which is the drift the brief guard
+already forbids quoting. Appendix A also now states what the repository
+deliberately does not contain, since a reader who finds no assembly script should
+be told that is a decision.
+
+**One guard could have passed on nothing.** `brief/` is not tracked, so on a
+fresh clone `check_brief_consistency.py` would have read an empty document and
+reported every cell as matching. The pytest wrapper already skipped it, but run
+directly it would have passed vacuously; it now announces the missing input and
+exits non-zero. This is the same defect its own deck check was written to
+prevent.
+
+Chain, three guards and the suite pass after the pruning: citations 77, fields
+209/209, sections 2, tables 32, images 13, zero defects.
+
+---
+
 ## 13. Outstanding
 
 **Open after the fifth round (§12q)**

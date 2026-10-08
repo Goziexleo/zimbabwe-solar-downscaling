@@ -26,3 +26,7 @@ brief/CR_Madukwe_Interview_Deck.pptx
 # viva preparation: candid defence notes, not for publication
 brief/
 data/_staging/
+
+# Runtime outputs, not source
+download.log
+reference_additions_report.md

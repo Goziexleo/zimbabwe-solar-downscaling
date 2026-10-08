@@ -400,10 +400,19 @@ def check():
 
 
 def main():
-    missing, resurrected, fmt = check()
     print("=" * 84)
     print(" Interview brief + PROJECT_STATUS consistency check")
     print("=" * 84)
+    # brief/ is not tracked, so on a fresh clone this input is absent. prose()
+    # returns "" in that case and every cell check would then compare against an
+    # empty document, which is the vacuous pass the deck check already guards
+    # against. Announce it and exit non-zero instead.
+    if not os.path.exists(BRIEF):
+        print("\nSKIPPED - the brief is not present at:\n  %s\n"
+              "  brief/ is not tracked in the repository, so nothing was "
+              "checked." % BRIEF)
+        return 1
+    missing, resurrected, fmt = check()
 
     if missing:
         print("\nCELLS THAT DISAGREE WITH THE CANONICAL CSVs (%d):" % len(missing))

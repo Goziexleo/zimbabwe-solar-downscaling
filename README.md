@@ -85,61 +85,106 @@ data/processed/                # everything below is generated
 
 Stages are ordered; each depends on the ones above it. Runtimes are for an Apple M1
 Air and are dominated by the per-cell models, which fit one estimator per grid cell.
+Every script derives its paths from its own location, so run them from the
+repository root.
 
 ```bash
-# 1. acquisition and preprocessing
-python download_allcmip6_data.py
-python download_era5_predictors2.py
+# 1. acquisition                                     (each needs its own credentials)
+python download_allcmip6_data.py                     # CMIP6 predictors, ESGF
+python download_era5_predictors2.py                  # ERA5 training predictors + target
+python download_era5_validation_predictors.py        # ERA5 2011-2024
+python download_srtm_dem.py                          # SRTM 90 m
+python download_suitability_data.py                  # WorldPop, OSM, land cover, WDPA
+python fetch_sarah_order.py                          # CM SAF SARAH, after the order lands
+
+# 2. preprocessing
 python process_era5_predictors.py
-python apply_edcm_bias_correction.py        # quantile mapping
-python apply_qc_bounds.py                   # physical bounds, writes flag counts
-python generate_topographic_features.py
-python compute_finegrid_clearsky_ghi.py     # PVLIB clear-sky ceiling
+python process_era5_validation_predictors.py
+python apply_edcm_bias_correction.py                 # quantile mapping (EDCDFm)
+python apply_qc_bounds.py                            # physical bounds, writes flag counts
+python generate_topographic_features.py              # slope, elevation, sky-view factor
+python compute_finegrid_clearsky_ghi.py              # PVLIB clear-sky ceiling
+python merge_predictor_stack.py
 python build_ml_features_and_targets.py
 python build_ml_validation_dataset.py
 
-# 2. training                                        approximate runtime
-python train_pixelwise_rf.py                        # 25 min
-python train_pixelwise_xgb.py                       # 15 min
-python train_cnn_downscaler.py                      #  5 min
-python train_unet_downscaler.py                     # 30 min
+# 3. hyperparameter selection, inside the training period only
+python hpo_pixelwise.py                              # 5-fold temporal CV
+python hpo_neural.py                                 # inner 2005-2010 split
+python optimise_unet.py                              # controlled variant sweep
 
-# 3. evaluation
+# 4. training                                        approximate runtime
+python train_pixelwise_rf.py                         # 25 min
+python train_pixelwise_xgb.py                        # 15 min
+python train_cnn_downscaler.py                       #  5 min
+python train_unet_downscaler.py                      # 30 min
+
+# 5. evaluation on the withheld 2011-2024 record
 python evaluate_cnn.py && python evaluate_unet.py
 python generate_validation_spatial_fields.py
-python compute_table33.py                           # headline metrics
-python compute_spatial_verification.py              # Taylor statistics
+python compute_table33.py                            # headline metrics (Table 4.1)
+python compute_spatial_verification.py               # Taylor statistics
+python compute_baselines.py                          # OLS, ridge, climatology, interpolation
 python compute_bootstrap_ci.py
-python compute_bca_centred_rmse.py                  # BCa intervals
-python compute_power_spectra.py                     # effective resolution
-python compute_information_content.py               # round-trip test
+python compute_bca_centred_rmse.py                   # percentile, basic and BCa intervals
+python compute_power_spectra.py                      # spectra and the cut sensitivity
+python compute_information_content.py                # round-trip test
 python compute_feature_importance.py
-python compute_rolling_origin.py                    # 2.5 h, refits every fold
+python compute_rolling_origin.py                     # 2.5 h, refits every fold
+python compute_rsds_ablation.py                      # predictor ablation (Table 3.4)
+python compute_pixelwise_cv_config_check.py
+python compute_dropout_variant_comparison.py
+python test_perfect_prognosis.py                     # ERA5 -> CMIP6 transfer test
 python validate_against_sarah.py
+python compare_sarah_era5.py && python compare_sarah_clearsky.py
 
-# 4. projection
-python generate_future_projections_xgb.py
+# 6. projection
+python generate_future_projections_xgb.py            # the deployed model
+python generate_future_projections_rf.py
+python generate_future_projections_cnn.py
+python generate_future_projections.py                # U-Net
 PROJECTIONS_DIR=$PWD/data/processed/projections_xgb \
 MME_OUTPUT_DIR=$PWD/data/processed/mme_aggregations_xgb \
   python compute_mme_aggregations.py
-python compute_scenario_discrimination.py           # the deployment screen
-python compute_uncertainty_decomposition.py
+python compute_projection_baselines.py               # operational baseline, driver consistency
+python compute_scenario_discrimination.py            # the deployment screen
+python compute_uncertainty_decomposition.py          # four-component variance budget
+python compute_pv_temperature_derating.py            # yield once modules heat
 
-# 5. suitability
+# 7. suitability
 python build_suitability_layers.py
 python compute_suitability.py
+python compute_robustness_monte_carlo.py
+python compute_robust_set_geography.py
+python compute_elevation_irradiance_gradient.py
 
-# 6. figures and documents
+# 8. figures and the document
+python make_study_area_map.py
 python make_figures.py
 python make_suitability_maps.py
-python build_chapter4.py
-python build_chapter5.py
-python build_thesis.py                              # assembles the dissertation
+./finalise_dissertation.sh                           # the only document entry point
 ```
 
-`run_neural_cascade.sh` runs stages 2 to 6 for the neural models with per-step exit
+`run_neural_cascade.sh` runs stages 4 to 8 for the neural models with per-step exit
 checks, which exists because an earlier version of that cascade reported success
 after every step had failed.
+
+### The document chain
+
+`finalise_dissertation.sh` is the single entry point for updating the dissertation,
+and the order inside it matters. It regenerates Chapters 4 and 5 from the evaluation
+outputs, splices them into the document while preserving the Zotero citation fields,
+rewrites the abstract from the same CSVs, applies the presentation and factual
+passes, rebuilds Appendix C, then the front-matter lists, then the table formatting,
+and finally runs the figure-freshness guard and the verification pass. Running any
+stage alone reintroduces something a later stage fixes.
+
+Chapters 1 to 3 are not generated. They are edited in place, which is why the
+corrections to them live in idempotent scripts the chain runs each time
+(`fix_facts.py`, `fix_presentation.py`, `fix_unet_refit_recorded.py`,
+`fix_methods_chapter_result_values.py`, `fix_method_citations_v7.py`,
+`add_appendix_c_crossrefs.py`, `insert_missing_references.py`) rather than in a
+generator. Each reports "nothing to change" once applied.
 
 ## Checking it
 
@@ -164,30 +209,43 @@ whose limits, are recorded in `PROJECT_STATUS.md` §7.18.
 
 ## Repository layout
 
+Flat by design: every script reads and writes under `data/` relative to its own
+location, so the stage order lives in this README rather than in directory names.
+
 | Path | Contents |
 |---|---|
-| `*.py` | analysis scripts, one stage each |
+| `download_*.py`, `fetch_*.py` | data acquisition, one source each |
+| `process_*.py`, `apply_*.py`, `build_ml_*.py`, `merge_predictor_stack.py` | preprocessing to the model-ready stack |
+| `hpo_*.py`, `optimise_unet.py` | hyperparameter selection, inside the training period only |
+| `train_*.py` | the four architectures; `pixelwise_common.py`, `unet_model.py`, `cnn_model.py` are their shared parts |
+| `evaluate_*.py`, `compute_*.py`, `test_perfect_prognosis.py`, `validate_against_sarah.py` | evaluation, one result file each |
+| `generate_future_projections*.py` | projections, one per architecture |
+| `build_suitability_layers.py`, `compute_suitability.py` | the multi-criteria overlay |
+| `make_*.py` | figures and maps |
+| `build_chapter4.py`, `build_chapter5.py`, `build_appendix_c.py` | generate the results chapters and the supporting-table appendix |
+| `splice_results_chapters.py` | swaps those chapters in, preserving the Zotero citation fields |
+| `finalise_dissertation.sh` | the document chain; the only entry point for updating the dissertation |
+| `fix_*.py`, `add_*.py`, `insert_missing_references.py` | idempotent corrections to the hand-edited chapters, run by the chain |
 | `zimbabwe_mask.py` | the national mask every "over Zimbabwe" metric uses |
-| `compute_baselines.py` | linear, ridge, climatology and interpolation baselines |
-| `compute_projection_baselines.py` | the quantile-mapped operational baseline, and the driver-consistency check |
-| `compute_robust_set_geography.py` | provinces and true areas of the robust set |
-| `build_chapter4.py`, `build_chapter5.py` | generate the results chapters |
-| `splice_results_chapters.py` | swaps those chapters into the dissertation, preserving citation fields |
-| `normalise_tables.py` | puts every table on one format |
-| `build_thesis.py` | assembles a full dissertation from scratch (see the warning below) |
 | `check_*.py` | document consistency guards |
-| `tests/` | pytest invariants |
-| `brief/` | viva brief and slide deck, generated from `brief/viva-brief.html` |
+| `tests/` | pytest invariants, including the three document guards |
 | `assets/` | University of Zimbabwe logo used on the title page |
-| `scripts/` | helper utilities |
+| `scripts/`, `deprecated/` | earlier variants of the download scripts, and a daily-resolution experiment that was abandoned; kept for the record and not part of any stage |
 | `PROJECT_STATUS.md` | authoritative record of results, defects and limitations |
 
 `data/`, `figures/` and `logs/` are generated and not tracked.
 
-**`build_thesis.py` rebuilds the whole document and will destroy the citation
-fields inserted by hand into the merged file.** Once reference management has
-begun, update the results chapters with `splice_results_chapters.py`, which
-replaces only Chapters 4 and 5 and checks the field count before and after.
+The repository holds only what produces the result. One-off scripts that patched
+the document once and were consumed, the orchestration scripts written for
+particular reruns, and an abandoned MERRA-2 predictor branch were removed once
+spent; they remain in the git history, and `PROJECT_STATUS.md` records what each
+round did.
+
+**There is no script that rebuilds the dissertation from scratch.** One existed
+and was removed: the merged document carries 77 Zotero citation fields that exist
+only in it, and regenerating the file destroys them. Chapters 4 and 5 are updated
+through `finalise_dissertation.sh`, which replaces only those chapters and
+verifies the field count before and after.
 
 ## A limitation worth stating here
 
@@ -208,7 +266,7 @@ research question, method choice, interpretation or reported number originates f
 the tool. Appendix B of the dissertation states this in full.
 
 The literature summaries proved to be the weak point. An audit against the sources
-themselves, recorded in `CITATION_AUDIT.md`, found several attributions that the
+themselves, recorded in `PROJECT_STATUS.md`, found several attributions that the
 cited papers do not support — among them the claim that Buster et al. (2024) used
 ERA5 as a training target, when it used ERA5 as the low-resolution input and NSRDB
 and WTK as targets. Those passages have been rewritten. Anyone reusing this work
